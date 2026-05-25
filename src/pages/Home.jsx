@@ -1,104 +1,103 @@
-import { useNavigate } from 'react-router-dom'
-import { Camera, Search, ClipboardList, LogOut } from 'lucide-react'
+// Home.jsx — หน้าเมนูหลัก
+// แสดงตัวเลือก 3 อย่าง: แจ้งสัตว์จร, ค้นหาสัตว์เลี้ยง, ติดตามรายงาน
 
-const menuItems = [
-  {
-    icon: <Camera size={36} className="text-orange-500" />,
-    bg: 'bg-orange-50',
-    iconBg: 'bg-orange-100',
-    title: 'ถ่ายภาพสัตว์จร',
-    desc: 'พบสัตว์จรบนท้องถนน? ถ่ายภาพและแจ้งให้หน่วยงานทราบ',
-    features: ['AI วิเคราะห์สายพันธุ์และขนาด', 'ปักหมุดตำแหน่ง GPS อัตโนมัติ', 'ส่งข้อมูลให้ อบต./เทศบาล'],
-    path: '/report',
-    arrow: false,
-  },
-  {
-    icon: <Search size={36} className="text-green-500" />,
-    bg: 'bg-green-50',
-    iconBg: 'bg-green-100',
-    title: 'ค้นหาสัตว์เลี้ยง',
-    desc: 'ต้องการรับเลี้ยงสัตว์? ค้นหาเพื่อนที่เหมาะสมกับคุณ',
-    features: ['ระบุความต้องการและนิสัยของคุณ', 'AI แนะนำสัตว์ที่เหมาะสม', 'ดูข้อมูลติดต่อรับเลี้ยง'],
-    path: '/find-pet',
-    arrow: false,
-  },
-  {
-    icon: <ClipboardList size={28} className="text-purple-500" />,
-    bg: 'bg-white',
-    iconBg: 'bg-purple-100',
-    title: 'ติดตามรายงาน',
-    desc: 'ตรวจสอบสถานะการรายงานสัตว์จรที่คุณได้ส่งไป',
-    path: '/track',
-    arrow: true,
-  },
-]
+import { useNavigate } from 'react-router-dom' // useNavigate ใช้สำหรับเปลี่ยนหน้า
 
-export default function Home({ user, onLogout }) {
+// รับ props มาจาก App.jsx
+// user = ข้อมูลผู้ใช้ที่ Login อยู่
+// onLogout = ฟังก์ชัน Logout
+function Home({ user, onLogout }) {
+
+  // navigate คือฟังก์ชันที่ใช้เปลี่ยนหน้า เช่น navigate('/report')
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-100 pb-8">
-      {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between sticky top-0 z-10">
+    <div className="min-h-screen bg-blue-50 pb-8">
+
+      {/* Header — แถบด้านบน แสดงชื่อแอปและปุ่ม Logout */}
+      <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-xl">
-            🐕
-          </div>
+          <div className="text-3xl">🐕</div>
           <div>
-            <p className="font-bold text-gray-800 text-sm leading-tight">ระบบจัดการหมาจร</p>
+            <p className="font-bold text-gray-800 text-sm">ระบบจัดการหมาจร</p>
+            {/* แสดงชื่อผู้ใช้ที่ Login */}
             <p className="text-gray-500 text-xs">{user.name}</p>
           </div>
         </div>
+
+        {/* ปุ่ม Logout — เมื่อกดจะเรียกฟังก์ชัน onLogout */}
         <button
           onClick={onLogout}
-          className="flex items-center gap-1 text-gray-500 text-sm hover:text-red-500 transition-colors"
+          className="text-gray-500 text-sm hover:text-red-500"
         >
-          <LogOut size={16} />
-          <span>ออกจากระบบ</span>
+          ออกจากระบบ
         </button>
       </div>
 
-      {/* Hero */}
+      {/* หัวข้อหน้า */}
       <div className="px-4 pt-6 pb-4">
         <h2 className="text-2xl font-bold text-gray-800">เลือกบริการที่ต้องการ</h2>
-        <p className="text-gray-500 text-sm mt-1">ช่วยเหลือสัตว์จรหรือค้นหาเพื่อนสี่ขาตัวใหม่</p>
+        <p className="text-gray-500 text-sm mt-1">
+          ช่วยเหลือสัตว์จรหรือค้นหาเพื่อนสี่ขาตัวใหม่
+        </p>
       </div>
 
-      {/* Menu Cards */}
+      {/* การ์ดเมนู */}
       <div className="px-4 space-y-4">
-        {menuItems.map((item, i) => (
-          <button
-            key={i}
-            onClick={() => navigate(item.path)}
-            className={`w-full text-left ${item.bg} rounded-2xl p-5 shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex flex-col gap-3 flex-1">
-                <div className={`w-14 h-14 ${item.iconBg} rounded-2xl flex items-center justify-center`}>
-                  {item.icon}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800">{item.title}</h3>
-                  <p className="text-gray-500 text-sm mt-1">{item.desc}</p>
-                </div>
-                {item.features && (
-                  <ul className="space-y-1">
-                    {item.features.map((f, fi) => (
-                      <li key={fi} className="text-sm text-gray-600 flex items-start gap-2">
-                        <span className="text-primary mt-0.5">•</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {item.arrow && (
-                <span className="text-gray-400 text-xl ml-2">→</span>
-              )}
-            </div>
-          </button>
-        ))}
+
+        {/* การ์ดที่ 1 — แจ้งสัตว์จร */}
+        <button
+          onClick={() => navigate('/report')} // กดแล้วไปหน้า /report
+          className="w-full text-left bg-orange-50 rounded-2xl p-5 shadow-sm hover:shadow-md"
+        >
+          <div className="text-4xl mb-3">📷</div>
+          <h3 className="text-lg font-bold text-gray-800">ถ่ายภาพสัตว์จร</h3>
+          <p className="text-gray-500 text-sm mt-1">
+            พบสัตว์จรบนท้องถนน? ถ่ายภาพและแจ้งให้หน่วยงานทราบ
+          </p>
+          {/* รายการฟีเจอร์ */}
+          <ul className="mt-3 space-y-1">
+            <li className="text-sm text-gray-600">• AI วิเคราะห์สายพันธุ์และขนาด</li>
+            <li className="text-sm text-gray-600">• ปักหมุดตำแหน่ง GPS อัตโนมัติ</li>
+            <li className="text-sm text-gray-600">• ส่งข้อมูลให้ อบต./เทศบาล</li>
+          </ul>
+        </button>
+
+        {/* การ์ดที่ 2 — ค้นหาสัตว์เลี้ยง */}
+        <button
+          onClick={() => navigate('/find-pet')} // กดแล้วไปหน้า /find-pet
+          className="w-full text-left bg-green-50 rounded-2xl p-5 shadow-sm hover:shadow-md"
+        >
+          <div className="text-4xl mb-3">🔍</div>
+          <h3 className="text-lg font-bold text-gray-800">ค้นหาสัตว์เลี้ยง</h3>
+          <p className="text-gray-500 text-sm mt-1">
+            ต้องการรับเลี้ยงสัตว์? ค้นหาเพื่อนที่เหมาะสมกับคุณ
+          </p>
+          <ul className="mt-3 space-y-1">
+            <li className="text-sm text-gray-600">• ระบุความต้องการและนิสัยของคุณ</li>
+            <li className="text-sm text-gray-600">• AI แนะนำสัตว์ที่เหมาะสม</li>
+            <li className="text-sm text-gray-600">• ดูข้อมูลติดต่อรับเลี้ยง</li>
+          </ul>
+        </button>
+
+        {/* การ์ดที่ 3 — ติดตามรายงาน */}
+        <button
+          onClick={() => navigate('/track')} // กดแล้วไปหน้า /track
+          className="w-full text-left bg-white rounded-2xl p-5 shadow-sm hover:shadow-md flex items-center justify-between"
+        >
+          <div>
+            <div className="text-4xl mb-3">📋</div>
+            <h3 className="text-lg font-bold text-gray-800">ติดตามรายงาน</h3>
+            <p className="text-gray-500 text-sm mt-1">
+              ตรวจสอบสถานะการรายงานสัตว์จรที่คุณได้ส่งไป
+            </p>
+          </div>
+          <span className="text-gray-400 text-xl">→</span>
+        </button>
+
       </div>
     </div>
   )
 }
+
+export default Home

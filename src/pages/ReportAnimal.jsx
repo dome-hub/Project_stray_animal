@@ -1,82 +1,122 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Camera, MapPin, Loader2, CheckCircle } from 'lucide-react'
+// ReportAnimal.jsx — หน้าแจ้งพบสัตว์จร
+// ผู้ใช้อัปโหลดรูป ระบุตำแหน่ง แล้วส่งรายงาน
 
-const AI_RESULTS = [
-  { breed: 'สุนัขพันธุ์ไทยผสม', size: 'กลาง', personality: 'เป็นมิตร / ระวังคนแปลกหน้า', confidence: 87 },
-  { breed: 'สุนัขพันธุ์บางแก้ว', size: 'เล็ก', personality: 'ขี้เล่น / สงบเสงี่ยม', confidence: 72 },
-  { breed: 'แมวส้ม / แมววิเชียรมาศผสม', size: 'เล็ก', personality: 'เป็นมิตร / ชอบคน', confidence: 91 },
+import { useState, useRef } from 'react' // useState เก็บข้อมูล, useRef ใช้กับ input file
+import { useNavigate } from 'react-router-dom'
+
+// ข้อมูลจำลองผลลัพธ์ AI (ในของจริงจะเชื่อม API)
+const ผลวิเคราะห์AI = [
+  { สายพันธุ์: 'สุนัขพันธุ์ไทยผสม', ขนาด: 'กลาง', นิสัย: 'เป็นมิตร / ระวังคนแปลกหน้า', ความแม่นยำ: 87 },
+  { สายพันธุ์: 'สุนัขพันธุ์บางแก้ว', ขนาด: 'เล็ก', นิสัย: 'ขี้เล่น / สงบเสงี่ยม', ความแม่นยำ: 72 },
+  { สายพันธุ์: 'แมววิเชียรมาศผสม', ขนาด: 'เล็ก', นิสัย: 'เป็นมิตร / ชอบคน', ความแม่นยำ: 91 },
 ]
 
-export default function ReportAnimal() {
+function ReportAnimal() {
   const navigate = useNavigate()
-  const fileRef = useRef(null)
-  const [image, setImage] = useState(null)
-  const [location, setLocation] = useState('')
-  const [detail, setDetail] = useState('')
-  const [aiResult, setAiResult] = useState(null)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [gpsLoading, setGpsLoading] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    const url = URL.createObjectURL(file)
-    setImage(url)
-    setAiResult(null)
-    setAnalyzing(true)
-    setTimeout(() => {
-      const r = AI_RESULTS[Math.floor(Math.random() * AI_RESULTS.length)]
-      setAiResult(r)
-      setAnalyzing(false)
+  // useRef ใช้เชื่อมกับ input type="file" เพื่อเปิดหน้าต่างเลือกรูป
+  const inputรูปภาพ = useRef(null)
+
+  // เก็บ URL รูปภาพที่ผู้ใช้เลือก
+  const [รูปภาพ, setรูปภาพ] = useState(null)
+
+  // เก็บข้อความตำแหน่งที่พบสัตว์
+  const [ตำแหน่ง, setตำแหน่ง] = useState('')
+
+  // เก็บรายละเอียดเพิ่มเติม
+  const [รายละเอียด, setรายละเอียด] = useState('')
+
+  // เก็บผลที่ AI วิเคราะห์ได้
+  const [ผลAI, setผลAI] = useState(null)
+
+  // true = AI กำลังวิเคราะห์รูปอยู่
+  const [กำลังวิเคราะห์, setกำลังวิเคราะห์] = useState(false)
+
+  // true = กำลังดึงตำแหน่ง GPS อยู่
+  const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
+
+  // true = ส่งรายงานสำเร็จแล้ว
+  const [ส่งสำเร็จ, setส่งสำเร็จ] = useState(false)
+
+  // true = กำลังส่งรายงานอยู่
+  const [กำลังส่ง, setกำลังส่ง] = useState(false)
+
+  // ฟังก์ชันนี้ทำงานเมื่อผู้ใช้เลือกรูปภาพ
+  function เลือกรูปภาพ(event) {
+    const ไฟล์ = event.target.files[0] // ดึงไฟล์แรกที่เลือก
+    if (!ไฟล์) return // ถ้าไม่มีไฟล์ → หยุด
+
+    // สร้าง URL ชั่วคราวจากไฟล์ เพื่อแสดงรูปในหน้าเว็บ
+    const urlรูป = URL.createObjectURL(ไฟล์)
+    setรูปภาพ(urlรูป)
+    setผลAI(null)
+    setกำลังวิเคราะห์(true) // แสดงสถานะ "กำลังวิเคราะห์"
+
+    // จำลองการรอ AI วิเคราะห์ 2 วินาที
+    setTimeout(function () {
+      // สุ่มเลือกผลลัพธ์จากอาร์เรย์
+      const สุ่มผล = ผลวิเคราะห์AI[Math.floor(Math.random() * ผลวิเคราะห์AI.length)]
+      setผลAI(สุ่มผล)
+      setกำลังวิเคราะห์(false)
     }, 2000)
   }
 
-  const handleGPS = () => {
-    setGpsLoading(true)
-    setTimeout(() => {
-      setLocation('ซอยลาดพร้าว 101 แขวงคลองจั่น เขตบางกะปิ กรุงเทพฯ')
-      setGpsLoading(false)
-    }, 1500)
+  // ฟังก์ชันดึงตำแหน่ง GPS ของผู้ใช้
+  function ใช้GPSปัจจุบัน() {
+    setกำลังหาตำแหน่ง(true)
+
+    // Browser Geolocation API — ขอตำแหน่งจากมือถือ/คอมพิวเตอร์
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        // สำเร็จ — ได้ค่า latitude, longitude
+        const lat = position.coords.latitude
+        const lng = position.coords.longitude
+        setตำแหน่ง(`พิกัด: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+        setกำลังหาตำแหน่ง(false)
+      },
+      function () {
+        // ล้มเหลว — ผู้ใช้ไม่อนุญาต หรือไม่รองรับ
+        setตำแหน่ง('ซอยลาดพร้าว 101 กรุงเทพฯ') // ใช้ค่าตัวอย่างแทน
+        setกำลังหาตำแหน่ง(false)
+      }
+    )
   }
 
-  const handleSubmit = () => {
-    if (!image || !location) return
-    setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
-      setSubmitted(true)
+  // ฟังก์ชันส่งรายงาน
+  function ส่งรายงาน() {
+    if (!รูปภาพ || !ตำแหน่ง) return // ถ้าไม่มีรูปหรือตำแหน่ง → หยุด
+    setกำลังส่ง(true)
+
+    // จำลองการส่งข้อมูลไป Server 2 วินาที
+    setTimeout(function () {
+      setกำลังส่ง(false)
+      setส่งสำเร็จ(true) // เปลี่ยนไปแสดงหน้าสำเร็จ
     }, 2000)
   }
 
-  if (submitted) {
+  // ถ้าส่งสำเร็จ → แสดงหน้ายืนยัน
+  if (ส่งสำเร็จ) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 flex flex-col items-center justify-center px-6 text-center">
-        <CheckCircle size={80} className="text-green-500 mb-4" />
+      <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center px-6 text-center">
+        <div className="text-7xl mb-4">✅</div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">ส่งรายงานสำเร็จ!</h2>
-        <p className="text-gray-600 mb-2">หน่วยงานได้รับข้อมูลแล้ว</p>
-        <p className="text-gray-500 text-sm mb-6">เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง</p>
-        <div className="bg-white rounded-2xl p-4 w-full max-w-xs mb-6 text-left space-y-2">
-          <div className="flex justify-between text-sm">
+        <p className="text-gray-600 mb-6">เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง</p>
+
+        {/* แสดงรหัสรายงาน */}
+        <div className="bg-white rounded-2xl p-4 w-full max-w-xs mb-6">
+          <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-500">รหัสรายงาน</span>
-            <span className="font-bold text-primary">#RPT{Date.now().toString().slice(-6)}</span>
+            <span className="font-bold text-orange-500">#RPT{Date.now().toString().slice(-6)}</span>
           </div>
-          {aiResult && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">สายพันธุ์ (AI)</span>
-              <span className="font-medium">{aiResult.breed}</span>
-            </div>
-          )}
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">สถานะ</span>
             <span className="text-green-600 font-medium">รอดำเนินการ</span>
           </div>
         </div>
+
         <button
           onClick={() => navigate('/home')}
-          className="bg-primary text-white px-8 py-3 rounded-xl font-medium"
+          className="bg-orange-500 text-white px-8 py-3 rounded-xl font-medium"
         >
           กลับหน้าหลัก
         </button>
@@ -85,12 +125,11 @@ export default function ReportAnimal() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-amber-50 pb-8">
+    <div className="min-h-screen bg-orange-50 pb-8">
+
       {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/home')} className="p-1 hover:bg-gray-100 rounded-lg">
-          <ArrowLeft size={22} className="text-gray-700" />
-        </button>
+      <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
+        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
         <div>
           <h1 className="font-bold text-gray-800">แจ้งพบสัตว์จร</h1>
           <p className="text-gray-500 text-xs">ถ่ายภาพและให้ AI วิเคราะห์ข้อมูล</p>
@@ -98,113 +137,123 @@ export default function ReportAnimal() {
       </div>
 
       <div className="px-4 pt-5 space-y-5">
-        {/* Image Upload */}
+
+        {/* ส่วนอัปโหลดรูปภาพ */}
         <div>
-          <label className="text-sm font-semibold text-gray-700 block mb-2">ภาพถ่ายสัตว์</label>
+          <p className="text-sm font-semibold text-gray-700 mb-2">ภาพถ่ายสัตว์</p>
+
+          {/* กล่องอัปโหลดรูป — กดแล้วเปิด input file */}
           <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-orange-300 rounded-2xl overflow-hidden cursor-pointer hover:border-primary transition-colors bg-white"
+            onClick={() => inputรูปภาพ.current.click()}
+            className="border-2 border-dashed border-orange-300 rounded-2xl overflow-hidden cursor-pointer bg-white"
           >
-            {image ? (
+            {รูปภาพ ? (
+              // ถ้ามีรูปแล้ว → แสดงรูป
               <div className="relative">
-                <img src={image} alt="สัตว์" className="w-full h-52 object-cover" />
-                {analyzing && (
+                <img src={รูปภาพ} alt="สัตว์" className="w-full h-52 object-cover" />
+                {/* ถ้า AI กำลังวิเคราะห์ → แสดง loading overlay */}
+                {กำลังวิเคราะห์ && (
                   <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
-                    <Loader2 size={32} className="animate-spin mb-2" />
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-2" />
                     <p className="text-sm">AI กำลังวิเคราะห์...</p>
                   </div>
                 )}
               </div>
             ) : (
+              // ถ้ายังไม่มีรูป → แสดงข้อความให้กด
               <div className="h-44 flex flex-col items-center justify-center text-gray-400">
-                <Camera size={44} className="mb-2 text-gray-300" />
+                <div className="text-5xl mb-2">📷</div>
                 <p className="text-sm font-medium">คลิกเพื่อถ่ายภาพหรืออัปโหลด</p>
                 <p className="text-xs mt-1">รองรับไฟล์ JPG, PNG</p>
               </div>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+
+          {/* input file ซ่อนอยู่ ถูกเปิดด้วย ref */}
+          <input
+            ref={inputรูปภาพ}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={เลือกรูปภาพ}
+          />
         </div>
 
-        {/* AI Result */}
-        {aiResult && !analyzing && (
+        {/* แสดงผล AI หลังวิเคราะห์เสร็จ */}
+        {ผลAI && !กำลังวิเคราะห์ && (
           <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
-            <p className="text-xs font-bold text-orange-600 mb-2">🤖 ผลวิเคราะห์จาก AI</p>
+            <p className="text-xs font-bold text-orange-600 mb-3">🤖 ผลวิเคราะห์จาก AI</p>
+
             <div className="space-y-2">
-              <Row label="สายพันธุ์" value={aiResult.breed} />
-              <Row label="ขนาด" value={aiResult.size} />
-              <Row label="นิสัยเบื้องต้น" value={aiResult.personality} />
-              <div className="flex items-center justify-between">
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-500">สายพันธุ์</span>
+                <span className="text-xs font-semibold">{ผลAI.สายพันธุ์}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-500">ขนาด</span>
+                <span className="text-xs font-semibold">{ผลAI.ขนาด}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-500">นิสัย</span>
+                <span className="text-xs font-semibold">{ผลAI.นิสัย}</span>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-500">ความแม่นยำ</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-orange-400 rounded-full"
-                      style={{ width: `${aiResult.confidence}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-bold text-orange-600">{aiResult.confidence}%</span>
-                </div>
+                <span className="text-xs font-bold text-orange-600">{ผลAI.ความแม่นยำ}%</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Location */}
+        {/* ส่วนระบุตำแหน่ง */}
         <div>
-          <label className="text-sm font-semibold text-gray-700 flex items-center gap-1 mb-2">
-            <MapPin size={14} className="text-primary" /> สถานที่พบ
-          </label>
+          <p className="text-sm font-semibold text-gray-700 mb-2">📍 สถานที่พบ</p>
+
+          {/* ช่องกรอกตำแหน่งด้วยตัวเอง */}
           <input
             type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            value={ตำแหน่ง}
+            onChange={(e) => setตำแหน่ง(e.target.value)}
             placeholder="เช่น ซอยลาดพร้าว 101 หรือ ใกล้สวนจตุจักร"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-primary"
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400"
           />
+
+          {/* ปุ่มใช้ GPS ดึงตำแหน่งอัตโนมัติ */}
           <button
-            onClick={handleGPS}
-            disabled={gpsLoading}
-            className="mt-2 w-full bg-primary text-white rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-60"
+            onClick={ใช้GPSปัจจุบัน}
+            disabled={กำลังหาตำแหน่ง}
+            className="mt-2 w-full bg-orange-500 text-white rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            {gpsLoading ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-            {gpsLoading ? 'กำลังระบุตำแหน่ง...' : 'ใช้ตำแหน่งปัจจุบัน'}
+            {กำลังหาตำแหน่ง ? '⏳ กำลังระบุตำแหน่ง...' : '📍 ใช้ตำแหน่งปัจจุบัน'}
           </button>
         </div>
 
-        {/* Detail */}
+        {/* ส่วนรายละเอียดเพิ่มเติม */}
         <div>
-          <label className="text-sm font-semibold text-gray-700 block mb-2">
+          <p className="text-sm font-semibold text-gray-700 mb-2">
             รายละเอียดเพิ่มเติม <span className="text-gray-400 font-normal">(ไม่บังคับ)</span>
-          </label>
+          </p>
           <textarea
-            value={detail}
-            onChange={(e) => setDetail(e.target.value)}
+            value={รายละเอียด}
+            onChange={(e) => setรายละเอียด(e.target.value)}
             placeholder="เช่น สัตว์ดูบาดเจ็บ หิวโหย เป็นมิตร กลัวคน ฯลฯ"
             rows={3}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-primary resize-none"
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400 resize-none"
           />
         </div>
 
-        {/* Submit */}
+        {/* ปุ่มส่งรายงาน */}
         <button
-          onClick={handleSubmit}
-          disabled={!image || !location || submitting}
-          className="w-full bg-primary text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 hover:bg-orange-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={ส่งรายงาน}
+          disabled={!รูปภาพ || !ตำแหน่ง || กำลังส่ง}
+          className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? <Loader2 size={20} className="animate-spin" /> : null}
-          {submitting ? 'กำลังส่ง...' : 'ส่งรายงานให้หน่วยงาน'}
+          {กำลังส่ง ? '⏳ กำลังส่ง...' : 'ส่งรายงานให้หน่วยงาน'}
         </button>
+
       </div>
     </div>
   )
 }
 
-function Row({ label, value }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-gray-500">{label}</span>
-      <span className="text-xs font-semibold text-gray-800">{value}</span>
-    </div>
-  )
-}
+export default ReportAnimal
