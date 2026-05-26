@@ -52,15 +52,9 @@ function Login() {
     }
   }
 
-  // helper: Promise ที่ reject หลัง ms มิลลิวินาที (ป้องกัน API ค้าง)
-  function withTimeout(promise, ms = 10000) {
-    const timer = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('TIMEOUT')), ms)
-    )
-    return Promise.race([promise, timer])
-  }
-
   // ---- Login ด้วย Supabase Auth ----
+  // ไม่ใช้ manual timeout แล้ว — Supabase มี HTTP timeout ของตัวเอง
+  // finally การันตีว่า setกำลังโหลด(false) ทำงานเสมอ ปุ่มไม่ค้าง
   async function handleLogin(e) {
     e.preventDefault()
     if (!อีเมลLogin || !รหัสผ่านLogin) {
@@ -72,34 +66,29 @@ function Login() {
     setข้อผิดพลาด('')
 
     try {
-      // ใช้ withTimeout → ถ้า Supabase ไม่ตอบใน 10 วินาที จะ throw 'TIMEOUT'
-      // ทำให้ finally ทำงานเสมอ ปุ่มไม่ค้างอีกต่อไป
-      const { error } = await withTimeout(
-        supabase.auth.signInWithPassword({
-          email:    อีเมลLogin.trim(),
-          password: รหัสผ่านLogin,
-        })
-      )
+      const { error } = await supabase.auth.signInWithPassword({
+        email:    อีเมลLogin.trim(),
+        password: รหัสผ่านLogin,
+      })
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
           setข้อผิดพลาด('กรุณายืนยันอีเมลก่อน ตรวจสอบกล่องจดหมายของคุณ')
-        } else if (error.message.includes('Invalid login credentials')) {
+        } else if (
+          error.message.includes('Invalid login credentials') ||
+          error.message.includes('invalid_credentials')
+        ) {
           setข้อผิดพลาด('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
         } else {
-          setข้อผิดพลาด(error.message)
+          setข้อผิดพลาด('เกิดข้อผิดพลาด: ' + error.message)
         }
       }
       // ถ้า login สำเร็จ → onAuthStateChange ใน App.jsx จะ redirect ให้อัตโนมัติ
 
-    } catch (err) {
-      if (err.message === 'TIMEOUT') {
-        setข้อผิดพลาด('เชื่อมต่อช้าเกินไป กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')
-      } else {
-        setข้อผิดพลาด('เชื่อมต่อไม่ได้ กรุณาลองใหม่อีกครั้ง')
-      }
+    } catch {
+      setข้อผิดพลาด('เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')
     } finally {
-      setกำลังโหลด(false)  // รันเสมอ ไม่ว่าจะสำเร็จ / error / timeout
+      setกำลังโหลด(false)  // รันเสมอ ไม่ว่าจะสำเร็จ / error / network fail
     }
   }
 
