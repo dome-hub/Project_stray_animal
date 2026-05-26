@@ -64,10 +64,16 @@ function Login() {
     setข้อผิดพลาด('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const TIMEOUT_MS = 15000
+      const loginPromise = supabase.auth.signInWithPassword({
         email:    อีเมลLogin.trim(),
         password: รหัสผ่านLogin,
       })
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), TIMEOUT_MS)
+      )
+
+      const { error } = await Promise.race([loginPromise, timeoutPromise])
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
@@ -82,7 +88,11 @@ function Login() {
         }
       }
     } catch (err) {
-      setข้อผิดพลาด('เชื่อมต่อไม่ได้: ' + err.message)
+      if (err.message === 'TIMEOUT') {
+        setข้อผิดพลาด('Supabase ไม่ตอบสนอง — ลอง Google Login แทน หรือตรวจสอบว่า email นี้สมัครด้วย Email หรือ Google')
+      } else {
+        setข้อผิดพลาด('เชื่อมต่อไม่ได้: ' + err.message)
+      }
     } finally {
       setกำลังโหลด(false)
     }
