@@ -52,6 +52,14 @@ function Login() {
     }
   }
 
+  // helper: Promise ที่ reject หลัง ms มิลลิวินาที (ป้องกัน API ค้าง)
+  function withTimeout(promise, ms = 10000) {
+    const timer = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), ms)
+    )
+    return Promise.race([promise, timer])
+  }
+
   // ---- Login ด้วย Supabase Auth ----
   async function handleLogin(e) {
     e.preventDefault()
@@ -64,10 +72,14 @@ function Login() {
     setข้อผิดพลาด('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email:    อีเมลLogin.trim(),
-        password: รหัสผ่านLogin,
-      })
+      // ใช้ withTimeout → ถ้า Supabase ไม่ตอบใน 10 วินาที จะ throw 'TIMEOUT'
+      // ทำให้ finally ทำงานเสมอ ปุ่มไม่ค้างอีกต่อไป
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email:    อีเมลLogin.trim(),
+          password: รหัสผ่านLogin,
+        })
+      )
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
@@ -81,10 +93,13 @@ function Login() {
       // ถ้า login สำเร็จ → onAuthStateChange ใน App.jsx จะ redirect ให้อัตโนมัติ
 
     } catch (err) {
-      setข้อผิดพลาด('เชื่อมต่อไม่ได้ กรุณาลองใหม่อีกครั้ง')
+      if (err.message === 'TIMEOUT') {
+        setข้อผิดพลาด('เชื่อมต่อช้าเกินไป กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')
+      } else {
+        setข้อผิดพลาด('เชื่อมต่อไม่ได้ กรุณาลองใหม่อีกครั้ง')
+      }
     } finally {
-      // ไม่ว่าจะสำเร็จหรือ error → ปิด loading เสมอ ป้องกันค้าง
-      setกำลังโหลด(false)
+      setกำลังโหลด(false)  // รันเสมอ ไม่ว่าจะสำเร็จ / error / timeout
     }
   }
 

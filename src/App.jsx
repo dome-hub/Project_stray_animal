@@ -55,27 +55,36 @@ function App() {
 
   // ดึง role + ชื่อ จาก public.users โดยใช้ id จาก Supabase Auth
   async function ดึงข้อมูลUser(authUser) {
+    // fallback พร้อมใช้งานทันที ถ้า DB ค้างหรือ error
+    const fallback = {
+      id:    authUser.id,
+      email: authUser.email,
+      name:  authUser.user_metadata?.name || authUser.email,
+      role:  'user',
+    }
+
     try {
-      const { data } = await supabase
+      // timeout 5 วินาที: ถ้า users table ค้าง → ใช้ fallback เลย ไม่รอ
+      const timer = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), 5000)
+      )
+      const query = supabase
         .from('users')
         .select('name, role, status')
         .eq('id', authUser.id)
         .single()
 
+      const { data } = await Promise.race([query, timer])
+
       setUser({
         id:    authUser.id,
         email: authUser.email,
-        name:  data?.name || authUser.user_metadata?.name || authUser.email,
+        name:  data?.name || fallback.name,
         role:  data?.role  || 'user',
       })
     } catch {
-      // ถ้าดึงจาก users table ไม่ได้ → ยังให้ login ได้ด้วย role default
-      setUser({
-        id:    authUser.id,
-        email: authUser.email,
-        name:  authUser.user_metadata?.name || authUser.email,
-        role:  'user',
-      })
+      // ดึงจาก users table ไม่ได้ หรือ timeout → login ด้วย role default
+      setUser(fallback)
     }
   }
 
