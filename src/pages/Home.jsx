@@ -1,6 +1,8 @@
 // Home.jsx — หน้าเมนูหลัก แสดงเมนูแตกต่างกันตาม Role
 
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../supabase'
 
 // เมนูของแต่ละ Role
 const เมนูแต่ละRole = {
@@ -43,6 +45,22 @@ function Home({ user, onLogout }) {
   const เมนู = เมนูแต่ละRole[role]
   const roleInfo = ข้อมูลRole[role]
 
+  // ดึง avatar_url ใหม่ทุกครั้งที่กลับมาหน้า Home
+  // เพราะผู้ใช้อาจเพิ่งอัปโหลดรูปจาก ProfilePage
+  const [avatarUrl, setAvatarUrl] = useState(null)
+
+  useEffect(function () {
+    if (!user?.id) return
+    supabase
+      .from('users')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single()
+      .then(function ({ data }) {
+        if (data?.avatar_url) setAvatarUrl(data.avatar_url)
+      })
+  }, [user?.id])
+
   return (
     <div className="min-h-screen bg-blue-50 pb-8">
 
@@ -73,10 +91,14 @@ function Home({ user, onLogout }) {
           {/* วงกลมโปรไฟล์ — กดแล้วไปหน้า Profile */}
           <button
             onClick={() => navigate('/profile')}
-            className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-lg hover:bg-blue-200 transition-colors"
+            className="w-9 h-9 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center text-lg hover:bg-blue-200 transition-colors border-2 border-white shadow-sm"
             title="โปรไฟล์ของฉัน"
           >
-            👤
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="โปรไฟล์" className="w-full h-full object-cover" />
+            ) : (
+              '👤'
+            )}
           </button>
 
           <button onClick={onLogout} className="text-gray-500 text-sm hover:text-red-500">

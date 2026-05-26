@@ -1,10 +1,16 @@
 // ProfilePage.jsx — หน้าโปรไฟล์ผู้ใช้
-// รูปโปรไฟล์: อัปโหลดขึ้น Supabase Storage + เก็บ URL ไว้ใน localStorage
-// (รอเชื่อม users table จริงเมื่อมี auth)
+// ดึงข้อมูลสดจาก users table เสมอ (role / ชื่อ / รูป อาจเปลี่ยนโดย admin)
 
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
+
+// แสดงผล role เป็นข้อความ + สี
+const roleMap = {
+  admin:     { ชื่อ: 'ผู้ดูแลระบบ',            emoji: '🛡️', สี: 'text-purple-700 bg-purple-50' },
+  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', emoji: '🦺', สี: 'text-orange-700 bg-orange-50' },
+  user:      { ชื่อ: 'ผู้ใช้งานทั่วไป',          emoji: '👤', สี: 'text-blue-700 bg-blue-50' },
+}
 
 // ข้อมูลจำลอง (รอเชื่อม Supabase จริงในอนาคต)
 const ประวัติแจ้ง = [
@@ -27,64 +33,100 @@ const สีสถานะ = {
 }
 
 function ProfilePage({ user }) {
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
   const inputรูป  = useRef(null)
 
   const [แท็บ, setแท็บ] = useState('info')
 
-  // เบอร์ติดต่อ
-  const [เบอร์ติดต่อ,       setเบอร์ติดต่อ]       = useState('081-234-5678')
-  const [กำลังแก้ไขเบอร์,   setกำลังแก้ไขเบอร์]   = useState(false)
-  const [เบอร์ชั่วคราว,     setเบอร์ชั่วคราว]     = useState('')
+  // ---- ข้อมูลสดจาก DB ----
+  // ดึงใหม่ทุกครั้งที่เข้าหน้า เผื่อ admin เปลี่ยน role หรือชื่อถูกแก้ไข
+  const [ข้อมูลDB, setข้อมูลDB] = useState(null)
+  const [กำลังโหลดDB, setกำลังโหลดDB] = useState(true)
 
-  // รูปโปรไฟล์
-  const [รูปโปรไฟล์,     setรูปโปรไฟล์]     = useState(null)
-  const [กำลังอัปโหลดรูป, setกำลังอัปโหลดรูป] = useState(false)
-
-  // โหลด avatar_url จาก users table ตอนเปิดหน้า
   useEffect(function () {
     if (!user?.id) return
+    setกำลังโหลดDB(true)
     supabase
       .from('users')
-      .select('avatar_url')
+      .select('name, role, avatar_url')
       .eq('id', user.id)
       .single()
       .then(function ({ data }) {
-        if (data?.avatar_url) setรูปโปรไฟล์(data.avatar_url)
+        if (data) {
+          setข้อมูลDB(data)
+          if (data.avatar_url) setรูปโปรไฟล์(data.avatar_url)
+        }
+        setกำลังโหลดDB(false)
+      })
+      .catch(function () {
+        setกำลังโหลดDB(false)
       })
   }, [user?.id])
 
-  function กดเลือกรูป() {
-    inputรูป.current.click()
+  // ---- รูปโปรไฟล์ ----
+  const [รูปโปรไฟล์,     setรูปโปรไฟล์]     = useState(null)
+  const [กำลังอัปโหลดรูป, setกำลังอัปโหลดรูป] = useState(false)
+
+  // ---- แก้ไขชื่อ ----
+  const [กำลังแก้ไขชื่อ,  setกำลังแก้ไขชื่อ]  = useState(false)
+  const [ชื่อชั่วคราว,    setชื่อชั่วคราว]    = useState('')
+  const [กำลังบันทึกชื่อ, setกำลังบันทึกชื่อ] = useState(false)
+
+  // ---- แก้ไขเบอร์ (local state) ----
+  const [เบอร์ติดต่อ,     setเบอร์ติดต่อ]     = useState('กดแก้ไขเพื่อเพิ่มเบอร์')
+  const [กำลังแก้ไขเบอร์, setกำลังแก้ไขเบอร์] = useState(false)
+  const [เบอร์ชั่วคราว,   setเบอร์ชั่วคราว]   = useState('')
+
+  // คำนวณ role ที่จะแสดง → ใช้ข้อมูลจาก DB ก่อนเสมอ
+  const currentRole = ข้อมูลDB?.role || user?.role || 'user'
+  const roleInfo    = roleMap[currentRole] || roleMap.user
+
+  // ชื่อที่แสดง → ใช้จาก DB ก่อน
+  const displayName = ข้อมูลDB?.name || user?.name || 'ผู้ใช้งาน'
+
+  // ---- บันทึกชื่อใหม่ลง DB ----
+  async function บันทึกชื่อ() {
+    if (!ชื่อชั่วคราว.trim()) return
+    setกำลังบันทึกชื่อ(true)
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ name: ชื่อชั่วคราว.trim() })
+        .eq('id', user.id)
+      if (error) throw new Error(error.message)
+      // อัปเดต state ท้องถิ่นทันที ไม่ต้อง fetch ใหม่
+      setข้อมูลDB(function (prev) { return { ...prev, name: ชื่อชั่วคราว.trim() } })
+      setกำลังแก้ไขชื่อ(false)
+    } catch (err) {
+      alert('บันทึกชื่อไม่สำเร็จ: ' + err.message)
+    } finally {
+      setกำลังบันทึกชื่อ(false)
+    }
   }
 
-  // เลือกรูป → อัปโหลดขึ้น Storage → บันทึก URL ลง users table
+  // ---- อัปโหลดรูปโปรไฟล์ ----
   async function เลือกรูปโปรไฟล์(event) {
     const ไฟล์ = event.target.files[0]
     if (!ไฟล์) return
 
     setกำลังอัปโหลดรูป(true)
-
     try {
-      // ชื่อไฟล์ใช้ user.id เพื่อให้แต่ละคนมีไฟล์เป็นของตัวเอง
       const นามสกุล = ไฟล์.name.split('.').pop()
       const ชื่อไฟล์ = `avatars/${user?.id || 'user'}.${นามสกุล}`
 
-      // อัปโหลดขึ้น Supabase Storage (upsert=true ทับไฟล์เก่าได้เลย)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images')
         .upload(ชื่อไฟล์, ไฟล์, { upsert: true })
 
       if (uploadError) throw new Error(uploadError.message)
 
-      // ดึง Public URL
       const { data: urlData } = supabase.storage
         .from('report-images')
         .getPublicUrl(uploadData.path)
 
-      const publicUrl = urlData.publicUrl
+      // เพิ่ม timestamp ต่อท้าย URL เพื่อบังคับ browser โหลดรูปใหม่ (ไม่ใช้ cache เก่า)
+      const publicUrl = urlData.publicUrl + '?t=' + Date.now()
 
-      // บันทึก URL ลง users table (เพื่อให้ข้ามเครื่องได้)
       const { error: updateError } = await supabase
         .from('users')
         .update({ avatar_url: publicUrl })
@@ -93,13 +135,13 @@ function ProfilePage({ user }) {
       if (updateError) throw new Error(updateError.message)
 
       setรูปโปรไฟล์(publicUrl)
+      setข้อมูลDB(function (prev) { return { ...prev, avatar_url: publicUrl } })
 
     } catch (err) {
       alert('อัปโหลดรูปไม่สำเร็จ: ' + err.message)
     } finally {
-      // ไม่ว่าจะสำเร็จหรือ error → ปิด loading เสมอ (ป้องกันค้าง)
       setกำลังอัปโหลดรูป(false)
-      event.target.value = ''  // reset input ให้เลือกไฟล์เดิมซ้ำได้
+      event.target.value = ''
     }
   }
 
@@ -118,35 +160,28 @@ function ProfilePage({ user }) {
         {/* รูปโปรไฟล์ — กดได้เพื่อเปลี่ยนรูป */}
         <div className="relative inline-block mb-3">
           <div
-            onClick={กดเลือกรูป}
+            onClick={() => inputรูป.current.click()}
             className="w-24 h-24 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center cursor-pointer mx-auto border-4 border-white shadow-md"
           >
             {กำลังอัปโหลดรูป ? (
-              // กำลังอัปโหลด → แสดง spinner
               <div className="w-7 h-7 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
             ) : รูปโปรไฟล์ ? (
-              // มีรูปแล้ว → แสดงรูปจริง
-              <img
-                src={รูปโปรไฟล์}
-                alt="โปรไฟล์"
-                className="w-full h-full object-cover"
-              />
+              <img src={รูปโปรไฟล์} alt="โปรไฟล์" className="w-full h-full object-cover" />
             ) : (
-              // ยังไม่มีรูป → แสดง emoji
               <span className="text-5xl">👤</span>
             )}
           </div>
 
-          {/* ปุ่มกล้องเล็กๆ มุมขวาล่างของรูป */}
+          {/* ปุ่มกล้องมุมขวาล่าง */}
           <button
-            onClick={กดเลือกรูป}
+            onClick={() => inputรูป.current.click()}
             className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-md border-2 border-white"
           >
             <span className="text-sm">📷</span>
           </button>
         </div>
 
-        {/* input file ซ่อนไว้ — trigger โดยกดที่รูปหรือปุ่มกล้อง */}
+        {/* input file ซ่อนไว้ */}
         <input
           ref={inputรูป}
           type="file"
@@ -155,10 +190,12 @@ function ProfilePage({ user }) {
           onChange={เลือกรูปโปรไฟล์}
         />
 
-        <h2 className="text-xl font-bold text-gray-800">{user?.name || 'ผู้ใช้งาน'}</h2>
-        <p className="text-gray-500 text-sm mt-1">{user?.email || 'user@gmail.com'}</p>
-        <div className="inline-block bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium mt-2">
-          👤 ผู้ใช้งานทั่วไป
+        <h2 className="text-xl font-bold text-gray-800">{displayName}</h2>
+        <p className="text-gray-500 text-sm mt-1">{user?.email || ''}</p>
+
+        {/* Badge role — อ่านจาก DB จริง ไม่ hardcode */}
+        <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-2 ${roleInfo.สี}`}>
+          {roleInfo.emoji} {roleInfo.ชื่อ}
         </div>
 
         {/* สถิติย่อ */}
@@ -203,16 +240,62 @@ function ProfilePage({ user }) {
           <h3 className="font-bold text-gray-800">ข้อมูลส่วนตัว</h3>
           <div className="space-y-3">
 
-            {/* ชื่อ */}
-            <div className="flex justify-between">
+            {/* ชื่อ — แก้ไขได้ บันทึกลง DB */}
+            <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">ชื่อ</span>
-              <span className="text-sm font-medium text-gray-800">{user?.name}</span>
+              <div className="flex items-center gap-2">
+                {กำลังแก้ไขชื่อ ? (
+                  <>
+                    <input
+                      value={ชื่อชั่วคราว}
+                      onChange={(e) => setชื่อชั่วคราว(e.target.value)}
+                      placeholder="ชื่อ-นามสกุล"
+                      className="border border-blue-300 rounded-lg px-2 py-1 text-sm text-right w-40 focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      onClick={บันทึกชื่อ}
+                      disabled={กำลังบันทึกชื่อ}
+                      className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg disabled:opacity-60"
+                    >
+                      {กำลังบันทึกชื่อ ? '...' : 'บันทึก'}
+                    </button>
+                    <button
+                      onClick={() => setกำลังแก้ไขชื่อ(false)}
+                      className="text-xs text-gray-400"
+                    >
+                      ยกเลิก
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm font-medium text-gray-800">{displayName}</span>
+                    <button
+                      onClick={() => {
+                        setชื่อชั่วคราว(displayName)
+                        setกำลังแก้ไขชื่อ(true)
+                      }}
+                      className="text-xs text-blue-500"
+                    >
+                      แก้ไข
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* อีเมล */}
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">อีเมล</span>
               <span className="text-sm font-medium text-gray-800">{user?.email}</span>
+            </div>
+
+            {/* สิทธิ์การใช้งาน */}
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">สิทธิ์</span>
+              <span className={`text-sm font-medium ${roleInfo.สี.split(' ')[0]}`}>
+                {roleInfo.emoji} {roleInfo.ชื่อ}
+              </span>
             </div>
 
             {/* เบอร์ติดต่อ */}
@@ -236,6 +319,12 @@ function ProfilePage({ user }) {
                     >
                       บันทึก
                     </button>
+                    <button
+                      onClick={() => setกำลังแก้ไขเบอร์(false)}
+                      className="text-xs text-gray-400"
+                    >
+                      ยกเลิก
+                    </button>
                   </>
                 ) : (
                   <>
@@ -254,22 +343,7 @@ function ProfilePage({ user }) {
               </div>
             </div>
 
-            {/* วันที่สมัคร */}
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">สมัครเมื่อ</span>
-              <span className="text-sm font-medium text-gray-800">25 พ.ค. 2569</span>
-            </div>
-
           </div>
-
-          {/* ปุ่มเปลี่ยนรูปโปรไฟล์ (ทางเลือก นอกจากกดที่รูปโดยตรง) */}
-          <button
-            onClick={กดเลือกรูป}
-            className="w-full mt-2 border border-blue-200 text-blue-600 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2"
-          >
-            📷 เปลี่ยนรูปโปรไฟล์
-          </button>
-
         </div>
       )}
 
