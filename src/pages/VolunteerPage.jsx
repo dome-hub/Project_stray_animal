@@ -225,12 +225,11 @@ function VolunteerPage({ หน้า }) {
       // ส่ง notification ให้ผู้แจ้ง
       if (report.reporter_id) {
         await supabase.from('notifications').insert({
-          user_id:   report.reporter_id,
-          title:     'เจ้าหน้าที่รับเรื่องแล้ว 🦺',
-          body:      `รายงาน #${String(report.id).padStart(6, '0')} ของคุณได้รับการดูแลแล้ว เจ้าหน้าที่จะลงพื้นที่เพื่อรับสัตว์โดยเร็ว`,
-          type:      'report_update',
-          report_id: report.id,
-          is_read:   false,
+          user_id: report.reporter_id,
+          title:   'เจ้าหน้าที่รับเรื่องแล้ว 🦺',
+          body:    `รายงาน #${String(report.id).padStart(6, '0')} ของคุณได้รับการดูแลแล้ว เจ้าหน้าที่จะลงพื้นที่เพื่อรับสัตว์โดยเร็ว`,
+          type:    'report_update',
+          is_read: false,
         })
       }
       // อัปเดต local state
@@ -293,20 +292,20 @@ function VolunteerPage({ หน้า }) {
       }
     }
 
-    // ส่ง notification ให้ผู้แจ้ง (เฉพาะบางสถานะ)
+    // ส่ง notification ให้ผู้แจ้ง — ทุกสถานะที่เปลี่ยน
     const msgMap = {
+      'รับเรื่องแล้ว':   `เจ้าหน้าที่รับเรื่องรายงาน #${String(report.id).padStart(6, '0')} ของคุณแล้ว กำลังเตรียมลงพื้นที่`,
       'ลงพื้นที่แล้ว':   `เจ้าหน้าที่ลงพื้นที่แล้ว (รายงาน #${String(report.id).padStart(6, '0')}) กำลังดำเนินการรับสัตว์`,
       'อยู่ศูนย์พักพิง': `สัตว์ที่คุณแจ้ง (#${String(report.id).padStart(6, '0')}) มาถึงศูนย์พักพิงแล้ว กำลังรับการดูแล 🏠`,
       'มีผู้รับเลี้ยง':   `สัตว์ที่คุณแจ้ง (#${String(report.id).padStart(6, '0')}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
     }
     if (report.reporter_id && msgMap[สถานะใหม่]) {
       await supabase.from('notifications').insert({
-        user_id:   report.reporter_id,
-        title:     `อัปเดตรายงาน #${String(report.id).padStart(6, '0')}`,
-        body:      msgMap[สถานะใหม่],
-        type:      'report_update',
-        report_id: report.id,
-        is_read:   false,
+        user_id: report.reporter_id,
+        title:   `อัปเดตรายงาน #${String(report.id).padStart(6, '0')}`,
+        body:    msgMap[สถานะใหม่],
+        type:    'report_update',
+        is_read: false,
       })
     }
 

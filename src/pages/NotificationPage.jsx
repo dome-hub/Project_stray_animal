@@ -1,20 +1,8 @@
-// NotificationPage.jsx — การแจ้งเตือนจาก Supabase (user) / mock (volunteer, admin)
+// NotificationPage.jsx — การแจ้งเตือนจาก Supabase (ทุก role เชื่อม DB จริง)
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
-
-// mock สำหรับ volunteer/admin (ยังไม่เชื่อม DB)
-const mockVolunteer = [
-  { id: 1, emoji: '🚨', ข้อความ: 'มีรายงานใหม่ ความเร่งด่วนสูง บริเวณกำแพงแสน รอการดำเนินการ', เวลา: '30 นาทีที่แล้ว', อ่านแล้ว: false },
-  { id: 2, emoji: '📋', ข้อความ: 'มีรายงานสัตว์จรใหม่ในพื้นที่ของคุณ 3 รายการ', เวลา: '2 ชั่วโมงที่แล้ว', อ่านแล้ว: false },
-  { id: 3, emoji: '✅', ข้อความ: 'รายงาน #000002 ที่คุณดูแลมีผู้รับเลี้ยงแล้ว', เวลา: 'เมื่อวาน', อ่านแล้ว: true },
-]
-const mockAdmin = [
-  { id: 1, emoji: '👤', ข้อความ: 'มีผู้ใช้ใหม่ลงทะเบียน 5 คนวันนี้', เวลา: '1 ชั่วโมงที่แล้ว', อ่านแล้ว: false },
-  { id: 2, emoji: '⚠️', ข้อความ: 'มีรายงานที่รอดำเนินการเกิน 24 ชั่วโมง จำนวน 2 รายการ', เวลา: '3 ชั่วโมงที่แล้ว', อ่านแล้ว: false },
-  { id: 3, emoji: '📊', ข้อความ: 'รายงานประจำสัปดาห์: อัตราการรับเลี้ยงเพิ่มขึ้น 12%', เวลา: 'เมื่อวาน', อ่านแล้ว: true },
-]
 
 function แปลงเวลา(str) {
   if (!str) return ''
@@ -29,6 +17,16 @@ function แปลงเวลา(str) {
   return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
 }
 
+// emoji ตามสถานะรายงาน
+function emojiสถานะ(status) {
+  if (status === 'รอดำเนินการ')    return '🚨'
+  if (status === 'รับเรื่องแล้ว')   return '🦺'
+  if (status === 'ลงพื้นที่แล้ว')   return '🚗'
+  if (status === 'อยู่ศูนย์พักพิง') return '🏠'
+  if (status === 'มีผู้รับเลี้ยง')   return '✅'
+  return '📋'
+}
+
 const หัวข้อตามRole = {
   user:      'การแจ้งเตือน',
   volunteer: 'แจ้งเตือนเจ้าหน้าที่',
@@ -39,56 +37,142 @@ function NotificationPage({ user }) {
   const navigate = useNavigate()
   const role = user?.role || 'user'
 
-  // user role → ดึงจาก DB จริง
-  const [รายการ, setรายการ] = useState([])
-  const [โหลด, setโหลด]     = useState(role === 'user')
+  const [รายการ, setรายการ]   = useState([])
+  const [โหลด, setโหลด]       = useState(true)
+  // volunteer/admin ใช้ local read-state (ไม่บันทึก DB)
+  const [อ่านแล้วLocal, setอ่านแล้วLocal] = useState(new Set())
 
   useEffect(function () {
-    if (role === 'volunteer') { setรายการ(mockVolunteer); return }
-    if (role === 'admin')     { setรายการ(mockAdmin);     return }
+    if (!user?.id) return
+    setโหลด(true)
 
-    // role === 'user' → ดึงจาก notifications table
-    async function ดึงการแจ้งเตือน() {
-      setโหลด(true)
-      const { data } = await supabase
+    // ---- role: user → ดึงจาก notifications table ----
+    if (role === 'user') {
+      supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(30)
-      if (data) {
-        setรายการ(data.map(function (n) {
-          return {
-            id:       n.id,
-            emoji:    n.type === 'report_update' ? '🦺' : '🔔',
-            ข้อความ:  n.body || n.title,
-            เวลา:     แปลงเวลา(n.created_at),
-            อ่านแล้ว: n.is_read,
-            dbId:     n.id,
-          }
-        }))
-      }
-      setโหลด(false)
+        .then(function ({ data }) {
+          setรายการ((data || []).map(function (n) {
+            return {
+              id:       n.id,
+              emoji:    n.type === 'report_update' ? '🦺' : '🔔',
+              หัวข้อ:   n.title || '',
+              ข้อความ:  n.body || n.title || '',
+              เวลา:     แปลงเวลา(n.created_at),
+              อ่านแล้ว: n.is_read,
+              dbId:     n.id,
+            }
+          }))
+          setโหลด(false)
+        })
+        .catch(function () { setโหลด(false) })
+      return
     }
-    if (user?.id) ดึงการแจ้งเตือน()
+
+    // ---- role: volunteer → ดึงรายงานล่าสุดจาก reports table ----
+    if (role === 'volunteer') {
+      supabase
+        .from('reports')
+        .select('id, animal_type, location_text, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(30)
+        .then(function ({ data }) {
+          setรายการ((data || []).map(function (r) {
+            const isNew = r.status === 'รอดำเนินการ'
+            return {
+              id:       r.id,
+              emoji:    emojiสถานะ(r.status),
+              หัวข้อ:   isNew ? '🚨 มีรายงานใหม่รอดำเนินการ' : `อัปเดต: ${r.status}`,
+              ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+              เวลา:     แปลงเวลา(r.created_at),
+              isNew,
+            }
+          }))
+          setโหลด(false)
+        })
+        .catch(function () { setโหลด(false) })
+      return
+    }
+
+    // ---- role: admin → ดึงรายงาน + ผู้ใช้ใหม่ ----
+    if (role === 'admin') {
+      Promise.all([
+        supabase
+          .from('reports')
+          .select('id, animal_type, location_text, status, created_at')
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('users')
+          .select('id, name, created_at')
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ]).then(function ([ร1, ร2]) {
+        const reportItems = (ร1.data || []).map(function (r) {
+          return {
+            id:      'r' + r.id,
+            emoji:   emojiสถานะ(r.status),
+            หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
+            ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+            เวลา:    แปลงเวลา(r.created_at),
+            isNew:   r.status === 'รอดำเนินการ',
+          }
+        })
+        const userItems = (ร2.data || []).map(function (u) {
+          return {
+            id:      'u' + u.id,
+            emoji:   '👤',
+            หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
+            ข้อความ: u.name || 'ผู้ใช้ใหม่',
+            เวลา:    แปลงเวลา(u.created_at),
+            isNew:   false,
+          }
+        })
+        // รวมแล้วเรียงตามเวลาล่าสุด
+        const all = [...reportItems, ...userItems].sort(function (a, b) {
+          return 0  // already sorted by fetch order
+        })
+        setรายการ(all)
+        setโหลด(false)
+      }).catch(function () { setโหลด(false) })
+      return
+    }
+
+    setโหลด(false)
   }, [role, user?.id])
 
-  const ยังไม่อ่าน = รายการ.filter(function (n) { return !n.อ่านแล้ว }).length
+  // สำหรับ volunteer/admin ใช้ local state ติดตามการอ่าน
+  function isอ่านแล้ว(item) {
+    if (role === 'user') return item.อ่านแล้ว
+    return !item.isNew || อ่านแล้วLocal.has(item.id)
+  }
+
+  const ยังไม่อ่าน = รายการ.filter(function (n) { return !isอ่านแล้ว(n) }).length
 
   async function กดอ่าน(item) {
-    setรายการ(function (prev) {
-      return prev.map(function (n) { return n.id === item.id ? { ...n, อ่านแล้ว: true } : n })
-    })
-    // อัปเดต DB สำหรับ user role
-    if (role === 'user' && item.dbId) {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', item.dbId)
+    if (role === 'user') {
+      setรายการ(function (prev) {
+        return prev.map(function (n) { return n.id === item.id ? { ...n, อ่านแล้ว: true } : n })
+      })
+      if (item.dbId) {
+        await supabase.from('notifications').update({ is_read: true }).eq('id', item.dbId)
+      }
+    } else {
+      setอ่านแล้วLocal(function (prev) { return new Set([...prev, item.id]) })
     }
   }
 
   async function อ่านทั้งหมด() {
-    setรายการ(function (prev) { return prev.map(function (n) { return { ...n, อ่านแล้ว: true } }) })
-    if (role === 'user' && user?.id) {
-      await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id)
+    if (role === 'user') {
+      setรายการ(function (prev) { return prev.map(function (n) { return { ...n, อ่านแล้ว: true } }) })
+      if (user?.id) {
+        await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id)
+      }
+    } else {
+      setอ่านแล้วLocal(new Set(รายการ.map(function (n) { return n.id })))
     }
   }
 
@@ -146,24 +230,30 @@ function NotificationPage({ user }) {
       {/* รายการ */}
       {!โหลด && (
         <div className="px-4 pt-3 space-y-3">
-          {รายการ.map(function (แจ้งเตือน) {
+          {รายการ.map(function (n) {
+            const read = isอ่านแล้ว(n)
             return (
               <button
-                key={แจ้งเตือน.id}
-                onClick={() => กดอ่าน(แจ้งเตือน)}
-                className={`w-full text-left rounded-2xl p-4 shadow-sm transition-all ${
-                  แจ้งเตือน.อ่านแล้ว ? 'bg-white' : 'bg-yellow-50 border-2 border-yellow-200'
+                key={n.id}
+                onClick={() => กดอ่าน(n)}
+                className={`w-full text-left rounded-2xl p-4 shadow-sm transition-all active:scale-95 ${
+                  read ? 'bg-white' : 'bg-yellow-50 border-2 border-yellow-200'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl">{แจ้งเตือน.emoji}</span>
-                  <div className="flex-1">
-                    <p className={`text-sm ${แจ้งเตือน.อ่านแล้ว ? 'text-gray-600' : 'text-gray-800 font-semibold'}`}>
-                      {แจ้งเตือน.ข้อความ}
+                  <span className="text-2xl shrink-0">{n.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    {n.หัวข้อ && (
+                      <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
+                        {n.หัวข้อ}
+                      </p>
+                    )}
+                    <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
+                      {n.ข้อความ}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">{แจ้งเตือน.เวลา}</p>
+                    <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
                   </div>
-                  {!แจ้งเตือน.อ่านแล้ว && (
+                  {!read && (
                     <div className="w-2.5 h-2.5 bg-orange-400 rounded-full mt-1 shrink-0" />
                   )}
                 </div>
