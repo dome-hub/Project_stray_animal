@@ -55,18 +55,28 @@ function App() {
 
   // ดึง role + ชื่อ จาก public.users โดยใช้ id จาก Supabase Auth
   async function ดึงข้อมูลUser(authUser) {
-    const { data } = await supabase
-      .from('users')
-      .select('name, role, status')
-      .eq('id', authUser.id)
-      .single()
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('name, role, status')
+        .eq('id', authUser.id)
+        .single()
 
-    setUser({
-      id:    authUser.id,
-      email: authUser.email,
-      name:  data?.name || authUser.user_metadata?.name || authUser.email,
-      role:  data?.role  || 'user',
-    })
+      setUser({
+        id:    authUser.id,
+        email: authUser.email,
+        name:  data?.name || authUser.user_metadata?.name || authUser.email,
+        role:  data?.role  || 'user',
+      })
+    } catch {
+      // ถ้าดึงจาก users table ไม่ได้ → ยังให้ login ได้ด้วย role default
+      setUser({
+        id:    authUser.id,
+        email: authUser.email,
+        name:  authUser.user_metadata?.name || authUser.email,
+        role:  'user',
+      })
+    }
   }
 
   // Logout จริงผ่าน Supabase Auth
