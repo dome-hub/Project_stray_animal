@@ -1,19 +1,9 @@
 // FindPet.jsx — หน้าค้นหาสัตว์เลี้ยง
-// มี 2 โหมด: ค้นหาตามความต้องการ และ ดูสัตว์ทั้งหมด
+// ดึงข้อมูลจาก Supabase Database จริงๆ แล้ว
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-// ข้อมูลสัตว์ทั้งหมดในระบบ (ในของจริงจะดึงจาก Database)
-const สัตว์ทั้งหมด = [
-  { id: 1, emoji: '🐕', ชื่อ: 'มะม่วง', สายพันธุ์: 'สุนัขพันธุ์ไทยผสม', อายุ: '2 ปี', เพศ: 'ตัวผู้', ขนาด: 'กลาง', นิสัย: ['เป็นมิตร', 'ขี้เล่น'], สถานที่: 'ลาดพร้าว กรุงเทพฯ', คะแนน: 95 },
-  { id: 2, emoji: '🐈', ชื่อ: 'ส้ม', สายพันธุ์: 'แมวส้ม', อายุ: '1 ปี', เพศ: 'ตัวเมีย', ขนาด: 'เล็ก', นิสัย: ['เป็นมิตร', 'สงบเสงี่ยม'], สถานที่: 'บางนา กรุงเทพฯ', คะแนน: 88 },
-  { id: 3, emoji: '🐕', ชื่อ: 'ขาว', สายพันธุ์: 'สุนัขไทยหลังอาน', อายุ: '3 ปี', เพศ: 'ตัวผู้', ขนาด: 'กลาง', นิสัย: ['ขี้เล่น', 'เป็นมิตร'], สถานที่: 'มีนบุรี กรุงเทพฯ', คะแนน: 82 },
-  { id: 4, emoji: '🐕', ชื่อ: 'ดำ', สายพันธุ์: 'สุนัขพันธุ์ผสม', อายุ: '4 ปี', เพศ: 'ไม่จำกัด', ขนาด: 'ใหญ่', นิสัย: ['สงบเสงี่ยม'], สถานที่: 'นนทบุรี', คะแนน: 75 },
-  { id: 5, emoji: '🐈', ชื่อ: 'เทา', สายพันธุ์: 'แมวเทา', อายุ: '6 เดือน', เพศ: 'ตัวผู้', ขนาด: 'เล็ก', นิสัย: ['ขี้เล่น'], สถานที่: 'ปทุมธานี', คะแนน: 70 },
-  { id: 6, emoji: '🐕', ชื่อ: 'บัตเตอร์', สายพันธุ์: 'ลาบราดอร์ผสม', อายุ: '1 ปี', เพศ: 'ตัวเมีย', ขนาด: 'ใหญ่', นิสัย: ['เป็นมิตร', 'ขี้เล่น', 'ชอบออกกำลัง'], สถานที่: 'รังสิต ปทุมธานี', คะแนน: 90 },
-  { id: 7, emoji: '🐈', ชื่อ: 'มิ้ว', สายพันธุ์: 'แมวขาว', อายุ: '2 ปี', เพศ: 'ตัวเมีย', ขนาด: 'เล็ก', นิสัย: ['สงบเสงี่ยม', 'ชอบอิสระ'], สถานที่: 'สาทร กรุงเทพฯ', คะแนน: 78 },
-]
+import { supabase } from '../supabase'   // นำเข้า supabase client
 
 function FindPet() {
   const navigate = useNavigate()
@@ -21,8 +11,11 @@ function FindPet() {
   // แท็บที่แสดงอยู่: 'form' = ค้นหา, 'result' = ผลค้นหา, 'all' = ดูทั้งหมด
   const [แท็บ, setแท็บ] = useState('form')
 
-  // กำลัง Loading AI อยู่ไหม
-  const [กำลังโหลด, setกำลังโหลด] = useState(false)
+  // กำลัง Loading อยู่ไหม
+  const [กำลังโหลด, setกำลังโหลด] = useState(true)
+
+  // สัตว์ทั้งหมดที่ดึงมาจาก Database
+  const [สัตว์ทั้งหมด, setSัตว์ทั้งหมด] = useState([])
 
   // เก็บค่าที่ผู้ใช้กรอก
   const [ประเภทสัตว์, setประเภทสัตว์] = useState('สุนัข')
@@ -31,8 +24,54 @@ function FindPet() {
   const [ขนาด, setขนาด] = useState('')
   const [นิสัยที่เลือก, setนิสัยที่เลือก] = useState([])
 
-  // เก็บผลการค้นหาจาก AI
+  // เก็บผลการค้นหา
   const [ผลค้นหา, setผลค้นหา] = useState([])
+
+  // ---- ดึงข้อมูลสัตว์จาก Supabase ตอนโหลดหน้า ----
+  // useEffect = ทำงานครั้งเดียวตอนหน้าเปิด ([] ข้างหลัง)
+  useEffect(function () {
+    async function ดึงข้อมูลสัตว์() {
+      setกำลังโหลด(true)
+
+      // ดึงข้อมูลจากตาราง animals ใน Supabase
+      const { data, error } = await supabase
+        .from('animals')       // ชื่อตาราง
+        .select('*')           // ดึงทุก column
+        .order('created_at', { ascending: false })  // ล่าสุดขึ้นก่อน
+
+      if (error) {
+        // ถ้าเกิดข้อผิดพลาด แสดงใน console
+        console.log('เกิดข้อผิดพลาดในการดึงข้อมูล:', error.message)
+      } else {
+        // แปลงข้อมูลจาก Database ให้ตรงกับที่การ์ดต้องการ
+        const แปลงแล้ว = data.map(function (สัตว์) {
+          return {
+            id: สัตว์.id,
+            // ถ้า breed มีคำว่า "แมว" → ใช้ emoji แมว, ไม่งั้นใช้สุนัข
+            emoji: สัตว์.breed?.includes('แมว') ? '🐈' : '🐕',
+            ชื่อ: สัตว์.name,
+            สายพันธุ์: สัตว์.breed || 'ไม่ระบุ',
+            อายุ: สัตว์.age || 'ไม่ระบุ',
+            เพศ: สัตว์.gender || 'ไม่ระบุ',
+            สถานะ: สัตว์.status,
+            สุขภาพ: สัตว์.health,
+            ลักษณะ: สัตว์.description || '',
+            วัคซีน: สัตว์.vaccine_info || '',
+            // traits เก็บเป็น "เป็นมิตร,ขี้เล่น" → แปลงเป็น array ['เป็นมิตร','ขี้เล่น']
+            นิสัย: สัตว์.traits ? สัตว์.traits.split(',') : ['เป็นมิตร'],
+            สถานที่: สัตว์.location || 'กำแพงแสน นครปฐม',
+            // คะแนนสุ่มชั่วคราว (ของจริงควรคำนวณจาก AI)
+            คะแนน: Math.floor(Math.random() * 20) + 75,
+          }
+        })
+        setSัตว์ทั้งหมด(แปลงแล้ว)
+      }
+
+      setกำลังโหลด(false)
+    }
+
+    ดึงข้อมูลสัตว์()
+  }, [])  // [] = ทำแค่ครั้งเดียวตอนเปิดหน้า
 
   // ฟังก์ชันเลือก/ยกเลิกนิสัย
   function เลือกนิสัย(นิสัย) {
@@ -43,25 +82,20 @@ function FindPet() {
     }
   }
 
-  // ฟังก์ชันค้นหาสัตว์ด้วย AI
+  // ฟังก์ชันค้นหาสัตว์ (กรองจากที่ดึงมาแล้ว)
   function ค้นหาสัตว์() {
-    setกำลังโหลด(true)
+    // กรองตามประเภท (สุนัข/แมว)
+    const กรอง = สัตว์ทั้งหมด.filter(function (สัตว์) {
+      if (ประเภทสัตว์ === 'สุนัข') return สัตว์.emoji === '🐕'
+      if (ประเภทสัตว์ === 'แมว') return สัตว์.emoji === '🐈'
+      return true
+    })
 
-    setTimeout(function () {
-      // กรองตามประเภท
-      const กรอง = สัตว์ทั้งหมด.filter((สัตว์) => {
-        if (ประเภทสัตว์ === 'สุนัข') return สัตว์.emoji === '🐕'
-        if (ประเภทสัตว์ === 'แมว') return สัตว์.emoji === '🐈'
-        return true
-      })
+    // เรียงจากคะแนนสูงสุด
+    const เรียงแล้ว = [...กรอง].sort((a, b) => b.คะแนน - a.คะแนน)
 
-      // เรียงจากคะแนนสูงสุด
-      const เรียงแล้ว = กรอง.sort((a, b) => b.คะแนน - a.คะแนน)
-
-      setผลค้นหา(เรียงแล้ว)
-      setกำลังโหลด(false)
-      setแท็บ('result') // เปลี่ยนไปแสดงผล
-    }, 2000)
+    setผลค้นหา(เรียงแล้ว)
+    setแท็บ('result')
   }
 
   // ---- หน้า Loading ----
@@ -69,8 +103,8 @@ function FindPet() {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center text-center px-6">
         <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-xl font-bold text-gray-800 mb-2">AI กำลังแนะนำสัตว์ที่เหมาะกับคุณ</h2>
-        <p className="text-gray-500 text-sm">กรุณารอสักครู่...</p>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">กำลังโหลดข้อมูลสัตว์...</h2>
+        <p className="text-gray-500 text-sm">กรุณารอสักครู่</p>
       </div>
     )
   }
@@ -111,12 +145,19 @@ function FindPet() {
         </button>
       </div>
 
-      {/* ---- แสดงผลการค้นหาจาก AI ---- */}
+      {/* ---- แสดงผลการค้นหา ---- */}
       {แท็บ === 'result' && (
         <div className="px-4 pt-4 space-y-4">
           <p className="text-sm text-gray-500 font-medium">
             พบ {ผลค้นหา.length} ตัว ที่เหมาะกับคุณ
           </p>
+
+          {ผลค้นหา.length === 0 && (
+            <div className="text-center py-10 text-gray-400">
+              <p className="text-4xl mb-2">🔍</p>
+              <p>ไม่พบสัตว์ที่ตรงกับเงื่อนไข</p>
+            </div>
+          )}
 
           {ผลค้นหา.map((สัตว์, ลำดับ) => (
             <การ์ดสัตว์
@@ -127,7 +168,6 @@ function FindPet() {
             />
           ))}
 
-          {/* ปุ่มค้นหาใหม่ */}
           <button
             onClick={() => setแท็บ('form')}
             className="w-full border-2 border-green-400 text-green-600 rounded-xl py-3 text-sm font-medium"
@@ -143,6 +183,13 @@ function FindPet() {
           <p className="text-sm text-gray-500 font-medium">
             สัตว์ทั้งหมดในระบบ {สัตว์ทั้งหมด.length} ตัว
           </p>
+
+          {สัตว์ทั้งหมด.length === 0 && (
+            <div className="text-center py-10 text-gray-400">
+              <p className="text-4xl mb-2">🐾</p>
+              <p>ยังไม่มีสัตว์ในระบบ</p>
+            </div>
+          )}
 
           {สัตว์ทั้งหมด.map((สัตว์) => (
             <การ์ดสัตว์
@@ -219,26 +266,6 @@ function FindPet() {
             </div>
           </div>
 
-          {/* เลือกขนาด */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">ขนาด</p>
-            <div className="grid grid-cols-2 gap-3">
-              {['เล็ก', 'กลาง', 'ใหญ่', 'ไม่จำกัด'].map((ตัวเลือก) => (
-                <button
-                  key={ตัวเลือก}
-                  onClick={() => setขนาด(ตัวเลือก)}
-                  className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                    ขนาด === ตัวเลือก
-                      ? 'border-green-500 bg-green-500 text-white'
-                      : 'border-gray-200 bg-white text-gray-700'
-                  }`}
-                >
-                  {ตัวเลือก}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* เลือกนิสัย */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-2">
@@ -276,7 +303,7 @@ function FindPet() {
   )
 }
 
-// Component การ์ดสัตว์ — ใช้ซ้ำได้ทั้งในหน้าผลค้นหาและหน้าดูทั้งหมด
+// Component การ์ดสัตว์ — ใช้ซ้ำได้
 function การ์ดสัตว์({ สัตว์, แสดงBadge, onClick }) {
   return (
     <button
@@ -293,7 +320,6 @@ function การ์ดสัตว์({ สัตว์, แสดงBadge, on
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-bold text-gray-800">{สัตว์.ชื่อ}</h3>
             <div className="flex items-center gap-1">
-              {/* Badge "แนะนำ" สำหรับอันดับ 1 */}
               {แสดงBadge && (
                 <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
                   แนะนำ

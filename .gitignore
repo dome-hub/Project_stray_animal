@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# ไฟล์ความลับ — ห้าม push ขึ้น GitHub เด็ดขาด!
+.env
+.env.local
+.env.production
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

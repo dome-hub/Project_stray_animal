@@ -39,24 +39,29 @@ function Login() {
     setกำลังโหลด(true)
     setข้อผิดพลาด('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email:    อีเมลLogin.trim(),
-      password: รหัสผ่านLogin,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email:    อีเมลLogin.trim(),
+        password: รหัสผ่านLogin,
+      })
 
-    if (error) {
-      // แปล error message เป็นภาษาไทย
-      if (error.message.includes('Email not confirmed')) {
-        setข้อผิดพลาด('กรุณายืนยันอีเมลก่อน ตรวจสอบกล่องจดหมายของคุณ')
-      } else if (error.message.includes('Invalid login credentials')) {
-        setข้อผิดพลาด('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
-      } else {
-        setข้อผิดพลาด(error.message)
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          setข้อผิดพลาด('กรุณายืนยันอีเมลก่อน ตรวจสอบกล่องจดหมายของคุณ')
+        } else if (error.message.includes('Invalid login credentials')) {
+          setข้อผิดพลาด('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
+        } else {
+          setข้อผิดพลาด(error.message)
+        }
       }
-    }
-    // ถ้า login สำเร็จ → onAuthStateChange ใน App.jsx จะ redirect ให้อัตโนมัติ
+      // ถ้า login สำเร็จ → onAuthStateChange ใน App.jsx จะ redirect ให้อัตโนมัติ
 
-    setกำลังโหลด(false)
+    } catch (err) {
+      setข้อผิดพลาด('เชื่อมต่อไม่ได้ กรุณาลองใหม่อีกครั้ง')
+    } finally {
+      // ไม่ว่าจะสำเร็จหรือ error → ปิด loading เสมอ ป้องกันค้าง
+      setกำลังโหลด(false)
+    }
   }
 
   // ---- สมัครสมาชิก ด้วย Supabase Auth ----

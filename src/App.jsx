@@ -22,11 +22,20 @@ function App() {
   const [กำลังโหลด, setกำลังโหลด] = useState(true)  // รอเช็ค session ก่อน render
 
   useEffect(function () {
+    // ป้องกันค้าง: ถ้าโหลดนานเกิน 5 วินาที ให้แสดงหน้า Login เลย
+    const timeout = setTimeout(function () {
+      setกำลังโหลด(false)
+    }, 5000)
+
     // เช็ค session ที่มีอยู่แล้ว (กรณี user เปิดแอปใหม่แต่เคย login ไว้)
     supabase.auth.getSession().then(async function ({ data: { session } }) {
+      clearTimeout(timeout)
       if (session?.user) {
         await ดึงข้อมูลUser(session.user)
       }
+      setกำลังโหลด(false)
+    }).catch(function () {
+      clearTimeout(timeout)
       setกำลังโหลด(false)
     })
 
