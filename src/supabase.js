@@ -1,11 +1,10 @@
 // supabase.js — ไฟล์เชื่อมต่อ Supabase Database
-// อ่านค่า URL และ KEY จากไฟล์ .env (ไม่ hardcode ตรงๆ เพื่อความปลอดภัย)
+// anon/publishable key เป็น public key — ออกแบบมาให้ expose ได้ ไม่มีผลด้านความปลอดภัย
+// ข้อมูลถูก RLS policy ปกป้องอยู่แล้ว
 
 import { createClient } from '@supabase/supabase-js'
 
-// import.meta.env คือวิธีอ่านตัวแปรจากไฟล์ .env ใน Vite
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
+const SUPABASE_URL = 'https://ipvidrxuajcpuqzevpnj.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_gU0ProhtJurAs0PMtHzAtQ_6tqdwZ7p'
 
-// สร้าง supabase client — export ออกไปให้ไฟล์อื่นใช้ได้
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
