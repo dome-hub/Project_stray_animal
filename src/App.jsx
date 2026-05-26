@@ -21,6 +21,17 @@ function App() {
   const [user, setUser]           = useState(null)
   const [กำลังโหลด, setกำลังโหลด] = useState(true)  // รอเช็ค session ก่อน render
 
+  // Warmup: ยิง HTTP request ไปยัง Supabase ทันทีที่ app โหลด
+  // เพื่อ pre-establish DNS+TCP+TLS connection ก่อนที่ user จะกด Login
+  // แก้ปัญหา cold start hang บน localhost (npm run dev ใหม่)
+  useEffect(function () {
+    // Warmup: ยิง request ไปยัง Supabase ทันทีที่ app โหลด
+    // เพื่อปลุก project จาก sleep (free tier) ก่อนที่ user จะกด Login
+    // ยิงทั้ง REST endpoint และ Auth endpoint พร้อมกัน
+    supabase.from('animals').select('id').limit(1).then(function () {}, function () {})
+    supabase.auth.getSession().catch(function () {})
+  }, [])
+
   useEffect(function () {
     let cancelled = false
 
@@ -31,7 +42,7 @@ function App() {
 
     // onAuthStateChange ยิง INITIAL_SESSION ทันทีที่ mount → ไม่ต้องเรียก getSession แยก
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async function (event, session) {
+      function (event, session) {
         if (cancelled) return
 
         if (event === 'SIGNED_OUT' || !session) {
@@ -42,11 +53,18 @@ function App() {
           session?.user &&
           (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')
         ) {
-          await ดึงข้อมูลUser(session.user)
-          if (!cancelled) {
-            clearTimeout(emergencyTimer)
-            setกำลังโหลด(false)
-          }
+          // แสดงแอปทันที — ใช้ข้อมูลจาก Auth ก่อน ไม่รอ DB
+          const authUser = session.user
+          setUser({
+            id:    authUser.id,
+            email: authUser.email,
+            name:  authUser.user_metadata?.name || authUser.email,
+            role:  'user',
+          })
+          clearTimeout(emergencyTimer)
+          setกำลังโหลด(false)
+          // โหลด role/name จริงจาก DB ใน background (ไม่บล็อก UI)
+          ดึงข้อมูลUser(authUser)
         }
       }
     )
@@ -58,9 +76,8 @@ function App() {
     }
   }, [])
 
-  // ดึง role + ชื่อ จาก public.users โดยใช้ id จาก Supabase Auth
-  // ไม่ใช้ timeout แล้ว — ปล่อยให้ query รอจนเสร็จตามธรรมชาติ
-  // (ป้องกัน role บัคเป็น 'user' เมื่อ DB ตอบช้า)
+  // ดึง role + ชื่อ จาก public.users (ทำงาน background ไม่บล็อก UI)
+  // เรียกหลัง setUser/setLoading แล้ว → อัปเดต role เมื่อ DB ตอบกลับ
   async function ดึงข้อมูลUser(authUser) {
     const fallback = {
       id:    authUser.id,

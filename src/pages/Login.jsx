@@ -22,7 +22,8 @@ function Login() {
   const [กำลังโหลด,      setกำลังโหลด]      = useState(false)
   const [กำลังGoogle,    setกำลังGoogle]    = useState(false)
   const [ข้อผิดพลาด,    setข้อผิดพลาด]    = useState('')
-  const [รอยืนยันเมล,   setรอยืนยันเมล]   = useState(false)  // หลังสมัคร รอกด confirm
+  const [รอยืนยันเมล,   setรอยืนยันเมล]   = useState(false)
+  const [ช้า,            setช้า]            = useState(false)
 
   function เปลี่ยนโหมด(โหมดใหม่) {
     setโหมด(โหมดใหม่)
@@ -62,18 +63,18 @@ function Login() {
 
     setกำลังโหลด(true)
     setข้อผิดพลาด('')
+    setช้า(false)
+
+    // หลัง 8 วิ → แสดงข้อความว่า Supabase กำลังตื่น (free tier sleep)
+    const slowTimer = setTimeout(function () { setช้า(true) }, 8000)
 
     try {
-      const TIMEOUT_MS = 15000
-      const loginPromise = supabase.auth.signInWithPassword({
+      // ไม่มี timeout แล้ว — ปล่อยให้รอจนกว่า Supabase จะตอบ
+      // free tier อาจใช้ 20-40 วิในการตื่นจาก sleep ครั้งแรก
+      const { error } = await supabase.auth.signInWithPassword({
         email:    อีเมลLogin.trim(),
         password: รหัสผ่านLogin,
       })
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('TIMEOUT')), TIMEOUT_MS)
-      )
-
-      const { error } = await Promise.race([loginPromise, timeoutPromise])
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
@@ -87,14 +88,13 @@ function Login() {
           setข้อผิดพลาด('เกิดข้อผิดพลาด: ' + error.message)
         }
       }
+      // ถ้าสำเร็จ → onAuthStateChange ใน App.jsx จะ set user → navigate อัตโนมัติ
     } catch (err) {
-      if (err.message === 'TIMEOUT') {
-        setข้อผิดพลาด('Supabase ไม่ตอบสนอง — ลอง Google Login แทน หรือตรวจสอบว่า email นี้สมัครด้วย Email หรือ Google')
-      } else {
-        setข้อผิดพลาด('เชื่อมต่อไม่ได้: ' + err.message)
-      }
+      setข้อผิดพลาด('เชื่อมต่อไม่ได้: ' + err.message)
     } finally {
+      clearTimeout(slowTimer)
       setกำลังโหลด(false)
+      setช้า(false)
     }
   }
 
@@ -222,6 +222,19 @@ function Login() {
               </button>
             </div>
 
+            {/* แสดงข้อความเตือนว่า Supabase กำลังตื่น (หลัง 8 วิ) */}
+            {กำลังโหลด && ช้า && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-center space-y-1">
+                <p className="text-xs text-orange-700 font-semibold">⏳ Supabase กำลังตื่นจาก sleep...</p>
+                <p className="text-xs text-orange-500">กรุณารอสักครู่ อาจใช้เวลา 20–40 วินาที</p>
+                <div className="flex justify-center gap-1 pt-1">
+                  {[0,1,2].map(function(i) {
+                    return <div key={i} className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                  })}
+                </div>
+              </div>
+            )}
+
             {ข้อผิดพลาด && (
               <p className="text-red-500 text-xs text-center bg-red-50 py-2 px-3 rounded-lg">
                 {ข้อผิดพลาด}
@@ -233,7 +246,10 @@ function Login() {
               disabled={กำลังโหลด}
               className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold transition-colors disabled:opacity-60"
             >
-              {กำลังโหลด ? '⏳ กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+              {กำลังโหลด
+                ? ช้า ? '⏳ รอ Supabase...' : '⏳ กำลังเข้าสู่ระบบ...'
+                : 'เข้าสู่ระบบ'
+              }
             </button>
 
           </form>
