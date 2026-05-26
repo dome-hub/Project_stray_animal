@@ -48,13 +48,14 @@ function ProfilePage({ user }) {
     setกำลังโหลดDB(true)
     supabase
       .from('users')
-      .select('name, role, avatar_url')
+      .select('name, role, avatar_url, phone')   // ดึง phone ด้วย
       .eq('id', user.id)
       .single()
       .then(function ({ data }) {
         if (data) {
           setข้อมูลDB(data)
           if (data.avatar_url) setรูปโปรไฟล์(data.avatar_url)
+          if (data.phone)      setเบอร์ติดต่อ(data.phone)   // โหลดเบอร์จาก DB
         }
         setกำลังโหลดDB(false)
       })
@@ -72,10 +73,11 @@ function ProfilePage({ user }) {
   const [ชื่อชั่วคราว,    setชื่อชั่วคราว]    = useState('')
   const [กำลังบันทึกชื่อ, setกำลังบันทึกชื่อ] = useState(false)
 
-  // ---- แก้ไขเบอร์ (local state) ----
-  const [เบอร์ติดต่อ,     setเบอร์ติดต่อ]     = useState('กดแก้ไขเพื่อเพิ่มเบอร์')
-  const [กำลังแก้ไขเบอร์, setกำลังแก้ไขเบอร์] = useState(false)
-  const [เบอร์ชั่วคราว,   setเบอร์ชั่วคราว]   = useState('')
+  // ---- แก้ไขเบอร์ — บันทึกลง DB จริง ----
+  const [เบอร์ติดต่อ,      setเบอร์ติดต่อ]      = useState('กดแก้ไขเพื่อเพิ่มเบอร์')
+  const [กำลังแก้ไขเบอร์,  setกำลังแก้ไขเบอร์]  = useState(false)
+  const [เบอร์ชั่วคราว,    setเบอร์ชั่วคราว]    = useState('')
+  const [กำลังบันทึกเบอร์, setกำลังบันทึกเบอร์] = useState(false)
 
   // คำนวณ role ที่จะแสดง → ใช้ข้อมูลจาก DB ก่อนเสมอ
   const currentRole = ข้อมูลDB?.role || user?.role || 'user'
@@ -101,6 +103,24 @@ function ProfilePage({ user }) {
       alert('บันทึกชื่อไม่สำเร็จ: ' + err.message)
     } finally {
       setกำลังบันทึกชื่อ(false)
+    }
+  }
+
+  // ---- บันทึกเบอร์โทรลง DB ----
+  async function บันทึกเบอร์() {
+    setกำลังบันทึกเบอร์(true)
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ phone: เบอร์ชั่วคราว.trim() })
+        .eq('id', user.id)
+      if (error) throw new Error(error.message)
+      setเบอร์ติดต่อ(เบอร์ชั่วคราว.trim() || 'กดแก้ไขเพื่อเพิ่มเบอร์')
+      setกำลังแก้ไขเบอร์(false)
+    } catch (err) {
+      alert('บันทึกเบอร์ไม่สำเร็จ: ' + err.message)
+    } finally {
+      setกำลังบันทึกเบอร์(false)
     }
   }
 
@@ -298,7 +318,7 @@ function ProfilePage({ user }) {
               </span>
             </div>
 
-            {/* เบอร์ติดต่อ */}
+            {/* เบอร์ติดต่อ — บันทึกลง users.phone ใน DB */}
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">เบอร์ติดต่อ</span>
               <div className="flex items-center gap-2">
@@ -309,15 +329,14 @@ function ProfilePage({ user }) {
                       onChange={(e) => setเบอร์ชั่วคราว(e.target.value)}
                       placeholder="เช่น 081-234-5678"
                       className="border border-blue-300 rounded-lg px-2 py-1 text-sm text-right w-36 focus:outline-none"
+                      autoFocus
                     />
                     <button
-                      onClick={() => {
-                        setเบอร์ติดต่อ(เบอร์ชั่วคราว)
-                        setกำลังแก้ไขเบอร์(false)
-                      }}
-                      className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg"
+                      onClick={บันทึกเบอร์}
+                      disabled={กำลังบันทึกเบอร์}
+                      className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg disabled:opacity-60"
                     >
-                      บันทึก
+                      {กำลังบันทึกเบอร์ ? '...' : 'บันทึก'}
                     </button>
                     <button
                       onClick={() => setกำลังแก้ไขเบอร์(false)}
@@ -328,10 +347,12 @@ function ProfilePage({ user }) {
                   </>
                 ) : (
                   <>
-                    <span className="text-sm font-medium text-gray-800">{เบอร์ติดต่อ}</span>
+                    <span className={`text-sm font-medium ${เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                      {เบอร์ติดต่อ}
+                    </span>
                     <button
                       onClick={() => {
-                        setเบอร์ชั่วคราว(เบอร์ติดต่อ)
+                        setเบอร์ชั่วคราว(เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? '' : เบอร์ติดต่อ)
                         setกำลังแก้ไขเบอร์(true)
                       }}
                       className="text-xs text-blue-500"

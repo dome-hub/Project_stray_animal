@@ -134,11 +134,11 @@ function App() {
         <Route path="/volunteer/stats"   element={ต้องLogin(<VolunteerPage หน้า="stats" />)} />
 
         {/* === Admin === */}
-        <Route path="/admin/dashboard" element={ต้องLogin(<AdminPage หน้า="dashboard" />)} />
-        <Route path="/admin/users"     element={ต้องLogin(<AdminPage หน้า="users" />)} />
-        <Route path="/admin/areas"     element={ต้องLogin(<AdminPage หน้า="areas" />)} />
-        <Route path="/admin/export"    element={ต้องLogin(<AdminPage หน้า="export" />)} />
-        <Route path="/admin/settings"  element={ต้องLogin(<AdminPage หน้า="settings" />)} />
+        <Route path="/admin/dashboard" element={ต้องLogin(<AdminPage หน้า="dashboard" user={user} />)} />
+        <Route path="/admin/users"     element={ต้องLogin(<AdminPage หน้า="users"     user={user} />)} />
+        <Route path="/admin/areas"     element={ต้องLogin(<AdminPage หน้า="areas"     user={user} />)} />
+        <Route path="/admin/export"    element={ต้องLogin(<AdminPage หน้า="export"    user={user} />)} />
+        <Route path="/admin/settings"  element={ต้องLogin(<AdminPage หน้า="settings"  user={user} />)} />
 
       </Routes>
     </BrowserRouter>

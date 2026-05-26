@@ -12,7 +12,7 @@ const สีRole = {
   admin:     'bg-purple-50 text-purple-700',
 }
 
-function AdminPage({ หน้า }) {
+function AdminPage({ หน้า, user }) {
   const navigate = useNavigate()
 
   // ---- State: Dashboard ----
@@ -293,50 +293,72 @@ function AdminPage({ หน้า }) {
                 </div>
               )}
 
-              {ผู้ใช้กรอง.map((u) => (
-                <div key={u.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-bold text-gray-800">{u.name || '(ไม่ระบุชื่อ)'}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
-                      <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
-                    </div>
-                    {/* Badge สถานะบัญชี */}
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      u.status === 'suspended'
-                        ? 'bg-red-50 text-red-600'
-                        : 'bg-green-50 text-green-600'
-                    }`}>
-                      {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
-                    </span>
-                  </div>
+              {ผู้ใช้กรอง.map((u) => {
+                // ตรวจว่าแถวนี้คือ admin ที่กำลังใช้งานอยู่หรือเปล่า
+                const คือตัวเอง = u.id === user?.id
 
-                  <div className="flex items-center gap-2">
-                    {/* Dropdown เปลี่ยน Role → บันทึกลง Supabase */}
-                    <select
-                      value={u.role || 'user'}
-                      onChange={(e) => เปลี่ยนRole(u.id, e.target.value)}
-                      className={`flex-1 text-xs px-2 py-1.5 rounded-lg border-0 font-medium ${สีRole[u.role] || สีRole.user}`}
-                    >
-                      <option value="user">👤 ผู้ใช้งาน</option>
-                      <option value="volunteer">🦺 เจ้าหน้าที่</option>
-                      <option value="admin">🛡️ Admin</option>
-                    </select>
-
-                    {/* ปุ่มระงับ / ยกเลิกระงับ → บันทึกลง Supabase */}
-                    <button
-                      onClick={() => สลับสถานะ(u.id, u.status || 'active')}
-                      className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
+                return (
+                  <div key={u.id} className={`bg-white rounded-2xl p-4 shadow-sm ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-800">{u.name || '(ไม่ระบุชื่อ)'}</p>
+                          {/* badge "คุณ" ให้รู้ว่าแถวนี้คือตัวเอง */}
+                          {คือตัวเอง && (
+                            <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">
+                              คุณ
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">{u.email}</p>
+                        <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
+                      </div>
+                      {/* Badge สถานะบัญชี */}
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                         u.status === 'suspended'
-                          ? 'bg-green-50 text-green-600'
-                          : 'bg-red-50 text-red-600'
-                      }`}
-                    >
-                      {u.status === 'suspended' ? 'ยกเลิกระงับ' : 'ระงับ'}
-                    </button>
+                          ? 'bg-red-50 text-red-600'
+                          : 'bg-green-50 text-green-600'
+                      }`}>
+                        {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {คือตัวเอง ? (
+                        // ถ้าเป็นแถวของตัวเอง → แสดงข้อความแทน ไม่ให้แก้ role/ระงับตัวเอง
+                        <p className="flex-1 text-xs text-gray-400 italic text-center py-1">
+                          🔒 ไม่สามารถแก้ไขบัญชีตัวเองได้
+                        </p>
+                      ) : (
+                        <>
+                          {/* Dropdown เปลี่ยน Role → บันทึกลง Supabase */}
+                          <select
+                            value={u.role || 'user'}
+                            onChange={(e) => เปลี่ยนRole(u.id, e.target.value)}
+                            className={`flex-1 text-xs px-2 py-1.5 rounded-lg border-0 font-medium ${สีRole[u.role] || สีRole.user}`}
+                          >
+                            <option value="user">👤 ผู้ใช้งาน</option>
+                            <option value="volunteer">🦺 เจ้าหน้าที่</option>
+                            <option value="admin">🛡️ Admin</option>
+                          </select>
+
+                          {/* ปุ่มระงับ / ยกเลิกระงับ → บันทึกลง Supabase */}
+                          <button
+                            onClick={() => สลับสถานะ(u.id, u.status || 'active')}
+                            className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
+                              u.status === 'suspended'
+                                ? 'bg-green-50 text-green-600'
+                                : 'bg-red-50 text-red-600'
+                            }`}
+                          >
+                            {u.status === 'suspended' ? 'ยกเลิกระงับ' : 'ระงับ'}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </>
           )}
         </div>
