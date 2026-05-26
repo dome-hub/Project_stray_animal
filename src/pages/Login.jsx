@@ -53,8 +53,6 @@ function Login() {
   }
 
   // ---- Login ด้วย Supabase Auth ----
-  // ไม่ใช้ manual timeout แล้ว — Supabase มี HTTP timeout ของตัวเอง
-  // finally การันตีว่า setกำลังโหลด(false) ทำงานเสมอ ปุ่มไม่ค้าง
   async function handleLogin(e) {
     e.preventDefault()
     if (!อีเมลLogin || !รหัสผ่านLogin) {
@@ -73,7 +71,7 @@ function Login() {
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
-          setข้อผิดพลาด('กรุณายืนยันอีเมลก่อน ตรวจสอบกล่องจดหมายของคุณ')
+          setข้อผิดพลาด('กรุณายืนยันอีเมลก่อน — ตรวจสอบกล่องจดหมายของคุณ')
         } else if (
           error.message.includes('Invalid login credentials') ||
           error.message.includes('invalid_credentials')
@@ -83,12 +81,10 @@ function Login() {
           setข้อผิดพลาด('เกิดข้อผิดพลาด: ' + error.message)
         }
       }
-      // ถ้า login สำเร็จ → onAuthStateChange ใน App.jsx จะ redirect ให้อัตโนมัติ
-
-    } catch {
-      setข้อผิดพลาด('เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')
+    } catch (err) {
+      setข้อผิดพลาด('เชื่อมต่อไม่ได้: ' + err.message)
     } finally {
-      setกำลังโหลด(false)  // รันเสมอ ไม่ว่าจะสำเร็จ / error / network fail
+      setกำลังโหลด(false)
     }
   }
 
