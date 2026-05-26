@@ -34,10 +34,52 @@ const รายงานทั้งหมด = [
 ]
 
 // ข้อมูลสัตว์ในความดูแล (จำลอง)
+// แต่ละตัวมีข้อมูลครบ: ตัวสัตว์, ผู้แจ้ง, และข้อมูลการจับ
 const สัตว์ในดูแล = [
-  { id: 1, emoji: '🐕', ชื่อ: 'มะม่วง', สายพันธุ์: 'สุนัขพันธุ์ไทยผสม', อายุ: '2 ปี', สถานะ: 'อยู่ศูนย์พักพิง', สุขภาพ: 'ปกติ' },
-  { id: 2, emoji: '🐈', ชื่อ: 'ส้ม', สายพันธุ์: 'แมวส้ม', อายุ: '1 ปี', สถานะ: 'รอการรับเลี้ยง', สุขภาพ: 'ปกติ' },
-  { id: 3, emoji: '🐕', ชื่อ: 'ขาว', สายพันธุ์: 'สุนัขไทยหลังอาน', อายุ: '3 ปี', สถานะ: 'อยู่ศูนย์พักพิง', สุขภาพ: 'อยู่ระหว่างรักษา' },
+  {
+    id: 1, emoji: '🐕', ชื่อ: 'มะม่วง', เพศ: 'ตัวผู้',
+    สายพันธุ์: 'สุนัขพันธุ์ไทยผสม', อายุ: '2 ปี',
+    สถานะ: 'อยู่ศูนย์พักพิง', สุขภาพ: 'ปกติ',
+    ลักษณะ: 'ขนสีน้ำตาล มีแผลเล็กน้อยที่ขาหน้าซ้าย ตาสองข้างปกติ',
+    วัคซีน: 'ฉีดวัคซีนพิษสุนัขบ้าแล้ว 20 พ.ค. 2569',
+    // ข้อมูลผู้แจ้ง
+    ผู้แจ้ง: { ชื่อ: 'สมชาย ใจดี', emoji: '👨', เบอร์: '081-234-5678', อีเมล: 'somchai@gmail.com' },
+    // ข้อมูลการจับ
+    การจับ: {
+      วันที่: '22 พ.ค. 2569', เวลา: '10:30 น.',
+      สถานที่: 'ถนนลาดพร้าว 101 หน้าร้านสะดวกซื้อ',
+      ผู้รับผิดชอบ: 'จ.ส.ต. ประยุทธ์ รักสัตว์', ตำแหน่ง: 'เจ้าหน้าที่อาสาสมัคร',
+      หมายเลขรายงาน: 'RPT001300',
+    },
+  },
+  {
+    id: 2, emoji: '🐈', ชื่อ: 'ส้ม', เพศ: 'ตัวเมีย',
+    สายพันธุ์: 'แมวส้ม', อายุ: '1 ปี',
+    สถานะ: 'รอการรับเลี้ยง', สุขภาพ: 'ปกติ',
+    ลักษณะ: 'ขนสีส้มทั้งตัว ผอมเล็กน้อย ไม่มีบาดแผล นิสัยเชื่อง',
+    วัคซีน: 'ยังไม่ได้ฉีดวัคซีน (รอนัดหมาย)',
+    ผู้แจ้ง: { ชื่อ: 'มาลี รักสัตว์', emoji: '👩', เบอร์: '089-876-5432', อีเมล: 'malee@gmail.com' },
+    การจับ: {
+      วันที่: '23 พ.ค. 2569', เวลา: '14:15 น.',
+      สถานที่: 'สวนสาธารณะหมู่บ้านเกษตร ตำบลกำแพงแสน',
+      ผู้รับผิดชอบ: 'นางสาว อัญชลี ดีงาม', ตำแหน่ง: 'อาสาสมัครพิทักษ์สัตว์',
+      หมายเลขรายงาน: 'RPT001299',
+    },
+  },
+  {
+    id: 3, emoji: '🐕', ชื่อ: 'ขาว', เพศ: 'ตัวผู้',
+    สายพันธุ์: 'สุนัขไทยหลังอาน', อายุ: '3 ปี',
+    สถานะ: 'อยู่ศูนย์พักพิง', สุขภาพ: 'อยู่ระหว่างรักษา',
+    ลักษณะ: 'ขนสีขาว มีบาดแผลที่หลัง อยู่ระหว่างรักษาจากสัตวแพทย์',
+    วัคซีน: 'ฉีดวัคซีนครบ กำลังรักษาแผลติดเชื้อ',
+    ผู้แจ้ง: { ชื่อ: 'วิชัย คงดี', emoji: '👨', เบอร์: '062-111-9999', อีเมล: 'wichai@gmail.com' },
+    การจับ: {
+      วันที่: '20 พ.ค. 2569', เวลา: '08:00 น.',
+      สถานที่: 'ใต้สะพานคลองกำแพงแสน หมู่ 3',
+      ผู้รับผิดชอบ: 'นาย ธนกร มั่นคง', ตำแหน่ง: 'เจ้าหน้าที่ อบต.',
+      หมายเลขรายงาน: 'RPT001289',
+    },
+  },
 ]
 
 // สีของความเร่งด่วน
@@ -62,6 +104,9 @@ function VolunteerPage({ หน้า }) {
 
   // State สำหรับ Modal โปรไฟล์ผู้แจ้ง — เก็บว่าตอนนี้กดดูรายงานไหน
   const [รายงานที่ดูโปรไฟล์, setรายงานที่ดูโปรไฟล์] = useState(null)  // null = ปิด modal
+
+  // State สำหรับ Modal รายละเอียดสัตว์ — เก็บสัตว์ที่กดแก้ไข
+  const [สัตว์ที่กดแก้ไข, setSัตว์ที่กดแก้ไข] = useState(null)  // null = ปิด modal
 
   // State สำหรับหน้า update
   const [รายงานที่เลือก, setรายงานที่เลือก] = useState(null)
@@ -445,24 +490,207 @@ function VolunteerPage({ หน้า }) {
             <div key={สัตว์.id} className="bg-white rounded-2xl p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl">{สัตว์.emoji}</span>
+                  {/* รูปสัตว์ */}
+                  <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center text-3xl shrink-0">
+                    {สัตว์.emoji}
+                  </div>
                   <div>
                     <p className="font-bold text-gray-800">{สัตว์.ชื่อ}</p>
-                    <p className="text-xs text-gray-500">{สัตว์.สายพันธุ์} • {สัตว์.อายุ}</p>
+                    <p className="text-xs text-gray-500">{สัตว์.สายพันธุ์} • {สัตว์.อายุ} • {สัตว์.เพศ}</p>
                     <p className={`text-xs mt-1 px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.สถานะ]}`}>
                       {สัตว์.สถานะ}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <button className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg">แก้ไข</button>
-                  <p className={`text-xs text-center ${สัตว์.สุขภาพ === 'ปกติ' ? 'text-green-600' : 'text-orange-600'}`}>
+                <div className="flex flex-col items-end gap-1.5">
+                  {/* ปุ่มแก้ไข — กดแล้วเปิด modal */}
+                  <button
+                    onClick={() => setSัตว์ที่กดแก้ไข(สัตว์)}
+                    className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium"
+                  >
+                    ดูรายละเอียด
+                  </button>
+                  <p className={`text-xs ${สัตว์.สุขภาพ === 'ปกติ' ? 'text-green-600' : 'text-orange-600'}`}>
                     {สัตว์.สุขภาพ === 'ปกติ' ? '💚' : '🟡'} {สัตว์.สุขภาพ}
                   </p>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ---- Modal รายละเอียดสัตว์ ---- */}
+      {/* เปิดเมื่อกดปุ่ม "ดูรายละเอียด" ในรายการสัตว์ */}
+      {สัตว์ที่กดแก้ไข && (
+        // พื้นหลังโปร่งแสง — กดข้างนอกเพื่อปิด
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+          onClick={() => setSัตว์ที่กดแก้ไข(null)}
+        >
+          {/* กล่อง modal — scroll ได้ */}
+          <div
+            className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle bar บนสุด */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            <div className="px-6 pb-8 space-y-5">
+
+              {/* หัว modal */}
+              <div className="flex items-center justify-between pt-2">
+                <h2 className="font-bold text-gray-800 text-lg">รายละเอียดสัตว์</h2>
+                <button
+                  onClick={() => setSัตว์ที่กดแก้ไข(null)}
+                  className="text-gray-400 text-2xl leading-none w-8 h-8 flex items-center justify-center"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* ===== ส่วนที่ 1: ข้อมูลสัตว์ ===== */}
+              <div className="bg-green-50 rounded-2xl p-4">
+                <p className="text-xs font-bold text-green-700 mb-3">🐾 ข้อมูลสัตว์</p>
+
+                {/* รูปสัตว์ขนาดใหญ่ */}
+                <div className="w-full h-36 bg-white rounded-2xl flex items-center justify-center text-7xl mb-4 shadow-sm">
+                  {สัตว์ที่กดแก้ไข.emoji}
+                </div>
+
+                {/* ชื่อและสถานะ */}
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xl font-bold text-gray-800">{สัตว์ที่กดแก้ไข.ชื่อ}</p>
+                    <p className="text-sm text-gray-500">{สัตว์ที่กดแก้ไข.สายพันธุ์}</p>
+                  </div>
+                  <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${สีสถานะสัตว์[สัตว์ที่กดแก้ไข.สถานะ]}`}>
+                    {สัตว์ที่กดแก้ไข.สถานะ}
+                  </span>
+                </div>
+
+                {/* ตารางข้อมูลพื้นฐาน */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { หัว: 'เพศ', ค่า: สัตว์ที่กดแก้ไข.เพศ },
+                    { หัว: 'อายุ', ค่า: สัตว์ที่กดแก้ไข.อายุ },
+                    { หัว: 'สุขภาพ', ค่า: สัตว์ที่กดแก้ไข.สุขภาพ },
+                    { หัว: 'วัคซีน', ค่า: '✅' },
+                  ].map((ข้อมูล) => (
+                    <div key={ข้อมูล.หัว} className="bg-white rounded-xl px-3 py-2">
+                      <p className="text-xs text-gray-400">{ข้อมูล.หัว}</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-0.5">{ข้อมูล.ค่า}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ลักษณะภายนอก */}
+                <div className="bg-white rounded-xl px-3 py-2 mt-2">
+                  <p className="text-xs text-gray-400">ลักษณะภายนอก</p>
+                  <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{สัตว์ที่กดแก้ไข.ลักษณะ}</p>
+                </div>
+
+                {/* ข้อมูลวัคซีน */}
+                <div className="bg-white rounded-xl px-3 py-2 mt-2">
+                  <p className="text-xs text-gray-400">ประวัติวัคซีน / การรักษา</p>
+                  <p className="text-sm text-gray-700 mt-0.5">{สัตว์ที่กดแก้ไข.วัคซีน}</p>
+                </div>
+              </div>
+
+              {/* ===== ส่วนที่ 2: ผู้แจ้ง ===== */}
+              <div className="bg-orange-50 rounded-2xl p-4">
+                <p className="text-xs font-bold text-orange-700 mb-3">👤 ผู้แจ้งสัตว์ตัวนี้</p>
+
+                {/* ชื่อผู้แจ้ง */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl shadow-sm">
+                    {สัตว์ที่กดแก้ไข.ผู้แจ้ง.emoji}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">{สัตว์ที่กดแก้ไข.ผู้แจ้ง.ชื่อ}</p>
+                    <p className="text-xs text-gray-500">{สัตว์ที่กดแก้ไข.ผู้แจ้ง.อีเมล}</p>
+                  </div>
+                </div>
+
+                {/* เบอร์โทร — กดโทรได้ */}
+                <a
+                  href={`tel:${สัตว์ที่กดแก้ไข.ผู้แจ้ง.เบอร์.replace(/-/g, '')}`}
+                  className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-sm"
+                >
+                  <span className="text-2xl">📞</span>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400">เบอร์ติดต่อ</p>
+                    <p className="font-bold text-green-700">{สัตว์ที่กดแก้ไข.ผู้แจ้ง.เบอร์}</p>
+                  </div>
+                  <span className="text-green-500 text-sm font-semibold">โทร</span>
+                </a>
+              </div>
+
+              {/* ===== ส่วนที่ 3: ข้อมูลการจับ ===== */}
+              <div className="bg-blue-50 rounded-2xl p-4">
+                <p className="text-xs font-bold text-blue-700 mb-3">🚐 ข้อมูลการจับ / นำเข้าศูนย์</p>
+
+                <div className="space-y-2">
+                  {/* วันที่และเวลา */}
+                  <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-xl">📅</span>
+                    <div>
+                      <p className="text-xs text-gray-400">วันที่จับ</p>
+                      <p className="font-semibold text-gray-800">
+                        {สัตว์ที่กดแก้ไข.การจับ.วันที่} เวลา {สัตว์ที่กดแก้ไข.การจับ.เวลา}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* สถานที่จับ */}
+                  <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-xl">📍</span>
+                    <div>
+                      <p className="text-xs text-gray-400">สถานที่จับ</p>
+                      <p className="font-semibold text-gray-800">{สัตว์ที่กดแก้ไข.การจับ.สถานที่}</p>
+                    </div>
+                  </div>
+
+                  {/* ผู้รับผิดชอบ */}
+                  <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-xl">🦺</span>
+                    <div>
+                      <p className="text-xs text-gray-400">ผู้รับผิดชอบการจับ</p>
+                      <p className="font-semibold text-gray-800">{สัตว์ที่กดแก้ไข.การจับ.ผู้รับผิดชอบ}</p>
+                      <p className="text-xs text-gray-500">{สัตว์ที่กดแก้ไข.การจับ.ตำแหน่ง}</p>
+                    </div>
+                  </div>
+
+                  {/* เลขรายงานอ้างอิง */}
+                  <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-xl">📋</span>
+                    <div>
+                      <p className="text-xs text-gray-400">อ้างอิงรายงาน</p>
+                      <p className="font-semibold text-gray-800">#{สัตว์ที่กดแก้ไข.การจับ.หมายเลขรายงาน}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ปุ่มแก้ไขข้อมูล + ปุ่มปิด */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSัตว์ที่กดแก้ไข(null)}
+                  className="flex-1 bg-gray-100 text-gray-600 rounded-xl py-3 font-medium"
+                >
+                  ปิด
+                </button>
+                <button
+                  className="flex-1 bg-green-500 text-white rounded-xl py-3 font-semibold"
+                >
+                  ✏️ แก้ไขข้อมูล
+                </button>
+              </div>
+
+            </div>
+          </div>
         </div>
       )}
 
