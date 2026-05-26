@@ -121,9 +121,11 @@ function VolunteerPage({ หน้า }) {
   const [filterTab, setFilterTab] = useState('all')
 
   // ---- Animals ----
-  const [สัตว์จากDB,     setSัตว์จากDB]     = useState([])
-  const [โหลดสัตว์,      setโหลดสัตว์]      = useState(true)
-  const [สัตว์ที่แก้ไข,   setSัตว์ที่แก้ไข]   = useState(null)
+  const [สัตว์จากDB,        setSัตว์จากDB]        = useState([])
+  const [โหลดสัตว์,         setโหลดสัตว์]         = useState(true)
+  const [สัตว์ที่แก้ไข,      setSัตว์ที่แก้ไข]      = useState(null)
+  const [ข้อมูลรายงานสัตว์,  setข้อมูลรายงานสัตว์]  = useState(null)   // { report + reporter }
+  const [โหลดรายงานสัตว์,   setโหลดรายงานสัตว์]   = useState(false)
   const [แสดงฟอร์มเพิ่ม, setแสดงฟอร์มเพิ่ม] = useState(false)
   const [ชื่อสัตว์,       setชื่อสัตว์]       = useState('')
   const [เพศสัตว์,       setเพศสัตว์]       = useState('')
@@ -360,10 +362,40 @@ function VolunteerPage({ หน้า }) {
         return prev.map(function (s) { return s.id === สัตว์ที่แก้ไข.id ? สัตว์ที่แก้ไข : s })
       })
       setSัตว์ที่แก้ไข(null)
+      setข้อมูลรายงานสัตว์(null)
       toast('✅ บันทึกข้อมูลสัตว์สำเร็จ!')
     } else {
       alert('บันทึกไม่สำเร็จ: ' + error.message)
     }
+  }
+
+  // เปิด bottom sheet แก้ไขสัตว์ + ดึงข้อมูลรายงาน/ผู้แจ้ง (ถ้ามาจากรายงาน)
+  async function เปิดแก้ไขสัตว์(สัตว์) {
+    setSัตว์ที่แก้ไข({ ...สัตว์ })
+    setข้อมูลรายงานสัตว์(null)
+
+    if (!สัตว์.report_id) return
+
+    setโหลดรายงานสัตว์(true)
+    const { data: report } = await supabase
+      .from('reports')
+      .select('id, animal_type, location_text, detail, reporter_id, created_at')
+      .eq('id', สัตว์.report_id)
+      .single()
+
+    if (report) {
+      let reporter = null
+      if (report.reporter_id) {
+        const { data } = await supabase
+          .from('users')
+          .select('name, phone, email, avatar_url')
+          .eq('id', report.reporter_id)
+          .single()
+        reporter = data || null
+      }
+      setข้อมูลรายงานสัตว์({ ...report, reporter })
+    }
+    setโหลดรายงานสัตว์(false)
   }
 
   // ================================================================
@@ -625,7 +657,7 @@ function VolunteerPage({ หน้า }) {
           <div className="space-y-3">
             {สัตว์จากDB.map(function (สัตว์) {
               return (
-                <button key={สัตว์.id} onClick={() => setSัตว์ที่แก้ไข({ ...สัตว์ })}
+                <button key={สัตว์.id} onClick={() => เปิดแก้ไขสัตว์(สัตว์)}
                   className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all"
                 >
                   <div className="flex items-center gap-3">
@@ -944,13 +976,13 @@ function VolunteerPage({ หน้า }) {
           ============================================================ */}
       {สัตว์ที่แก้ไข && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
-             onClick={() => setSัตว์ที่แก้ไข(null)}>
+             onClick={() => { setSัตว์ที่แก้ไข(null); setข้อมูลรายงานสัตว์(null) }}>
           <div className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
             <div className="flex items-center justify-between px-5 py-3">
               <p className="font-bold text-gray-800">แก้ไขข้อมูลสัตว์</p>
-              <button onClick={() => setSัตว์ที่แก้ไข(null)} className="text-gray-400 text-2xl leading-none">✕</button>
+              <button onClick={() => { setSัตว์ที่แก้ไข(null); setข้อมูลรายงานสัตว์(null) }} className="text-gray-400 text-2xl leading-none">✕</button>
             </div>
 
             <div className="px-5 pb-8 space-y-4">
@@ -965,6 +997,79 @@ function VolunteerPage({ หน้า }) {
               {สัตว์ที่แก้ไข.report_id && (
                 <div className="bg-orange-50 rounded-xl px-4 py-2.5 text-xs text-orange-600 font-medium">
                   📋 มาจากรายงาน #{String(สัตว์ที่แก้ไข.report_id).padStart(6, '0')}
+                </div>
+              )}
+
+              {/* ข้อมูลรายงาน + ผู้แจ้ง (เฉพาะสัตว์ที่มาจากรายงาน) */}
+              {สัตว์ที่แก้ไข.report_id && (
+                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 space-y-3">
+                  <p className="text-xs font-bold text-blue-700">👤 ข้อมูลผู้แจ้ง</p>
+
+                  {โหลดรายงานสัตว์ && (
+                    <p className="text-xs text-gray-400">กำลังโหลด...</p>
+                  )}
+
+                  {!โหลดรายงานสัตว์ && ข้อมูลรายงานสัตว์ && (
+                    <>
+                      {/* ตำแหน่งที่พบ */}
+                      {ข้อมูลรายงานสัตว์.location_text && (
+                        <div className="flex items-start gap-2 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
+                          <span className="text-base mt-0.5">📍</span>
+                          <div>
+                            <p className="text-xs text-gray-400">ตำแหน่งที่พบสัตว์</p>
+                            <p className="text-sm font-semibold text-gray-800">{ข้อมูลรายงานสัตว์.location_text}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* รายละเอียดจากผู้แจ้ง */}
+                      {ข้อมูลรายงานสัตว์.detail && (
+                        <div className="bg-white rounded-xl px-3 py-2.5 border border-blue-100">
+                          <p className="text-xs text-gray-400 mb-0.5">รายละเอียด</p>
+                          <p className="text-sm text-gray-700">"{ข้อมูลรายงานสัตว์.detail}"</p>
+                        </div>
+                      )}
+
+                      {/* ข้อมูลผู้แจ้ง */}
+                      {ข้อมูลรายงานสัตว์.reporter ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                              {ข้อมูลรายงานสัตว์.reporter.avatar_url
+                                ? <img src={ข้อมูลรายงานสัตว์.reporter.avatar_url} alt="ผู้แจ้ง" className="w-full h-full object-cover" />
+                                : <span className="text-xl">👤</span>
+                              }
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-800">{ข้อมูลรายงานสัตว์.reporter.name || 'ไม่ระบุ'}</p>
+                              <p className="text-xs text-gray-500">{ข้อมูลรายงานสัตว์.reporter.email || '-'}</p>
+                            </div>
+                          </div>
+                          {ข้อมูลรายงานสัตว์.reporter.phone ? (
+                            <a href={`tel:${ข้อมูลรายงานสัตว์.reporter.phone}`}
+                               className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border border-blue-200 w-full">
+                              <span className="text-xl">📞</span>
+                              <div>
+                                <p className="text-xs text-gray-400">เบอร์โทรติดต่อ</p>
+                                <p className="text-base font-bold text-blue-600">{ข้อมูลรายงานสัตว์.reporter.phone}</p>
+                              </div>
+                              <span className="ml-auto text-blue-500 font-medium text-sm">กดโทร →</span>
+                            </a>
+                          ) : (
+                            <p className="text-xs text-gray-400 bg-white rounded-xl px-3 py-2 border border-dashed border-blue-200">
+                              ⚠️ ผู้แจ้งยังไม่ได้ระบุเบอร์โทร
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">ไม่พบข้อมูลผู้แจ้ง</p>
+                      )}
+                    </>
+                  )}
+
+                  {!โหลดรายงานสัตว์ && !ข้อมูลรายงานสัตว์ && (
+                    <p className="text-xs text-gray-400 italic">ไม่พบข้อมูลรายงาน</p>
+                  )}
                 </div>
               )}
 
