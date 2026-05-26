@@ -22,40 +22,46 @@ function App() {
   const [กำลังโหลด, setกำลังโหลด] = useState(true)  // รอเช็ค session ก่อน render
 
   useEffect(function () {
-    // ป้องกันค้าง: ถ้าโหลดนานเกิน 5 วินาที ให้แสดงหน้า Login เลย
-    const timeout = setTimeout(function () {
-      setกำลังโหลด(false)
-    }, 5000)
+    let cancelled = false
 
-    // เช็ค session ที่มีอยู่แล้ว (กรณี user เปิดแอปใหม่แต่เคย login ไว้)
-    supabase.auth.getSession().then(async function ({ data: { session } }) {
-      clearTimeout(timeout)
-      if (session?.user) {
-        await ดึงข้อมูลUser(session.user)
-      }
-      setกำลังโหลด(false)
-    }).catch(function () {
-      clearTimeout(timeout)
-      setกำลังโหลด(false)
-    })
+    // Emergency bail: ถ้าทุกอย่างค้างนานเกิน 12 วินาที ให้ปิด loading เลย
+    const emergencyTimer = setTimeout(function () {
+      if (!cancelled) setกำลังโหลด(false)
+    }, 12000)
 
-    // ฟัง event: login / logout / กดลิงก์ยืนยันอีเมล
+    // onAuthStateChange ยิง INITIAL_SESSION ทันทีที่ mount → ไม่ต้องเรียก getSession แยก
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async function (event, session) {
-        if (session?.user) {
-          await ดึงข้อมูลUser(session.user)
-        } else {
+        if (cancelled) return
+
+        if (event === 'SIGNED_OUT' || !session) {
           setUser(null)
+          clearTimeout(emergencyTimer)
+          setกำลังโหลด(false)
+        } else if (
+          session?.user &&
+          (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')
+        ) {
+          await ดึงข้อมูลUser(session.user)
+          if (!cancelled) {
+            clearTimeout(emergencyTimer)
+            setกำลังโหลด(false)
+          }
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return function () {
+      cancelled = true
+      clearTimeout(emergencyTimer)
+      subscription.unsubscribe()
+    }
   }, [])
 
   // ดึง role + ชื่อ จาก public.users โดยใช้ id จาก Supabase Auth
+  // ไม่ใช้ timeout แล้ว — ปล่อยให้ query รอจนเสร็จตามธรรมชาติ
+  // (ป้องกัน role บัคเป็น 'user' เมื่อ DB ตอบช้า)
   async function ดึงข้อมูลUser(authUser) {
-    // fallback พร้อมใช้งานทันที ถ้า DB ค้างหรือ error
     const fallback = {
       id:    authUser.id,
       email: authUser.email,
@@ -64,26 +70,23 @@ function App() {
     }
 
     try {
-      // timeout 5 วินาที: ถ้า users table ค้าง → ใช้ fallback เลย ไม่รอ
-      const timer = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('TIMEOUT')), 5000)
-      )
-      const query = supabase
+      const { data, error } = await supabase
         .from('users')
         .select('name, role, status')
         .eq('id', authUser.id)
         .single()
 
-      const { data } = await Promise.race([query, timer])
-
-      setUser({
-        id:    authUser.id,
-        email: authUser.email,
-        name:  data?.name || fallback.name,
-        role:  data?.role  || 'user',
-      })
+      if (error || !data) {
+        setUser(fallback)
+      } else {
+        setUser({
+          id:    authUser.id,
+          email: authUser.email,
+          name:  data.name  || fallback.name,
+          role:  data.role  || 'user',
+        })
+      }
     } catch {
-      // ดึงจาก users table ไม่ได้ หรือ timeout → login ด้วย role default
       setUser(fallback)
     }
   }
