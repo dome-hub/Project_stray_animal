@@ -99,7 +99,7 @@ function ReportAnimal({ user }) {
         urgency:       'ปานกลาง',
         status:        'รอดำเนินการ',
         image_url:     imageUrl,          // URL รูปจริงจาก Storage
-        // reporter_id: user?.id          // เปิดใช้เมื่อมี auth จริง
+        reporter_id:   user?.id,          // บันทึกว่าใครเป็นคนแจ้ง
       })
       .select()
       .single()
