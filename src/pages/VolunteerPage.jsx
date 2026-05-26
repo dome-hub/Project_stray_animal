@@ -186,7 +186,7 @@ function VolunteerPage({ หน้า }) {
       setโหลดผู้แจ้ง(true)
       const { data } = await supabase
         .from('users')
-        .select('name, phone, email')
+        .select('name, phone, email, avatar_url')
         .eq('id', report.reporter_id)
         .single()
       setข้อมูลผู้แจ้ง(data || null)
@@ -747,7 +747,12 @@ function VolunteerPage({ หน้า }) {
                 {รายงานที่เปิด.reporter_id && !โหลดผู้แจ้ง && ข้อมูลผู้แจ้ง && (
                   <div className="space-y-2.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm">👤</div>
+                      <div className="w-10 h-10 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                        {ข้อมูลผู้แจ้ง.avatar_url
+                          ? <img src={ข้อมูลผู้แจ้ง.avatar_url} alt="ผู้แจ้ง" className="w-full h-full object-cover" />
+                          : <span className="text-xl">👤</span>
+                        }
+                      </div>
                       <div>
                         <p className="text-sm font-bold text-gray-800">{ข้อมูลผู้แจ้ง.name || 'ไม่ระบุ'}</p>
                         <p className="text-xs text-gray-500">{ข้อมูลผู้แจ้ง.email || '-'}</p>
@@ -840,14 +845,22 @@ function VolunteerPage({ หน้า }) {
                   {โหลดผู้แจ้ง ? (
                     <p className="text-xs text-gray-400">กำลังโหลด...</p>
                   ) : ข้อมูลผู้แจ้ง ? (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold">{ข้อมูลผู้แจ้ง.name || '-'}</p>
-                        <p className="text-xs text-gray-500">{ข้อมูลผู้แจ้ง.email || '-'}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                          {ข้อมูลผู้แจ้ง.avatar_url
+                            ? <img src={ข้อมูลผู้แจ้ง.avatar_url} alt="ผู้แจ้ง" className="w-full h-full object-cover" />
+                            : <span className="text-lg">👤</span>
+                          }
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{ข้อมูลผู้แจ้ง.name || '-'}</p>
+                          <p className="text-xs text-gray-500">{ข้อมูลผู้แจ้ง.email || '-'}</p>
+                        </div>
                       </div>
                       {ข้อมูลผู้แจ้ง.phone && (
                         <a href={`tel:${ข้อมูลผู้แจ้ง.phone}`}
-                           className="bg-blue-500 text-white text-xs px-3 py-2 rounded-xl font-semibold">
+                           className="bg-blue-500 text-white text-xs px-3 py-2 rounded-xl font-semibold shrink-0">
                           📞 {ข้อมูลผู้แจ้ง.phone}
                         </a>
                       )}
