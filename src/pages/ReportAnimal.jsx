@@ -14,7 +14,8 @@ const ผลวิเคราะห์AI = [
 
 function ReportAnimal({ user }) {
   const navigate = useNavigate()
-  const inputรูปภาพ = useRef(null)
+  const inputรูปภาพ  = useRef(null)   // เลือกจากแกลเลอรี่
+  const inputถ่ายรูป = useRef(null)   // เปิดกล้องโดยตรง
 
   const [รูปภาพPreview, setรูปภาพPreview] = useState(null)   // URL สำหรับ preview ใน browser
   const [ไฟล์รูปภาพ, setไฟล์รูปภาพ] = useState(null)        // File object จริง สำหรับ upload
@@ -174,10 +175,9 @@ function ReportAnimal({ user }) {
         {/* อัปโหลดรูปภาพ */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">ภาพถ่ายสัตว์</p>
-          <div
-            onClick={() => inputรูปภาพ.current.click()}
-            className="border-2 border-dashed border-orange-300 rounded-2xl overflow-hidden cursor-pointer bg-white"
-          >
+
+          {/* Preview */}
+          <div className="border-2 border-dashed border-orange-300 rounded-2xl overflow-hidden bg-white mb-3">
             {รูปภาพPreview ? (
               <div className="relative">
                 <img src={รูปภาพPreview} alt="สัตว์" className="w-full h-52 object-cover" />
@@ -187,15 +187,48 @@ function ReportAnimal({ user }) {
                     <p className="text-sm">AI กำลังวิเคราะห์...</p>
                   </div>
                 )}
+                {/* ปุ่มเปลี่ยนรูป */}
+                <button
+                  onClick={() => inputรูปภาพ.current.click()}
+                  className="absolute bottom-3 right-3 bg-white/90 text-gray-700 text-xs px-3 py-1.5 rounded-full shadow font-medium"
+                >
+                  เปลี่ยนรูป
+                </button>
               </div>
             ) : (
-              <div className="h-44 flex flex-col items-center justify-center text-gray-400">
-                <div className="text-5xl mb-2">📷</div>
-                <p className="text-sm font-medium">คลิกเพื่อถ่ายภาพหรืออัปโหลด</p>
-                <p className="text-xs mt-1">รองรับไฟล์ JPG, PNG</p>
+              <div className="h-36 flex flex-col items-center justify-center text-gray-400">
+                <div className="text-4xl mb-2">🐾</div>
+                <p className="text-sm text-gray-500">ยังไม่ได้เลือกรูป</p>
               </div>
             )}
           </div>
+
+          {/* 2 ปุ่ม: ถ่ายรูป / เลือกจากคลัง */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => inputถ่ายรูป.current.click()}
+              className="bg-orange-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              📷 ถ่ายรูปเลย
+            </button>
+            <button
+              onClick={() => inputรูปภาพ.current.click()}
+              className="bg-white border-2 border-orange-300 text-orange-600 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              🖼️ เลือกจากคลัง
+            </button>
+          </div>
+
+          {/* input เปิดกล้อง (capture) */}
+          <input
+            ref={inputถ่ายรูป}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={เลือกรูปภาพ}
+          />
+          {/* input เลือกจากแกลเลอรี่ */}
           <input
             ref={inputรูปภาพ}
             type="file"
