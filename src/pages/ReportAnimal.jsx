@@ -33,6 +33,8 @@ function ReportAnimal({ user }) {
   const [ผลAI,         setผลAI]         = useState(null)
   const [กำลังวิเคราะห์, setกำลังวิเคราะห์] = useState(false)
   const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
+  const [latitude,        setLatitude]        = useState(null)
+  const [longitude,       setLongitude]       = useState(null)
   const [กำลังส่ง,     setกำลังส่ง]     = useState(false)
   const [ส่งสำเร็จ,    setส่งสำเร็จ]    = useState(false)
   const [รหัสรายงาน,  setรหัสรายงาน]  = useState(null)
@@ -115,18 +117,42 @@ function ReportAnimal({ user }) {
     }, 'image/jpeg', 0.85)
   }
 
-  // ---- GPS ----
-  function ใช้GPSปัจจุบัน() {
+  // ---- GPS + Reverse Geocoding (Nominatim — ฟรี ไม่ต้อง API key) ----
+  async function ใช้GPSปัจจุบัน() {
     setกำลังหาตำแหน่ง(true)
     navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        setตำแหน่ง(`พิกัด: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`)
+      async function (pos) {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setLatitude(lat)
+        setLongitude(lng)
+        try {
+          const res  = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'Accept-Language': 'th' } }
+          )
+          const data = await res.json()
+          const a    = data.address || {}
+          // ประกอบที่อยู่แบบสั้น: ถนน → แขวง/ตำบล → เขต/อำเภอ → เมือง → จังหวัด
+          const parts = [
+            a.road || a.pedestrian || a.path,
+            a.suburb || a.neighbourhood || a.quarter || a.village,
+            a.city_district || a.district,
+            a.city || a.town || a.county,
+            a.state,
+          ].filter(Boolean)
+          setตำแหน่ง(parts.join(', ') || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+        } catch {
+          // Nominatim ใช้ไม่ได้ → แสดงพิกัดดิบ
+          setตำแหน่ง(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+        }
         setกำลังหาตำแหน่ง(false)
       },
       function () {
-        setตำแหน่ง('กำแพงแสน นครปฐม')
         setกำลังหาตำแหน่ง(false)
-      }
+        alert('ไม่สามารถระบุตำแหน่งได้ กรุณากรอกด้วยตนเอง')
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
     )
   }
 
@@ -154,6 +180,8 @@ function ReportAnimal({ user }) {
       status:        'รอดำเนินการ',
       image_url:     imageUrl,
       reporter_id:   user?.id,
+      latitude:      latitude,
+      longitude:     longitude,
     }).select().single()
 
     setกำลังส่ง(false)
@@ -359,6 +387,19 @@ function ReportAnimal({ user }) {
             className="mt-2 w-full bg-orange-500 text-white rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">
             {กำลังหาตำแหน่ง ? '⏳ กำลังระบุตำแหน่ง...' : '📍 ใช้ตำแหน่งปัจจุบัน (GPS)'}
           </button>
+
+          {/* แสดง link Google Maps เมื่อมีพิกัด */}
+          {latitude && longitude && (
+            <a
+              href={`https://www.google.com/maps?q=${latitude},${longitude}`}
+              target="_blank" rel="noreferrer"
+              className="mt-2 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-700 font-medium"
+            >
+              <span className="text-lg">🗺️</span>
+              <span className="flex-1">ดูตำแหน่งใน Google Maps</span>
+              <span className="text-xs text-green-500">→</span>
+            </a>
+          )}
         </div>
 
         {/* รายละเอียด */}

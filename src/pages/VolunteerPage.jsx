@@ -386,7 +386,7 @@ function VolunteerPage({ หน้า }) {
     setโหลดรายงานสัตว์(true)
     const { data: report } = await supabase
       .from('reports')
-      .select('id, animal_type, location_text, detail, reporter_id, created_at')
+      .select('id, animal_type, location_text, latitude, longitude, detail, reporter_id, created_at')
       .eq('id', สัตว์.report_id)
       .single()
 
@@ -757,9 +757,18 @@ function VolunteerPage({ หน้า }) {
               {/* ตำแหน่ง */}
               <div className="flex items-start gap-3 bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
                 <span className="text-xl mt-0.5">📍</span>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-400 mb-0.5">ตำแหน่งที่พบสัตว์</p>
                   <p className="text-sm font-semibold text-gray-800">{รายงานที่เปิด.location_text || '-'}</p>
+                  {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
+                    <a
+                      href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
+                      target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                    >
+                      🗺️ เปิดใน Google Maps →
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -863,12 +872,21 @@ function VolunteerPage({ หน้า }) {
 
             <div className="px-5 pb-8 space-y-4">
               {/* รูป + ข้อมูล */}
-              <div className="flex gap-3 items-center bg-gray-50 rounded-2xl p-3">
+              <div className="flex gap-3 items-start bg-gray-50 rounded-2xl p-3">
                 <AnimalThumb imageUrl={รายงานที่เปิด.image_url} type={รายงานที่เปิด.animal_type} />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-800">{รายงานที่เปิด.animal_type || 'ไม่ระบุ'}</p>
                   <p className="text-xs text-gray-500 truncate">📍 {รายงานที่เปิด.location_text}</p>
                   <p className="text-xs text-gray-400">{แปลงวันที่เวลา(รายงานที่เปิด.created_at)}</p>
+                  {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
+                    <a
+                      href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
+                      target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                    >
+                      🗺️ Google Maps →
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -1022,9 +1040,18 @@ function VolunteerPage({ หน้า }) {
                       {ข้อมูลรายงานสัตว์.location_text && (
                         <div className="flex items-start gap-2 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
                           <span className="text-base mt-0.5">📍</span>
-                          <div>
+                          <div className="flex-1">
                             <p className="text-xs text-gray-400">ตำแหน่งที่พบสัตว์</p>
                             <p className="text-sm font-semibold text-gray-800">{ข้อมูลรายงานสัตว์.location_text}</p>
+                            {ข้อมูลรายงานสัตว์.latitude && ข้อมูลรายงานสัตว์.longitude && (
+                              <a
+                                href={`https://www.google.com/maps?q=${ข้อมูลรายงานสัตว์.latitude},${ข้อมูลรายงานสัตว์.longitude}`}
+                                target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                              >
+                                🗺️ เปิดใน Google Maps →
+                              </a>
+                            )}
                           </div>
                         </div>
                       )}
