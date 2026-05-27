@@ -528,8 +528,8 @@ function AdminPage({ หน้า, user }) {
                 </div>
               )}
 
-              {/* ข้อมูลศูนย์พักพิง (volunteer/admin) */}
-              {(userที่เลือก.role === 'volunteer' || userที่เลือก.role === 'admin') && (
+              {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) */}
+              {userที่เลือก.role === 'volunteer' && (
                 <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
                   <p className="text-xs font-bold text-orange-600 uppercase tracking-wide">🏠 ข้อมูลศูนย์พักพิง</p>
                   {[
