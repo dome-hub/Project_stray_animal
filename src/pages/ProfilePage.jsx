@@ -383,8 +383,8 @@ function ProfilePage({ user }) {
         </div>
       )}
 
-      {/* ======== ข้อมูลศูนย์พักพิง (volunteer/admin เท่านั้น) ======== */}
-      {แท็บ === 'info' && (currentRole === 'volunteer' || currentRole === 'admin') && (
+      {/* ======== ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) ======== */}
+      {แท็บ === 'info' && currentRole === 'volunteer' && (
         <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-gray-800">🏠 ข้อมูลศูนย์พักพิง</h3>
