@@ -280,44 +280,47 @@ function ReportAnimal({ user }) {
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">ภาพถ่ายสัตว์</p>
 
-          {/* Preview */}
-          <div className="border-2 border-dashed border-orange-300 rounded-2xl overflow-hidden bg-white mb-3">
-            {รูปภาพPreview ? (
-              <div className="relative">
-                <img src={รูปภาพPreview} alt="สัตว์" className="w-full h-52 object-cover" />
-                {กำลังวิเคราะห์ && (
-                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
-                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-2" />
-                    <p className="text-sm">AI กำลังวิเคราะห์...</p>
-                  </div>
-                )}
+          {รูปภาพPreview ? (
+            /* ---- มีรูปแล้ว: preview + แถบถ่ายใหม่ / คลัง ---- */
+            <div className="relative rounded-2xl overflow-hidden border-2 border-orange-200">
+              <img src={รูปภาพPreview} alt="สัตว์" className="w-full h-64 object-cover" />
+              {กำลังวิเคราะห์ && (
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
+                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-2" />
+                  <p className="text-sm">AI กำลังวิเคราะห์...</p>
+                </div>
+              )}
+              <div className="absolute bottom-0 inset-x-0 bg-black/50 flex items-center justify-between px-5 py-3">
+                <button onClick={เปิดกล้อง}
+                  className="flex items-center gap-1.5 text-white text-sm font-medium">
+                  <span className="text-xl">📷</span> ถ่ายใหม่
+                </button>
                 <button onClick={() => inputGallery.current.click()}
-                  className="absolute bottom-3 right-3 bg-white/90 text-gray-700 text-xs px-3 py-1.5 rounded-full shadow font-medium">
-                  เปลี่ยนรูป
+                  className="flex items-center gap-1.5 text-white text-sm font-medium">
+                  <span className="text-xl">🖼️</span> คลัง
                 </button>
               </div>
-            ) : (
-              <div className="h-36 flex flex-col items-center justify-center text-gray-400">
-                <div className="text-4xl mb-2">🐾</div>
-                <p className="text-sm">ยังไม่ได้เลือกรูป</p>
-              </div>
-            )}
-          </div>
-
-          {/* 2 ปุ่ม */}
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={เปิดกล้อง}
-              className="bg-orange-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2">
-              📷 ถ่ายรูปเลย
-            </button>
-            <button onClick={() => inputGallery.current.click()}
-              className="bg-white border-2 border-orange-300 text-orange-600 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2">
-              🖼️ เลือกจากคลัง
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            ปุ่ม "ถ่ายรูปเลย" จะขออนุญาตเข้าถึงกล้องจากเบราว์เซอร์
-          </p>
+            </div>
+          ) : (
+            /* ---- ยังไม่มีรูป: กดทั้งก้อนเพื่อเปิดกล้อง + ไอคอนคลังมุมล่างขวา ---- */
+            <div className="relative">
+              <button
+                onClick={เปิดกล้อง}
+                className="w-full h-64 border-2 border-dashed border-orange-300 rounded-2xl bg-white flex flex-col items-center justify-center active:bg-orange-50 transition-colors"
+              >
+                <span className="text-6xl mb-3">📷</span>
+                <p className="text-base font-semibold text-gray-600">แตะเพื่อถ่ายรูป</p>
+                <p className="text-xs text-gray-400 mt-1">ระบบจะขอสิทธิ์เข้าถึงกล้อง</p>
+              </button>
+              {/* ไอคอนคลังมุมขวาล่าง */}
+              <button
+                onClick={() => inputGallery.current.click()}
+                className="absolute bottom-3 right-3 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm flex items-center gap-1.5 text-gray-600 text-xs font-medium"
+              >
+                <span className="text-base">🖼️</span> คลัง
+              </button>
+            </div>
+          )}
 
           <input ref={inputGallery} type="file" accept="image/*" className="hidden" onChange={เลือกรูปภาพ} />
         </div>
