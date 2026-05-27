@@ -6,15 +6,24 @@ import { supabase } from '../supabase'
 
 function แปลงเวลา(str) {
   if (!str) return ''
-  const diff = Date.now() - new Date(str).getTime()
-  const min  = Math.floor(diff / 60000)
-  const hr   = Math.floor(min / 60)
-  const day  = Math.floor(hr / 24)
-  if (min < 1)   return 'เมื่อกี้'
-  if (min < 60)  return `${min} นาทีที่แล้ว`
-  if (hr < 24)   return `${hr} ชั่วโมงที่แล้ว`
-  if (day < 7)   return `${day} วันที่แล้ว`
-  return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+  const d   = new Date(str)
+  const now = new Date()
+
+  const time = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+
+  // วันเดียวกัน
+  if (d.toDateString() === now.toDateString()) return `วันนี้ ${time}`
+
+  // เมื่อวาน
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) return `เมื่อวาน ${time}`
+
+  // วันอื่น → แสดงวันที่ + เวลาเต็ม
+  return (
+    d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) +
+    ' ' + time
+  )
 }
 
 // emoji ตามสถานะรายงาน
