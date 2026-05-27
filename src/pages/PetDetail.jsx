@@ -106,39 +106,62 @@ function PetDetail() {
       {/* ข้อมูลทั่วไป */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
         <h3 className="font-bold text-gray-800 mb-4">ข้อมูลทั่วไป</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-xs text-gray-500 mb-1">อายุ</p>
-            <p className="font-semibold text-gray-800 text-sm">{สัตว์.อายุ}</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-xs text-gray-500 mb-1">เพศ</p>
-            <p className="font-semibold text-gray-800 text-sm">{สัตว์.เพศ}</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-xs text-gray-500 mb-1">ขนาด</p>
-            <p className="font-semibold text-gray-800 text-sm">{สัตว์.ขนาด}</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <p className="text-xs text-gray-500 mb-1">ประเภท</p>
-            <p className="font-semibold text-gray-800 text-sm">
-              {สัตว์.emoji === '🐕' ? 'สุนัข' : 'แมว'}
-            </p>
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { label: 'ประเภท',   value: สัตว์.emoji === '🐕' ? 'สุนัข' : 'แมว' },
+            { label: 'เพศ',      value: สัตว์.เพศ  || 'ไม่ระบุ' },
+            { label: 'อายุ',     value: สัตว์.อายุ || 'ไม่ระบุ' },
+            { label: 'สายพันธุ์', value: สัตว์.สายพันธุ์ || 'ไม่ระบุ' },
+            { label: 'สุขภาพ',   value: สัตว์.สุขภาพ || 'ไม่ระบุ' },
+            { label: 'สถานะ',    value: สัตว์.สถานะ  || 'ไม่ระบุ' },
+          ].map(function (item) {
+            return (
+              <div key={item.label} className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+                <p className="font-semibold text-gray-800 text-sm">{item.value}</p>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* นิสัย */}
-      <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
-        <h3 className="font-bold text-gray-800 mb-3">นิสัย</h3>
-        <div className="flex flex-wrap gap-2">
-          {สัตว์.นิสัย.map((น) => (
-            <span key={น} className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm">
-              {น}
-            </span>
-          ))}
+      {/* วัคซีน */}
+      {สัตว์.วัคซีน && (
+        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3">💉 การฉีดวัคซีน</h3>
+          <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+            สัตว์.วัคซีน === 'ฉีดแล้ว'    ? 'bg-green-100 text-green-700' :
+            สัตว์.วัคซีน === 'ยังไม่ฉีด'  ? 'bg-red-100 text-red-600'   :
+            'bg-gray-100 text-gray-600'
+          }`}>
+            {สัตว์.วัคซีน === 'ฉีดแล้ว' ? '✅ ฉีดวัคซีนแล้ว' :
+             สัตว์.วัคซีน === 'ยังไม่ฉีด' ? '❌ ยังไม่ได้ฉีดวัคซีน' :
+             '❓ ไม่ทราบประวัติ'}
+          </span>
         </div>
-      </div>
+      )}
+
+      {/* นิสัย */}
+      {สัตว์.นิสัย && สัตว์.นิสัย.length > 0 && (
+        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3">🐾 ลักษณะนิสัย</h3>
+          <div className="flex flex-wrap gap-2">
+            {สัตว์.นิสัย.map((น) => (
+              <span key={น} className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                {น.trim()}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* รายละเอียดเพิ่มเติม */}
+      {สัตว์.ลักษณะ && (
+        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3">📝 รายละเอียดเพิ่มเติม</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">{สัตว์.ลักษณะ}</p>
+        </div>
+      )}
 
       {/* ข้อมูลศูนย์พักพิง */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
