@@ -1,17 +1,15 @@
 // PetDetail.jsx — หน้าแสดงรายละเอียดสัตว์แต่ละตัว
 // ผู้ใช้สามารถกดยื่นคำขอรับเลี้ยงได้
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { supabase } from '../supabase'
 
 function PetDetail() {
   const navigate = useNavigate()
 
-  // useLocation ใช้รับข้อมูลที่ส่งมาจากหน้า FindPet
-  // state.สัตว์ คือข้อมูลสัตว์ที่กดเลือกมา
   const { state } = useLocation()
 
-  // ถ้าไม่มีข้อมูลส่งมา → ใช้ข้อมูลตัวอย่างแทน
   const สัตว์ = state?.สัตว์ || {
     id: 1,
     emoji: '🐕',
@@ -25,27 +23,44 @@ function PetDetail() {
     คะแนน: 95,
   }
 
-  // รับเลี้ยงสำเร็จหรือยัง
   const [รับเลี้ยงสำเร็จ, setรับเลี้ยงสำเร็จ] = useState(false)
+  const [กำลังส่ง,        setกำลังส่ง]        = useState(false)
 
-  // กำลังส่งคำขออยู่ไหม
-  const [กำลังส่ง, setกำลังส่ง] = useState(false)
+  // ---- ข้อมูลศูนย์พักพิงจาก DB ----
+  const [ศูนย์,    setศูนย์]    = useState(null)
+  const [โหลดศูนย์, setโหลดศูนย์] = useState(true)
 
-  // ฟังก์ชันกดปุ่มรับเลี้ยง
+  useEffect(function () {
+    // ดึงข้อมูลศูนย์จาก volunteer คนแรกที่มี shelter_name
+    supabase
+      .from('users')
+      .select('name, phone, shelter_name, shelter_location, service_area')
+      .eq('role', 'volunteer')
+      .not('shelter_name', 'is', null)
+      .limit(1)
+      .then(function ({ data }) {
+        if (data && data.length > 0) setศูนย์(data[0])
+        setโหลดศูนย์(false)
+      }, function () { setโหลดศูนย์(false) })
+  }, [])
+
   function ยื่นคำขอรับเลี้ยง() {
     setกำลังส่ง(true)
-    // จำลองการส่งข้อมูล 1.5 วินาที
     setTimeout(function () {
       setกำลังส่ง(false)
-      setรับเลี้ยงสำเร็จ(true) // เปลี่ยนไปหน้าสำเร็จ
+      setรับเลี้ยงสำเร็จ(true)
     }, 1500)
   }
 
-  // ถ้าส่งสำเร็จ → แสดงหน้ายืนยัน
   if (รับเลี้ยงสำเร็จ) {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-7xl mb-4">{สัตว์.emoji}</div>
+        <div className="w-28 h-28 mx-auto mb-4 rounded-2xl overflow-hidden bg-green-100 flex items-center justify-center">
+          {สัตว์.รูป
+            ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
+            : <span className="text-7xl">{สัตว์.emoji}</span>
+          }
+        </div>
         <div className="text-6xl mb-4">✅</div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">ยื่นคำขอสำเร็จ!</h2>
         <p className="text-gray-600 mb-1">
@@ -54,10 +69,8 @@ function PetDetail() {
         <p className="text-gray-500 text-sm mb-6">
           เจ้าหน้าที่จะติดต่อกลับภายใน 1-2 วันทำการ
         </p>
-        <button
-          onClick={() => navigate('/home')}
-          className="bg-green-500 text-white px-8 py-3 rounded-xl font-medium"
-        >
+        <button onClick={() => navigate('/home')}
+          className="bg-green-500 text-white px-8 py-3 rounded-xl font-medium">
           กลับหน้าหลัก
         </button>
       </div>
@@ -83,7 +96,6 @@ function PetDetail() {
         </div>
         <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
         <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
-        {/* แสดงคะแนนความเหมาะสมจาก AI */}
         {สัตว์.คะแนน && (
           <div className="inline-block bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium mt-2">
             🤖 AI แนะนำ {สัตว์.คะแนน}% เหมาะกับคุณ
@@ -94,7 +106,6 @@ function PetDetail() {
       {/* ข้อมูลทั่วไป */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
         <h3 className="font-bold text-gray-800 mb-4">ข้อมูลทั่วไป</h3>
-        {/* Grid 2 คอลัมน์ */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-xl p-3 text-center">
             <p className="text-xs text-gray-500 mb-1">อายุ</p>
@@ -121,7 +132,6 @@ function PetDetail() {
       <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
         <h3 className="font-bold text-gray-800 mb-3">นิสัย</h3>
         <div className="flex flex-wrap gap-2">
-          {/* วนแสดง Tag นิสัยแต่ละอย่าง */}
           {สัตว์.นิสัย.map((น) => (
             <span key={น} className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm">
               {น}
@@ -130,11 +140,53 @@ function PetDetail() {
         </div>
       </div>
 
-      {/* สถานที่ */}
+      {/* ข้อมูลศูนย์พักพิง */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
-        <h3 className="font-bold text-gray-800 mb-3">สถานที่</h3>
-        <p className="text-sm text-gray-600">📍 {สัตว์.สถานที่}</p>
-        <p className="text-sm text-gray-600 mt-2">📞 ศูนย์พักพิงสัตว์กรุงเทพ • 02-XXX-XXXX</p>
+        <h3 className="font-bold text-gray-800 mb-3">🏠 ศูนย์พักพิง</h3>
+
+        {โหลดศูนย์ ? (
+          <p className="text-sm text-gray-400">กำลังโหลด...</p>
+        ) : ศูนย์ ? (
+          <div className="space-y-2.5">
+            {ศูนย์.shelter_name && (
+              <div className="flex gap-2">
+                <span className="text-base shrink-0">🏠</span>
+                <p className="text-sm font-semibold text-gray-800">{ศูนย์.shelter_name}</p>
+              </div>
+            )}
+            {ศูนย์.shelter_location && (
+              <div className="flex gap-2">
+                <span className="text-base shrink-0">📍</span>
+                <p className="text-sm text-gray-600">{ศูนย์.shelter_location}</p>
+              </div>
+            )}
+            {ศูนย์.service_area && (
+              <div className="flex gap-2">
+                <span className="text-base shrink-0">🗺️</span>
+                <p className="text-sm text-gray-600">พื้นที่รับผิดชอบ: {ศูนย์.service_area}</p>
+              </div>
+            )}
+            {ศูนย์.phone && (
+              <a href={`tel:${ศูนย์.phone}`}
+                className="flex gap-2 items-center bg-green-50 rounded-xl px-3 py-2.5 mt-1">
+                <span className="text-base shrink-0">📞</span>
+                <p className="text-sm font-semibold text-green-700">{ศูนย์.phone}</p>
+                <span className="text-xs text-green-500 ml-auto">โทรเลย</span>
+              </a>
+            )}
+            {ศูนย์.name && (
+              <div className="flex gap-2">
+                <span className="text-base shrink-0">👤</span>
+                <p className="text-sm text-gray-500">ผู้รับผิดชอบ: {ศูนย์.name}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">📍 {สัตว์.สถานที่}</p>
+            <p className="text-sm text-gray-500">📞 ติดต่อเจ้าหน้าที่เพื่อรับข้อมูลเพิ่มเติม</p>
+          </div>
+        )}
       </div>
 
       {/* ปุ่มรับเลี้ยง */}
