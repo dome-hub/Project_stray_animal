@@ -224,13 +224,15 @@ function VolunteerPage({ หน้า }) {
     if (!error) {
       // ส่ง notification ให้ผู้แจ้ง
       if (report.reporter_id) {
-        await supabase.from('notifications').insert({
+        const { error: notiErr } = await supabase.from('notifications').insert({
           user_id: report.reporter_id,
           title:   'เจ้าหน้าที่รับเรื่องแล้ว 🦺',
           body:    `รายงาน #${String(report.id).padStart(6, '0')} ของคุณได้รับการดูแลแล้ว เจ้าหน้าที่จะลงพื้นที่เพื่อรับสัตว์โดยเร็ว`,
           type:    'report_update',
           is_read: false,
         })
+        if (notiErr) console.error('❌ ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+        else console.log('✅ ส่ง notification ให้ผู้แจ้งสำเร็จ (reporter_id:', report.reporter_id, ')')
       }
       // อัปเดต local state
       setรายงานทั้งหมด(function (prev) {
@@ -300,13 +302,15 @@ function VolunteerPage({ หน้า }) {
       'มีผู้รับเลี้ยง':   `สัตว์ที่คุณแจ้ง (#${String(report.id).padStart(6, '0')}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
     }
     if (report.reporter_id && msgMap[สถานะใหม่]) {
-      await supabase.from('notifications').insert({
+      const { error: notiErr } = await supabase.from('notifications').insert({
         user_id: report.reporter_id,
         title:   `อัปเดตรายงาน #${String(report.id).padStart(6, '0')}`,
         body:    msgMap[สถานะใหม่],
         type:    'report_update',
         is_read: false,
       })
+      if (notiErr) console.error('❌ ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+      else console.log('✅ ส่ง notification ให้ผู้แจ้งสำเร็จ (reporter_id:', report.reporter_id, ')')
     }
 
     // อัปเดต local state
