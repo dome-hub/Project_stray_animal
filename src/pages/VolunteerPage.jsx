@@ -502,10 +502,11 @@ function VolunteerPage({ หน้า }) {
               const isNew  = ร.status === 'รอดำเนินการ'
               const isDone = ร.status === 'มีผู้รับเลี้ยง'
               return (
-                <button key={ร.id} onClick={() => เปิดรายละเอียด(ร)}
-                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 ${
+                <div key={ร.id}
+                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer ${
                     isNew ? 'ring-2 ring-orange-300' : ''
                   }`}
+                  onClick={() => เปิดรายละเอียด(ร)}
                 >
                   <div className={`h-1.5 w-full ${isNew ? 'bg-yellow-400' : isDone ? 'bg-green-400' : 'bg-blue-400'}`} />
                   <div className="p-4 flex items-center gap-3">
@@ -517,15 +518,31 @@ function VolunteerPage({ หน้า }) {
                           {ร.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">📍 {ร.location_text || '-'}</p>
-                      <p className="text-xs text-gray-400">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
+
+                      {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
+                      {ร.latitude && ร.longitude ? (
+                        <a
+                          href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
+                          target="_blank" rel="noreferrer"
+                          onClick={function (e) { e.stopPropagation() }}
+                          className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                        >
+                          <span className="text-sm">📍</span>
+                          <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
+                          <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">Maps ↗</span>
+                        </a>
+                      ) : (
+                        <p className="text-xs text-gray-500 truncate">📍 {ร.location_text || '-'}</p>
+                      )}
+
+                      <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
                       {ร.detail && (
                         <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
                       )}
                     </div>
                     <span className="text-gray-300 text-xl shrink-0">›</span>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -561,15 +578,32 @@ function VolunteerPage({ หน้า }) {
 
               {รายงานActive.map(function (ร) {
                 return (
-                  <button key={ร.id} onClick={() => เปิดรายละเอียด(ร)}
-                    className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all"
+                  <div key={ร.id}
+                    className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer"
+                    onClick={() => เปิดรายละเอียด(ร)}
                   >
                     <div className={`h-1.5 ${ร.status === 'รอดำเนินการ' ? 'bg-yellow-400' : 'bg-blue-400'}`} />
                     <div className="p-4 flex items-center gap-3">
                       <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุ'}</p>
-                        <p className="text-xs text-gray-500 truncate">📍 {ร.location_text}</p>
+
+                        {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
+                        {ร.latitude && ร.longitude ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
+                            target="_blank" rel="noreferrer"
+                            onClick={function (e) { e.stopPropagation() }}
+                            className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                          >
+                            <span className="text-sm">📍</span>
+                            <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
+                            <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">Maps ↗</span>
+                          </a>
+                        ) : (
+                          <p className="text-xs text-gray-500 truncate">📍 {ร.location_text}</p>
+                        )}
+
                         <p className="text-xs text-gray-400">{แปลงวันที่เวลา(ร.created_at)}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium border mt-1 inline-block ${สีสถานะ[ร.status] || ''}`}>
                           {ร.status}
@@ -577,7 +611,7 @@ function VolunteerPage({ หน้า }) {
                       </div>
                       <span className="text-gray-300 text-xl shrink-0">›</span>
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </>
