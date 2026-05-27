@@ -1,59 +1,126 @@
 // ReportAnimal.jsx — หน้าแจ้งพบสัตว์จร
 // อัปโหลดรูปจริงขึ้น Supabase Storage + บันทึก URL ลงตาราง reports
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
-// ผลวิเคราะห์ AI ยังคงเป็น mock อยู่ (รอเชื่อม Vision API จริงในอนาคต)
 const ผลวิเคราะห์AI = [
   { สายพันธุ์: 'สุนัขพันธุ์ไทยผสม', ขนาด: 'กลาง', นิสัย: 'เป็นมิตร / ระวังคนแปลกหน้า', ความแม่นยำ: 87 },
   { สายพันธุ์: 'สุนัขพันธุ์บางแก้ว', ขนาด: 'เล็ก', นิสัย: 'ขี้เล่น / สงบเสงี่ยม', ความแม่นยำ: 72 },
   { สายพันธุ์: 'แมววิเชียรมาศผสม', ขนาด: 'เล็ก', นิสัย: 'เป็นมิตร / ชอบคน', ความแม่นยำ: 91 },
 ]
 
+function triggerAI(setผลAI, setกำลังวิเคราะห์) {
+  setผลAI(null)
+  setกำลังวิเคราะห์(true)
+  setTimeout(function () {
+    setผลAI(ผลวิเคราะห์AI[Math.floor(Math.random() * ผลวิเคราะห์AI.length)])
+    setกำลังวิเคราะห์(false)
+  }, 2000)
+}
+
 function ReportAnimal({ user }) {
   const navigate = useNavigate()
-  const inputรูปภาพ  = useRef(null)   // เลือกจากแกลเลอรี่
-  const inputถ่ายรูป = useRef(null)   // เปิดกล้องโดยตรง
+  const inputGallery = useRef(null)     // เลือกจากคลัง (file input ธรรมดา)
+  const videoRef     = useRef(null)     // video element สำหรับ live camera
+  const streamRef    = useRef(null)     // MediaStream ที่กำลังเปิดอยู่
 
-  const [รูปภาพPreview, setรูปภาพPreview] = useState(null)   // URL สำหรับ preview ใน browser
-  const [ไฟล์รูปภาพ, setไฟล์รูปภาพ] = useState(null)        // File object จริง สำหรับ upload
-  const [ตำแหน่ง, setตำแหน่ง] = useState('')
-  const [รายละเอียด, setรายละเอียด] = useState('')
-  const [ผลAI, setผลAI] = useState(null)
+  const [รูปภาพPreview, setรูปภาพPreview] = useState(null)
+  const [ไฟล์รูปภาพ,   setไฟล์รูปภาพ]   = useState(null)
+  const [ตำแหน่ง,      setตำแหน่ง]      = useState('')
+  const [รายละเอียด,   setรายละเอียด]   = useState('')
+  const [ผลAI,         setผลAI]         = useState(null)
   const [กำลังวิเคราะห์, setกำลังวิเคราะห์] = useState(false)
   const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
-  const [กำลังส่ง, setกำลังส่ง] = useState(false)
-  const [ส่งสำเร็จ, setส่งสำเร็จ] = useState(false)
-  const [รหัสรายงาน, setรหัสรายงาน] = useState(null)
+  const [กำลังส่ง,     setกำลังส่ง]     = useState(false)
+  const [ส่งสำเร็จ,    setส่งสำเร็จ]    = useState(false)
+  const [รหัสรายงาน,  setรหัสรายงาน]  = useState(null)
 
-  // เลือกรูป → เก็บ File จริง + สร้าง preview URL + จำลอง AI วิเคราะห์
+  // ---- Camera state ----
+  const [แสดงกล้อง,   setแสดงกล้อง]   = useState(false)
+  const [กล้องพร้อม,  setกล้องพร้อม]  = useState(false)
+  const [errorกล้อง,  setErrorกล้อง]  = useState('')
+
+  // cleanup stream เมื่อ component unmount
+  useEffect(function () {
+    return function () { ปิดกล้อง() }
+  }, [])
+
+  // ---- เลือกรูปจากแกลเลอรี่ ----
   function เลือกรูปภาพ(event) {
     const ไฟล์ = event.target.files[0]
     if (!ไฟล์) return
-
-    setไฟล์รูปภาพ(ไฟล์)                              // เก็บ File object ไว้ upload
-    setรูปภาพPreview(URL.createObjectURL(ไฟล์))       // สร้าง URL สำหรับแสดงผล
-    setผลAI(null)
-    setกำลังวิเคราะห์(true)
-
-    // จำลอง AI วิเคราะห์ 2 วินาที
-    setTimeout(function () {
-      const สุ่มผล = ผลวิเคราะห์AI[Math.floor(Math.random() * ผลวิเคราะห์AI.length)]
-      setผลAI(สุ่มผล)
-      setกำลังวิเคราะห์(false)
-    }, 2000)
+    setไฟล์รูปภาพ(ไฟล์)
+    setรูปภาพPreview(URL.createObjectURL(ไฟล์))
+    triggerAI(setผลAI, setกำลังวิเคราะห์)
+    event.target.value = ''
   }
 
-  // ดึง GPS จากมือถือ
+  // ---- เปิดกล้อง (getUserMedia) ----
+  async function เปิดกล้อง() {
+    setErrorกล้อง('')
+    setกล้องพร้อม(false)
+    setแสดงกล้อง(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.onloadedmetadata = function () {
+          videoRef.current.play()
+          setกล้องพร้อม(true)
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      if (err.name === 'NotAllowedError') {
+        setErrorกล้อง('❌ ไม่ได้รับอนุญาตใช้กล้อง\nกรุณาอนุญาตการเข้าถึงกล้องในการตั้งค่าเบราว์เซอร์')
+      } else if (err.name === 'NotFoundError') {
+        setErrorกล้อง('❌ ไม่พบกล้องในอุปกรณ์นี้')
+      } else {
+        setErrorกล้อง('❌ ไม่สามารถเปิดกล้องได้: ' + err.message)
+      }
+    }
+  }
+
+  // ---- ปิดกล้อง / หยุด stream ----
+  function ปิดกล้อง() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(function (t) { t.stop() })
+      streamRef.current = null
+    }
+    setแสดงกล้อง(false)
+    setกล้องพร้อม(false)
+    setErrorกล้อง('')
+  }
+
+  // ---- กดถ่ายรูป ----
+  function ถ่ายรูป() {
+    const video = videoRef.current
+    if (!video) return
+    const canvas = document.createElement('canvas')
+    canvas.width  = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d').drawImage(video, 0, 0)
+    canvas.toBlob(function (blob) {
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      setไฟล์รูปภาพ(file)
+      setรูปภาพPreview(URL.createObjectURL(file))
+      triggerAI(setผลAI, setกำลังวิเคราะห์)
+      ปิดกล้อง()
+    }, 'image/jpeg', 0.85)
+  }
+
+  // ---- GPS ----
   function ใช้GPSปัจจุบัน() {
     setกำลังหาตำแหน่ง(true)
     navigator.geolocation.getCurrentPosition(
-      function (position) {
-        const lat = position.coords.latitude
-        const lng = position.coords.longitude
-        setตำแหน่ง(`พิกัด: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+      function (pos) {
+        setตำแหน่ง(`พิกัด: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`)
         setกำลังหาตำแหน่ง(false)
       },
       function () {
@@ -63,54 +130,37 @@ function ReportAnimal({ user }) {
     )
   }
 
-  // ส่งรายงาน → อัปโหลดรูปขึ้น Storage → บันทึกลง reports
+  // ---- ส่งรายงาน ----
   async function ส่งรายงาน() {
     if (!ตำแหน่ง) return
     setกำลังส่ง(true)
 
     let imageUrl = null
-
-    // ---- อัปโหลดรูปขึ้น Supabase Storage ----
     if (ไฟล์รูปภาพ) {
       const ชื่อไฟล์ = `${Date.now()}_${ไฟล์รูปภาพ.name.replace(/\s/g, '_')}`
-
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('report-images')
-        .upload(ชื่อไฟล์, ไฟล์รูปภาพ)
-
-      if (uploadError) {
-        console.log('อัปโหลดรูปไม่สำเร็จ:', uploadError.message)
-        // ยังส่งรายงานได้แม้ไม่มีรูป
-      } else {
-        // ดึง Public URL ของรูปที่อัปโหลด
-        const { data: urlData } = supabase.storage
-          .from('report-images')
-          .getPublicUrl(uploadData.path)
+        .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
         imageUrl = urlData.publicUrl
       }
     }
 
-    // ---- บันทึกลงตาราง reports ใน Supabase ----
-    const { data, error } = await supabase
-      .from('reports')
-      .insert({
-        animal_type:   ผลAI?.สายพันธุ์ || 'ไม่ระบุ',
-        location_text: ตำแหน่ง,
-        detail:        รายละเอียด,
-        urgency:       'ปานกลาง',
-        status:        'รอดำเนินการ',
-        image_url:     imageUrl,          // URL รูปจริงจาก Storage
-        reporter_id:   user?.id,          // บันทึกว่าใครเป็นคนแจ้ง
-      })
-      .select()
-      .single()
+    const { data, error } = await supabase.from('reports').insert({
+      animal_type:   ผลAI?.สายพันธุ์ || 'ไม่ระบุ',
+      location_text: ตำแหน่ง,
+      detail:        รายละเอียด,
+      urgency:       'ปานกลาง',
+      status:        'รอดำเนินการ',
+      image_url:     imageUrl,
+      reporter_id:   user?.id,
+    }).select().single()
 
     setกำลังส่ง(false)
 
     if (error) {
       alert('เกิดข้อผิดพลาด: ' + error.message)
     } else {
-      // ส่ง notification ยืนยันให้ผู้แจ้งทันที
       if (user?.id) {
         await supabase.from('notifications').insert({
           user_id: user.id,
@@ -142,16 +192,11 @@ function ReportAnimal({ user }) {
             <span className="text-yellow-600 font-medium">รอดำเนินการ</span>
           </div>
         </div>
-        <button
-          onClick={() => navigate('/track')}
-          className="bg-orange-500 text-white px-8 py-3 rounded-xl font-medium mb-3"
-        >
+        <button onClick={() => navigate('/track')}
+          className="bg-orange-500 text-white px-8 py-3 rounded-xl font-medium mb-3">
           ติดตามสถานะรายงาน
         </button>
-        <button
-          onClick={() => navigate('/home')}
-          className="text-gray-500 text-sm"
-        >
+        <button onClick={() => navigate('/home')} className="text-gray-500 text-sm">
           กลับหน้าหลัก
         </button>
       </div>
@@ -160,6 +205,65 @@ function ReportAnimal({ user }) {
 
   return (
     <div className="min-h-screen bg-orange-50 pb-8">
+
+      {/* Camera Modal */}
+      {แสดงกล้อง && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-3 bg-black/60">
+            <button onClick={ปิดกล้อง} className="text-white text-sm px-3 py-1 bg-white/20 rounded-full">
+              ✕ ยกเลิก
+            </button>
+            <p className="text-white font-medium text-sm">📷 ถ่ายรูปสัตว์</p>
+            <div className="w-16" />
+          </div>
+
+          {/* Video / Error */}
+          <div className="flex-1 relative overflow-hidden bg-gray-900 flex items-center justify-center">
+            {errorกล้อง ? (
+              <div className="text-center px-8">
+                <p className="text-white text-sm whitespace-pre-line leading-relaxed">{errorกล้อง}</p>
+                <button onClick={ปิดกล้อง}
+                  className="mt-6 bg-white text-gray-800 px-6 py-2.5 rounded-xl text-sm font-medium">
+                  ปิด
+                </button>
+              </div>
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+                {!กล้องพร้อม && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="text-center text-white">
+                      <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                      <p className="text-sm">กำลังเปิดกล้อง...</p>
+                      <p className="text-xs text-white/60 mt-1">กรุณาอนุญาตการเข้าถึงกล้องเมื่อระบบถาม</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Shutter button */}
+          {!errorกล้อง && (
+            <div className="bg-black/80 flex justify-center items-center py-8">
+              <button
+                onClick={ถ่ายรูป}
+                disabled={!กล้องพร้อม}
+                className="w-20 h-20 rounded-full border-4 border-white bg-white/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+              >
+                <div className="w-14 h-14 rounded-full bg-white" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
@@ -172,7 +276,7 @@ function ReportAnimal({ user }) {
 
       <div className="px-4 pt-5 space-y-5">
 
-        {/* อัปโหลดรูปภาพ */}
+        {/* ส่วนรูปภาพ */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">ภาพถ่ายสัตว์</p>
 
@@ -187,55 +291,35 @@ function ReportAnimal({ user }) {
                     <p className="text-sm">AI กำลังวิเคราะห์...</p>
                   </div>
                 )}
-                {/* ปุ่มเปลี่ยนรูป */}
-                <button
-                  onClick={() => inputรูปภาพ.current.click()}
-                  className="absolute bottom-3 right-3 bg-white/90 text-gray-700 text-xs px-3 py-1.5 rounded-full shadow font-medium"
-                >
+                <button onClick={() => inputGallery.current.click()}
+                  className="absolute bottom-3 right-3 bg-white/90 text-gray-700 text-xs px-3 py-1.5 rounded-full shadow font-medium">
                   เปลี่ยนรูป
                 </button>
               </div>
             ) : (
               <div className="h-36 flex flex-col items-center justify-center text-gray-400">
                 <div className="text-4xl mb-2">🐾</div>
-                <p className="text-sm text-gray-500">ยังไม่ได้เลือกรูป</p>
+                <p className="text-sm">ยังไม่ได้เลือกรูป</p>
               </div>
             )}
           </div>
 
-          {/* 2 ปุ่ม: ถ่ายรูป / เลือกจากคลัง */}
+          {/* 2 ปุ่ม */}
           <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => inputถ่ายรูป.current.click()}
-              className="bg-orange-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2"
-            >
+            <button onClick={เปิดกล้อง}
+              className="bg-orange-500 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2">
               📷 ถ่ายรูปเลย
             </button>
-            <button
-              onClick={() => inputรูปภาพ.current.click()}
-              className="bg-white border-2 border-orange-300 text-orange-600 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2"
-            >
+            <button onClick={() => inputGallery.current.click()}
+              className="bg-white border-2 border-orange-300 text-orange-600 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2">
               🖼️ เลือกจากคลัง
             </button>
           </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            ปุ่ม "ถ่ายรูปเลย" จะขออนุญาตเข้าถึงกล้องจากเบราว์เซอร์
+          </p>
 
-          {/* input เปิดกล้อง (capture) */}
-          <input
-            ref={inputถ่ายรูป}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={เลือกรูปภาพ}
-          />
-          {/* input เลือกจากแกลเลอรี่ */}
-          <input
-            ref={inputรูปภาพ}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={เลือกรูปภาพ}
-          />
+          <input ref={inputGallery} type="file" accept="image/*" className="hidden" onChange={เลือกรูปภาพ} />
         </div>
 
         {/* ผล AI */}
@@ -243,22 +327,19 @@ function ReportAnimal({ user }) {
           <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
             <p className="text-xs font-bold text-orange-600 mb-3">🤖 ผลวิเคราะห์จาก AI</p>
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-xs text-gray-500">สายพันธุ์</span>
-                <span className="text-xs font-semibold">{ผลAI.สายพันธุ์}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs text-gray-500">ขนาด</span>
-                <span className="text-xs font-semibold">{ผลAI.ขนาด}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs text-gray-500">นิสัย</span>
-                <span className="text-xs font-semibold">{ผลAI.นิสัย}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-xs text-gray-500">ความแม่นยำ</span>
-                <span className="text-xs font-bold text-orange-600">{ผลAI.ความแม่นยำ}%</span>
-              </div>
+              {[
+                { label: 'สายพันธุ์', value: ผลAI.สายพันธุ์ },
+                { label: 'ขนาด',      value: ผลAI.ขนาด },
+                { label: 'นิสัย',     value: ผลAI.นิสัย },
+                { label: 'ความแม่นยำ', value: ผลAI.ความแม่นยำ + '%' },
+              ].map(function (r) {
+                return (
+                  <div key={r.label} className="flex justify-between">
+                    <span className="text-xs text-gray-500">{r.label}</span>
+                    <span className={`text-xs font-semibold ${r.label === 'ความแม่นยำ' ? 'text-orange-600' : ''}`}>{r.value}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -268,18 +349,11 @@ function ReportAnimal({ user }) {
           <p className="text-sm font-semibold text-gray-700 mb-2">
             📍 สถานที่พบ <span className="text-red-400">*</span>
           </p>
-          <input
-            type="text"
-            value={ตำแหน่ง}
-            onChange={(e) => setตำแหน่ง(e.target.value)}
+          <input type="text" value={ตำแหน่ง} onChange={(e) => setตำแหน่ง(e.target.value)}
             placeholder="เช่น หน้าวัดกำแพงแสน หรือ ถนนสาย 1"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400"
-          />
-          <button
-            onClick={ใช้GPSปัจจุบัน}
-            disabled={กำลังหาตำแหน่ง}
-            className="mt-2 w-full bg-orange-500 text-white rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
-          >
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400" />
+          <button onClick={ใช้GPSปัจจุบัน} disabled={กำลังหาตำแหน่ง}
+            className="mt-2 w-full bg-orange-500 text-white rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">
             {กำลังหาตำแหน่ง ? '⏳ กำลังระบุตำแหน่ง...' : '📍 ใช้ตำแหน่งปัจจุบัน (GPS)'}
           </button>
         </div>
@@ -289,21 +363,15 @@ function ReportAnimal({ user }) {
           <p className="text-sm font-semibold text-gray-700 mb-2">
             รายละเอียดเพิ่มเติม <span className="text-gray-400 font-normal">(ไม่บังคับ)</span>
           </p>
-          <textarea
-            value={รายละเอียด}
-            onChange={(e) => setรายละเอียด(e.target.value)}
+          <textarea value={รายละเอียด} onChange={(e) => setรายละเอียด(e.target.value)}
             placeholder="เช่น สัตว์ดูบาดเจ็บ หิวโหย เป็นมิตร ฯลฯ"
             rows={3}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400 resize-none"
-          />
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400 resize-none" />
         </div>
 
-        {/* ปุ่มส่ง */}
-        <button
-          onClick={ส่งรายงาน}
-          disabled={!ตำแหน่ง || กำลังส่ง || กำลังวิเคราะห์}
-          className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        {/* ส่ง */}
+        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || กำลังส่ง || กำลังวิเคราะห์}
+          className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {กำลังส่ง ? '⏳ กำลังอัปโหลดและบันทึก...' : 'ส่งรายงานให้เจ้าหน้าที่'}
         </button>
 
