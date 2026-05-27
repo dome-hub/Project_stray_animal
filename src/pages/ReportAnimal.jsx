@@ -109,6 +109,16 @@ function ReportAnimal({ user }) {
     if (error) {
       alert('เกิดข้อผิดพลาด: ' + error.message)
     } else {
+      // ส่ง notification ยืนยันให้ผู้แจ้งทันที
+      if (user?.id) {
+        await supabase.from('notifications').insert({
+          user_id: user.id,
+          title:   '📋 ส่งรายงานสำเร็จ',
+          body:    `รายงาน #${String(data.id).padStart(6, '0')} ได้รับแล้ว เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง`,
+          type:    'report_update',
+          is_read: false,
+        })
+      }
       setรหัสรายงาน(data.id)
       setส่งสำเร็จ(true)
     }

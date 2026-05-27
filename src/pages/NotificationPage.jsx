@@ -80,17 +80,20 @@ function NotificationPage({ user }) {
         .order('created_at', { ascending: false })
         .limit(30)
         .then(function ({ data }) {
-          setรายการ((data || []).map(function (r) {
+          const items = (data || []).map(function (r) {
             const isNew = r.status === 'รอดำเนินการ'
             return {
               id:       r.id,
               emoji:    emojiสถานะ(r.status),
-              หัวข้อ:   isNew ? '🚨 มีรายงานใหม่รอดำเนินการ' : `อัปเดต: ${r.status}`,
+              หัวข้อ:   isNew ? '🚨 รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
               ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
               เวลา:     แปลงเวลา(r.created_at),
               isNew,
             }
-          }))
+          })
+          // รอดำเนินการขึ้นก่อนเสมอ
+          items.sort(function (a, b) { return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) })
+          setรายการ(items)
           setโหลด(false)
         })
         .catch(function () { setโหลด(false) })
@@ -223,7 +226,13 @@ function NotificationPage({ user }) {
         <div className="text-center py-16 text-gray-400">
           <p className="text-5xl mb-3">🔔</p>
           <p className="font-medium">ยังไม่มีการแจ้งเตือน</p>
-          <p className="text-xs mt-1">การแจ้งเตือนจะปรากฏเมื่อเจ้าหน้าที่รับเรื่อง</p>
+          <p className="text-xs mt-1">
+            {role === 'user'
+              ? 'การแจ้งเตือนจะปรากฏเมื่อส่งรายงาน หรือเจ้าหน้าที่ดำเนินการ'
+              : role === 'volunteer'
+              ? 'การแจ้งเตือนจะปรากฏเมื่อมีรายงานสัตว์จรเข้ามา'
+              : 'การแจ้งเตือนจะปรากฏเมื่อมีกิจกรรมในระบบ'}
+          </p>
         </div>
       )}
 
