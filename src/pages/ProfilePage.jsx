@@ -56,6 +56,14 @@ function ProfilePage({ user }) {
   const [เบอร์ชั่วคราว,    setเบอร์ชั่วคราว]    = useState('')
   const [กำลังบันทึกเบอร์, setกำลังบันทึกเบอร์] = useState(false)
 
+  // ---- ข้อมูลศูนย์พักพิง (volunteer/admin เท่านั้น) ----
+  const [shelterName,         setShelterName]         = useState('')
+  const [shelterLocation,     setShelterLocation]     = useState('')
+  const [serviceArea,         setServiceArea]         = useState('')
+  const [กำลังแก้ไขShelter,  setกำลังแก้ไขShelter]  = useState(false)
+  const [shelterTemp,         setShelterTemp]         = useState({ name: '', location: '', area: '' })
+  const [กำลังบันทึกShelter, setกำลังบันทึกShelter] = useState(false)
+
   // ---- ข้อมูลแต่ละ Tab ----
   const [ประวัติแจ้ง,    setประวัติแจ้ง]    = useState([])
   const [กำลังโหลดแจ้ง, setกำลังโหลดแจ้ง] = useState(false)
@@ -73,14 +81,17 @@ function ProfilePage({ user }) {
     setกำลังโหลดDB(true)
     supabase
       .from('users')
-      .select('name, role, avatar_url, phone')
+      .select('name, role, avatar_url, phone, shelter_name, shelter_location, service_area')
       .eq('id', user.id)
       .single()
       .then(function ({ data }) {
         if (data) {
           setข้อมูลDB(data)
-          if (data.avatar_url) setรูปโปรไฟล์(data.avatar_url)
-          if (data.phone)      setเบอร์ติดต่อ(data.phone)
+          if (data.avatar_url)       setรูปโปรไฟล์(data.avatar_url)
+          if (data.phone)            setเบอร์ติดต่อ(data.phone)
+          if (data.shelter_name)     setShelterName(data.shelter_name)
+          if (data.shelter_location) setShelterLocation(data.shelter_location)
+          if (data.service_area)     setServiceArea(data.service_area)
         }
         setกำลังโหลดDB(false)
       })
@@ -162,6 +173,27 @@ function ProfilePage({ user }) {
       alert('บันทึกชื่อไม่สำเร็จ: ' + err.message)
     } finally {
       setกำลังบันทึกชื่อ(false)
+    }
+  }
+
+  // ---- บันทึกข้อมูลศูนย์พักพิงลง DB ----
+  async function บันทึกShelter() {
+    setกำลังบันทึกShelter(true)
+    try {
+      const { error } = await supabase.from('users').update({
+        shelter_name:     shelterTemp.name.trim() || null,
+        shelter_location: shelterTemp.location.trim() || null,
+        service_area:     shelterTemp.area.trim() || null,
+      }).eq('id', user.id)
+      if (error) throw new Error(error.message)
+      setShelterName(shelterTemp.name.trim())
+      setShelterLocation(shelterTemp.location.trim())
+      setServiceArea(shelterTemp.area.trim())
+      setกำลังแก้ไขShelter(false)
+    } catch (err) {
+      alert('บันทึกไม่สำเร็จ: ' + err.message)
+    } finally {
+      setกำลังบันทึกShelter(false)
     }
   }
 
@@ -348,6 +380,94 @@ function ProfilePage({ user }) {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* ======== ข้อมูลศูนย์พักพิง (volunteer/admin เท่านั้น) ======== */}
+      {แท็บ === 'info' && (currentRole === 'volunteer' || currentRole === 'admin') && (
+        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-800">🏠 ข้อมูลศูนย์พักพิง</h3>
+            {!กำลังแก้ไขShelter && (
+              <button
+                onClick={() => {
+                  setShelterTemp({ name: shelterName, location: shelterLocation, area: serviceArea })
+                  setกำลังแก้ไขShelter(true)
+                }}
+                className="text-xs text-orange-500 font-medium"
+              >
+                แก้ไข
+              </button>
+            )}
+          </div>
+
+          {กำลังแก้ไขShelter ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">ชื่อศูนย์พักพิง</label>
+                <input
+                  value={shelterTemp.name}
+                  onChange={(e) => setShelterTemp(function (p) { return { ...p, name: e.target.value } })}
+                  placeholder="เช่น ศูนย์พักพิงสัตว์กำแพงแสน"
+                  className="w-full border border-orange-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">ที่ตั้ง / Location</label>
+                <input
+                  value={shelterTemp.location}
+                  onChange={(e) => setShelterTemp(function (p) { return { ...p, location: e.target.value } })}
+                  placeholder="เช่น ถนนสาย 1 กำแพงแสน นครปฐม"
+                  className="w-full border border-orange-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">พื้นที่รับผิดชอบ</label>
+                <input
+                  value={shelterTemp.area}
+                  onChange={(e) => setShelterTemp(function (p) { return { ...p, area: e.target.value } })}
+                  placeholder="เช่น อ.กำแพงแสน, อ.ดอนตูม, อ.บางเลน"
+                  className="w-full border border-orange-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={บันทึกShelter}
+                  disabled={กำลังบันทึกShelter}
+                  className="flex-1 bg-orange-500 text-white rounded-xl py-2 text-sm font-medium disabled:opacity-60"
+                >
+                  {กำลังบันทึกShelter ? '⏳ กำลังบันทึก...' : '💾 บันทึก'}
+                </button>
+                <button
+                  onClick={() => setกำลังแก้ไขShelter(false)}
+                  className="flex-1 bg-gray-100 text-gray-600 rounded-xl py-2 text-sm font-medium"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">ชื่อศูนย์พักพิง</span>
+                <span className={`text-sm font-medium ${shelterName ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                  {shelterName || 'ยังไม่ได้กรอก'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">ที่ตั้ง</span>
+                <span className={`text-sm font-medium text-right max-w-[60%] ${shelterLocation ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                  {shelterLocation || 'ยังไม่ได้กรอก'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500 shrink-0">พื้นที่รับผิดชอบ</span>
+                <span className={`text-sm font-medium text-right max-w-[60%] ${serviceArea ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                  {serviceArea || 'ยังไม่ได้กรอก'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
