@@ -282,15 +282,17 @@ function VolunteerPage({ หน้า }) {
         .maybeSingle()
 
       if (!existing) {
-        await supabase.from('animals').insert({
+        const { error: animalErr } = await supabase.from('animals').insert({
           name:      'ยังไม่ตั้งชื่อ',
           breed:     report.animal_type || 'ไม่ระบุ',
           status:    'อยู่ศูนย์พักพิง',
           health:    'ยังไม่ตรวจ',
-          image_url: report.image_url || null,
+          photo_url: report.image_url || null,
           location:  report.location_text || 'กำแพงแสน นครปฐม',
           report_id: report.id,
         })
+        if (animalErr) console.error('❌ เพิ่มสัตว์ไม่สำเร็จ:', animalErr.message)
+        else console.log('✅ เพิ่มสัตว์ในระบบอัตโนมัติสำเร็จ (report_id:', report.id, ')')
       }
     }
 
