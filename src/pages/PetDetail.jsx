@@ -75,7 +75,12 @@ function PetDetail() {
 
       {/* การ์ดรูปสัตว์และชื่อ */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-6 shadow-sm text-center">
-        <div className="text-7xl mb-4">{สัตว์.emoji}</div>
+        <div className="w-36 h-36 mx-auto mb-4 rounded-2xl overflow-hidden bg-green-100 flex items-center justify-center">
+          {สัตว์.รูป
+            ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
+            : <span className="text-7xl">{สัตว์.emoji}</span>
+          }
+        </div>
         <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
         <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
         {/* แสดงคะแนนความเหมาะสมจาก AI */}
