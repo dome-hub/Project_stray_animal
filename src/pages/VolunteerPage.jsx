@@ -354,12 +354,14 @@ function VolunteerPage({ หน้า }) {
   async function บันทึกแก้ไขสัตว์() {
     if (!สัตว์ที่แก้ไข) return
     const { error } = await supabase.from('animals').update({
-      name:   สัตว์ที่แก้ไข.name,
-      breed:  สัตว์ที่แก้ไข.breed,
-      age:    สัตว์ที่แก้ไข.age,
-      gender: สัตว์ที่แก้ไข.gender,
-      health: สัตว์ที่แก้ไข.health,
-      status: สัตว์ที่แก้ไข.status,
+      name:         สัตว์ที่แก้ไข.name,
+      breed:        สัตว์ที่แก้ไข.breed,
+      age:          สัตว์ที่แก้ไข.age,
+      gender:       สัตว์ที่แก้ไข.gender,
+      health:       สัตว์ที่แก้ไข.health,
+      status:       สัตว์ที่แก้ไข.status,
+      traits:       สัตว์ที่แก้ไข.traits       || null,
+      vaccine_info: สัตว์ที่แก้ไข.vaccine_info || null,
     }).eq('id', สัตว์ที่แก้ไข.id)
 
     if (!error) {
@@ -1119,6 +1121,39 @@ function VolunteerPage({ หน้า }) {
                         className={`py-2.5 rounded-xl text-xs font-medium border-2 ${
                           สัตว์ที่แก้ไข.status === ส ? 'border-green-500 bg-green-500 text-white' : 'border-gray-200 text-gray-700'
                         }`}>{ส}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ลักษณะนิสัย */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1">ลักษณะนิสัย</p>
+                <input
+                  value={สัตว์ที่แก้ไข.traits || ''}
+                  placeholder="เช่น เป็นมิตร, ขี้เล่น, สงบเสงี่ยม (คั่นด้วยจุลภาค)"
+                  onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, traits: e.target.value } }) }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-400"
+                />
+                <p className="text-xs text-gray-400 mt-1">คั่นนิสัยหลายข้อด้วย " , " เช่น เป็นมิตร, ขี้เล่น</p>
+              </div>
+
+              {/* ประวัติการฉีดวัคซีน */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ประวัติการฉีดวัคซีน</p>
+                <div className="flex gap-2">
+                  {['ฉีดแล้ว', 'ยังไม่ฉีด', 'ไม่ทราบ'].map(function (ว) {
+                    const สี = ว === 'ฉีดแล้ว' ? 'border-green-500 bg-green-500 text-white'
+                              : ว === 'ยังไม่ฉีด' ? 'border-red-400 bg-red-400 text-white'
+                              : 'border-gray-400 bg-gray-400 text-white'
+                    return (
+                      <button key={ว}
+                        onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, vaccine_info: ว } }) }}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-medium border-2 ${
+                          สัตว์ที่แก้ไข.vaccine_info === ว ? สี : 'border-gray-200 text-gray-600'
+                        }`}>
+                        {ว === 'ฉีดแล้ว' ? '✅ ฉีดแล้ว' : ว === 'ยังไม่ฉีด' ? '❌ ยังไม่ฉีด' : '❓ ไม่ทราบ'}
+                      </button>
                     )
                   })}
                 </div>
