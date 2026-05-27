@@ -57,7 +57,7 @@ function FindPet() {
             สุขภาพ: สัตว์.health,
             ลักษณะ: สัตว์.description || '',
             วัคซีน: สัตว์.vaccine_info || '',
-            นิสัย: สัตว์.traits ? สัตว์.traits.split(',') : ['เป็นมิตร'],
+            นิสัย: สัตว์.traits ? สัตว์.traits.split(',').map(function (t) { return t.trim() }).filter(Boolean) : [],
             สถานที่: สัตว์.location || 'กำแพงแสน นครปฐม',
             คะแนน: Math.floor(Math.random() * 20) + 75,
           }
