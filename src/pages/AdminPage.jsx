@@ -25,6 +25,11 @@ function AdminPage({ หน้า, user }) {
   const [ค้นหาผู้ใช้, setค้นหาผู้ใช้] = useState('')
   const [โหลดผู้ใช้, setโหลดผู้ใช้] = useState(true)
 
+  // ---- State: User Detail Sheet ----
+  const [userที่เลือก,   setUserที่เลือก]   = useState(null)   // user object
+  const [userDetail,     setUserDetail]     = useState(null)   // ข้อมูลเพิ่มเติมจาก DB
+  const [โหลดDetail,    setโหลดDetail]    = useState(false)
+
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
   const [โหลดExport, setโหลดExport] = useState(true)
@@ -112,6 +117,26 @@ function AdminPage({ หน้า, user }) {
     } else {
       alert('เปลี่ยนสถานะไม่สำเร็จ: ' + error.message)
     }
+  }
+
+  // ---- เปิด User Detail Sheet ----
+  async function เปิดUserDetail(u) {
+    setUserที่เลือก(u)
+    setUserDetail(null)
+    setโหลดDetail(true)
+
+    // ดึงข้อมูลเพิ่มเติม: นับรายงาน + ข้อมูลศูนย์พักพิง
+    const [ร1] = await Promise.all([
+      supabase
+        .from('reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('reporter_id', u.id),
+    ])
+
+    setUserDetail({
+      รายงานทั้งหมด: ร1.count || 0,
+    })
+    setโหลดDetail(false)
   }
 
   // ---- ดึงจำนวนสำหรับ Export ----
@@ -294,67 +319,39 @@ function AdminPage({ หน้า, user }) {
               )}
 
               {ผู้ใช้กรอง.map((u) => {
-                // ตรวจว่าแถวนี้คือ admin ที่กำลังใช้งานอยู่หรือเปล่า
                 const คือตัวเอง = u.id === user?.id
-
                 return (
-                  <div key={u.id} className={`bg-white rounded-2xl p-4 shadow-sm ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}>
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
+                  <div
+                    key={u.id}
+                    onClick={() => เปิดUserDetail(u)}
+                    className={`bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all cursor-pointer ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                        {u.avatar_url
+                          ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                          : <span className="text-xl">👤</span>
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-800">{u.name || '(ไม่ระบุชื่อ)'}</p>
-                          {/* badge "คุณ" ให้รู้ว่าแถวนี้คือตัวเอง */}
+                          <p className="font-bold text-gray-800 text-sm truncate">{u.name || '(ไม่ระบุชื่อ)'}</p>
                           {คือตัวเอง && (
-                            <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">
-                              คุณ
-                            </span>
+                            <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{u.email}</p>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
                         <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
                       </div>
-                      {/* Badge สถานะบัญชี */}
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        u.status === 'suspended'
-                          ? 'bg-red-50 text-red-600'
-                          : 'bg-green-50 text-green-600'
-                      }`}>
-                        {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {คือตัวเอง ? (
-                        // ถ้าเป็นแถวของตัวเอง → แสดงข้อความแทน ไม่ให้แก้ role/ระงับตัวเอง
-                        <p className="flex-1 text-xs text-gray-400 italic text-center py-1">
-                          🔒 ไม่สามารถแก้ไขบัญชีตัวเองได้
-                        </p>
-                      ) : (
-                        <>
-                          {/* Dropdown เปลี่ยน Role → บันทึกลง Supabase */}
-                          <select
-                            value={u.role || 'user'}
-                            onChange={(e) => เปลี่ยนRole(u.id, e.target.value)}
-                            className={`flex-1 text-xs px-2 py-1.5 rounded-lg border-0 font-medium ${สีRole[u.role] || สีRole.user}`}
-                          >
-                            <option value="user">👤 ผู้ใช้งาน</option>
-                            <option value="volunteer">🦺 เจ้าหน้าที่</option>
-                            <option value="admin">🛡️ Admin</option>
-                          </select>
-
-                          {/* ปุ่มระงับ / ยกเลิกระงับ → บันทึกลง Supabase */}
-                          <button
-                            onClick={() => สลับสถานะ(u.id, u.status || 'active')}
-                            className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
-                              u.status === 'suspended'
-                                ? 'bg-green-50 text-green-600'
-                                : 'bg-red-50 text-red-600'
-                            }`}
-                          >
-                            {u.status === 'suspended' ? 'ยกเลิกระงับ' : 'ระงับ'}
-                          </button>
-                        </>
-                      )}
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
+                          {u.role === 'admin' ? '🛡️ Admin' : u.role === 'volunteer' ? '🦺 เจ้าหน้าที่' : '👤 ผู้ใช้'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )
@@ -458,6 +455,144 @@ function AdminPage({ หน้า, user }) {
               <span className="text-sm text-gray-500">{item.ค่า}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ======== User Detail Bottom Sheet ======== */}
+      {userที่เลือก && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/40" onClick={() => setUserที่เลือก(null)} />
+
+          {/* Sheet */}
+          <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            <div className="px-5 pb-8 space-y-4">
+              {/* Header: Avatar + ชื่อ */}
+              <div className="flex items-center gap-4 py-2">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                  {userที่เลือก.avatar_url
+                    ? <img src={userที่เลือก.avatar_url} alt={userที่เลือก.name} className="w-full h-full object-cover" />
+                    : <span className="text-4xl">👤</span>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-bold text-gray-800 text-lg">{userที่เลือก.name || '(ไม่ระบุชื่อ)'}</h2>
+                  <p className="text-sm text-gray-500">{userที่เลือก.email}</p>
+                  <div className="flex gap-2 mt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[userที่เลือก.role] || สีRole.user}`}>
+                      {userที่เลือก.role === 'admin' ? '🛡️ Admin' : userที่เลือก.role === 'volunteer' ? '🦺 เจ้าหน้าที่' : '👤 ผู้ใช้งาน'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${userที่เลือก.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                      {userที่เลือก.status === 'suspended' ? '🚫 ระงับ' : '✅ ใช้งาน'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ข้อมูลส่วนตัว */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ข้อมูลส่วนตัว</p>
+                {[
+                  { label: 'ชื่อ',           value: userที่เลือก.name || '-' },
+                  { label: 'อีเมล',           value: userที่เลือก.email || '-' },
+                  { label: 'เบอร์ติดต่อ',     value: userที่เลือก.phone || '-' },
+                  { label: 'วันที่สมัคร',     value: แปลงวันที่(userที่เลือก.created_at) },
+                  { label: 'User ID',         value: String(userที่เลือก.id).slice(0, 8) + '...' },
+                ].map(function (row) {
+                  return (
+                    <div key={row.label} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">{row.label}</span>
+                      <span className="text-sm font-medium text-gray-800 text-right max-w-[60%] break-all">{row.value}</span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* สถิติ */}
+              {โหลดDetail ? (
+                <div className="bg-blue-50 rounded-2xl p-4 text-center">
+                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : userDetail && (
+                <div className="bg-blue-50 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">สถิติการใช้งาน</p>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">รายงานที่แจ้ง</span>
+                    <span className="text-sm font-bold text-blue-700">{userDetail.รายงานทั้งหมด} รายการ</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ข้อมูลศูนย์พักพิง (volunteer/admin) */}
+              {(userที่เลือก.role === 'volunteer' || userที่เลือก.role === 'admin') && (
+                <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
+                  <p className="text-xs font-bold text-orange-600 uppercase tracking-wide">🏠 ข้อมูลศูนย์พักพิง</p>
+                  {[
+                    { label: 'ชื่อศูนย์',          value: userที่เลือก.shelter_name     || '-' },
+                    { label: 'ที่ตั้ง',              value: userที่เลือก.shelter_location || '-' },
+                    { label: 'พื้นที่รับผิดชอบ',    value: userที่เลือก.service_area     || '-' },
+                  ].map(function (row) {
+                    return (
+                      <div key={row.label} className="flex justify-between items-start">
+                        <span className="text-sm text-gray-500 shrink-0">{row.label}</span>
+                        <span className={`text-sm font-medium text-right max-w-[60%] ${row.value === '-' ? 'text-gray-400 italic' : 'text-gray-800'}`}>{row.value}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Actions — ไม่แสดงถ้าเป็นตัวเอง */}
+              {userที่เลือก.id !== user?.id && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">จัดการบัญชี</p>
+                  {/* เปลี่ยน Role */}
+                  <select
+                    value={userที่เลือก.role || 'user'}
+                    onChange={function (e) {
+                      เปลี่ยนRole(userที่เลือก.id, e.target.value)
+                      setUserที่เลือก(function (p) { return { ...p, role: e.target.value } })
+                      setรายการผู้ใช้(function (prev) {
+                        return prev.map(function (u) { return u.id === userที่เลือก.id ? { ...u, role: e.target.value } : u })
+                      })
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
+                  >
+                    <option value="user">👤 ผู้ใช้งานทั่วไป</option>
+                    <option value="volunteer">🦺 เจ้าหน้าที่ / อาสาสมัคร</option>
+                    <option value="admin">🛡️ ผู้ดูแลระบบ (Admin)</option>
+                  </select>
+
+                  {/* ระงับ / ยกเลิกระงับ */}
+                  <button
+                    onClick={function () {
+                      const สถานะใหม่ = userที่เลือก.status === 'suspended' ? 'active' : 'suspended'
+                      สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
+                      setUserที่เลือก(function (p) { return { ...p, status: สถานะใหม่ } })
+                    }}
+                    className={`w-full py-3 rounded-xl text-sm font-bold ${
+                      userที่เลือก.status === 'suspended'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {userที่เลือก.status === 'suspended' ? '✅ ยกเลิกการระงับบัญชี' : '🚫 ระงับบัญชีนี้'}
+                  </button>
+                </div>
+              )}
+
+              {userที่เลือก.id === user?.id && (
+                <div className="bg-purple-50 rounded-2xl p-3 text-center">
+                  <p className="text-xs text-purple-500">🔒 ไม่สามารถแก้ไขบัญชีตัวเองได้</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
