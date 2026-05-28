@@ -90,10 +90,12 @@ function TrackReport({ user }) {
   // ดึงรายงาน
   useEffect(function () {
     async function ดึงรายงาน() {
+      if (!user?.id) { setกำลังโหลด(false); return }
       setกำลังโหลด(true)
       const { data, error } = await supabase
         .from('reports')
         .select('*')
+        .eq('reporter_id', user.id)
         .order('created_at', { ascending: false })
       if (!error) setรายการรายงาน(data)
       setกำลังโหลด(false)
@@ -146,11 +148,11 @@ function TrackReport({ user }) {
 
       <div className="px-4 pt-4 space-y-4">
 
-        {รายการรายงาน.length === 0 && (
+        {!กำลังโหลด && รายการรายงาน.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 text-center">
             <div className="text-6xl mb-4">📋</div>
-            <p className="text-gray-600 font-semibold">ยังไม่มีรายงาน</p>
-            <p className="text-gray-400 text-sm mt-1">กดแจ้งสัตว์จรเพื่อสร้างรายงานแรก</p>
+            <p className="text-gray-600 font-semibold">คุณยังไม่มีรายงาน</p>
+            <p className="text-gray-400 text-sm mt-1">รายการแจ้งสัตว์จรของคุณจะแสดงที่นี่</p>
             <button onClick={() => navigate('/report')}
               className="mt-4 bg-orange-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium">
               แจ้งสัตว์จร
