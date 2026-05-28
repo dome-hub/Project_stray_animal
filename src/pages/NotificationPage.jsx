@@ -4,28 +4,30 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
+// บวก UTC+7 ด้วยตัวเองทุกครั้ง ไม่พึ่ง Intl timezone ของ browser
+function toBKK(d) {
+  return new Date(d.getTime() + 7 * 60 * 60 * 1000)
+}
+
+const เดือนสั้น = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+
 function แปลงเวลา(str) {
   if (!str) return ''
-  const tz = 'Asia/Bangkok'
-  const d  = new Date(str)
 
-  // เวลาใน timezone ไทยเสมอ ไม่ว่า browser จะตั้ง timezone อะไร
-  const time = d.toLocaleTimeString('th-TH', {
-    hour: '2-digit', minute: '2-digit', timeZone: tz,
-  }) + ' น.'
+  const bkk  = toBKK(new Date(str))   // timestamp → Bangkok UTC+7
+  const now  = toBKK(new Date())       // ตอนนี้ใน Bangkok
 
-  // เปรียบเทียบวันใน timezone ไทย
-  const fmt        = { timeZone: tz }
-  const thaiDate   = d.toLocaleDateString('th-TH', fmt)
-  const thaiToday  = new Date().toLocaleDateString('th-TH', fmt)
-  const thaiYest   = new Date(Date.now() - 86400000).toLocaleDateString('th-TH', fmt)
+  const hh   = String(bkk.getUTCHours()).padStart(2, '0')
+  const mm   = String(bkk.getUTCMinutes()).padStart(2, '0')
+  const time = `${hh}:${mm} น.`
 
-  if (thaiDate === thaiToday) return `วันนี้ ${time}`
-  if (thaiDate === thaiYest)  return `เมื่อวาน ${time}`
+  const key  = (d) => `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
+  const yest = new Date(now.getTime() - 86400000)
 
-  return d.toLocaleDateString('th-TH', {
-    day: 'numeric', month: 'short', timeZone: tz,
-  }) + ' ' + time
+  if (key(bkk) === key(now))  return `วันนี้ ${time}`
+  if (key(bkk) === key(yest)) return `เมื่อวาน ${time}`
+
+  return `${bkk.getUTCDate()} ${เดือนสั้น[bkk.getUTCMonth()]} ${time}`
 }
 
 // emoji ตามสถานะรายงาน
