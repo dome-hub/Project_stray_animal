@@ -66,13 +66,18 @@ const สถานะDefault = {
 // สถานะที่เจ้าหน้าที่รับเรื่องแล้ว
 const สถานะที่รับเรื่อง = ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'อยู่ศูนย์พักพิง', 'มีผู้รับเลี้ยง']
 
+// บวก UTC+7 เองทุกครั้ง — ไม่พึ่ง timezone ของ browser
+const เดือนTR = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+
 function แปลงวันที่(dateString) {
-  const d = new Date(dateString)
+  const bkk  = new Date(new Date(dateString).getTime() + 7 * 60 * 60 * 1000)
+  const day  = bkk.getUTCDate()
+  const mon  = เดือนTR[bkk.getUTCMonth()]
+  const year = bkk.getUTCFullYear() + 543
+  const hh   = String(bkk.getUTCHours()).padStart(2, '0')
+  const mm   = String(bkk.getUTCMinutes()).padStart(2, '0')
   return (
-    d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ' • ' +
-    d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) +
-    ' น.'
+    `${day} ${mon} ${year} • ${hh}:${mm} น.`
   )
 }
 
