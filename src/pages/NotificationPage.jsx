@@ -61,8 +61,15 @@ function NotificationPage({ user }) {
 
   const [รายการ, setรายการ]   = useState([])
   const [โหลด, setโหลด]       = useState(true)
-  // volunteer/admin ใช้ local read-state (ไม่บันทึก DB)
-  const [อ่านแล้วLocal, setอ่านแล้วLocal] = useState(new Set())
+
+  // volunteer/admin — เก็บ read-state ใน localStorage เพื่อคงค่าข้าม navigate
+  const lsKey = `noti_read_${user?.id || 'anon'}`
+  const [อ่านแล้วLocal, setอ่านแล้วLocal] = useState(function () {
+    try {
+      const saved = localStorage.getItem(lsKey)
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch { return new Set() }
+  })
 
   useEffect(function () {
     if (!user?.id) return
@@ -186,7 +193,11 @@ function NotificationPage({ user }) {
         await supabase.from('notifications').update({ is_read: true }).eq('id', item.dbId)
       }
     } else {
-      setอ่านแล้วLocal(function (prev) { return new Set([...prev, item.id]) })
+      setอ่านแล้วLocal(function (prev) {
+        const next = new Set([...prev, item.id])
+        try { localStorage.setItem(lsKey, JSON.stringify([...next])) } catch {}
+        return next
+      })
     }
   }
 
@@ -197,7 +208,10 @@ function NotificationPage({ user }) {
         await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id)
       }
     } else {
-      setอ่านแล้วLocal(new Set(รายการ.map(function (n) { return n.id })))
+      const allIds = รายการ.map(function (n) { return n.id })
+      const next = new Set(allIds)
+      try { localStorage.setItem(lsKey, JSON.stringify(allIds)) } catch {}
+      setอ่านแล้วLocal(next)
     }
   }
 
