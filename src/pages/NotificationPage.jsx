@@ -61,6 +61,7 @@ function NotificationPage({ user }) {
 
   const [รายการ, setรายการ]   = useState([])
   const [โหลด, setโหลด]       = useState(true)
+  const [เมนูเปิด, setเมนูเปิด] = useState(null)   // id ของ item ที่เปิด ⋮ อยู่
 
   // volunteer/admin — เก็บ read-state ใน localStorage เพื่อคงค่าข้าม navigate
   const lsKey = `noti_read_${user?.id || 'anon'}`
@@ -215,8 +216,20 @@ function NotificationPage({ user }) {
     }
   }
 
+  async function ลบแจ้งเตือน(item) {
+    setเมนูเปิด(null)
+    if (role === 'user') {
+      // ลบจาก DB
+      if (item.dbId) {
+        await supabase.from('notifications').delete().eq('id', item.dbId)
+      }
+    }
+    // ลบออกจาก local state (ทุก role)
+    setรายการ(function (prev) { return prev.filter(function (n) { return n.id !== item.id }) })
+  }
+
   return (
-    <div className="min-h-screen bg-yellow-50 pb-8">
+    <div className="min-h-screen bg-yellow-50 pb-8" onClick={() => setเมนูเปิด(null)}>
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
@@ -276,33 +289,65 @@ function NotificationPage({ user }) {
       {!โหลด && (
         <div className="px-4 pt-3 space-y-3">
           {รายการ.map(function (n) {
-            const read = isอ่านแล้ว(n)
+            const read    = isอ่านแล้ว(n)
+            const isOpen  = เมนูเปิด === n.id
             return (
-              <button
+              <div
                 key={n.id}
-                onClick={() => กดอ่าน(n)}
-                className={`w-full text-left rounded-2xl p-4 shadow-sm transition-all active:scale-95 ${
+                className={`relative rounded-2xl shadow-sm ${
                   read ? 'bg-white' : 'bg-yellow-50 border-2 border-yellow-200'
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl shrink-0">{n.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    {n.หัวข้อ && (
-                      <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
-                        {n.หัวข้อ}
+                {/* พื้นที่กดอ่าน */}
+                <button
+                  onClick={() => กดอ่าน(n)}
+                  className="w-full text-left p-4 pr-10"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl shrink-0">{n.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      {n.หัวข้อ && (
+                        <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
+                          {n.หัวข้อ}
+                        </p>
+                      )}
+                      <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
+                        {n.ข้อความ}
                       </p>
+                      <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
+                    </div>
+                    {!read && (
+                      <div className="w-2.5 h-2.5 bg-orange-400 rounded-full mt-1 shrink-0" />
                     )}
-                    <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
-                      {n.ข้อความ}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
                   </div>
-                  {!read && (
-                    <div className="w-2.5 h-2.5 bg-orange-400 rounded-full mt-1 shrink-0" />
-                  )}
-                </div>
-              </button>
+                </button>
+
+                {/* ปุ่ม ⋮ */}
+                <button
+                  onClick={function (e) {
+                    e.stopPropagation()
+                    setเมนูเปิด(isOpen ? null : n.id)
+                  }}
+                  className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                >
+                  ⋮
+                </button>
+
+                {/* Dropdown เมื่อกด ⋮ */}
+                {isOpen && (
+                  <div
+                    className="absolute top-10 right-3 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden"
+                    onClick={function (e) { e.stopPropagation() }}
+                  >
+                    <button
+                      onClick={() => ลบแจ้งเตือน(n)}
+                      className="flex items-center gap-2 px-4 py-3 text-sm text-red-500 font-medium hover:bg-red-50 w-full text-left"
+                    >
+                      🗑️ ลบการแจ้งเตือน
+                    </button>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
