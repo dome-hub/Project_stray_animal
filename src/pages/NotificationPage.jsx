@@ -110,17 +110,27 @@ function NotificationPage({ user }) {
         .order('created_at', { ascending: false })
         .limit(30)
         .then(function ({ data }) {
-          const items = (data || []).map(function (r) {
-            const isNew = r.status === 'รอดำเนินการ'
-            return {
-              id:       r.id,
-              emoji:    emojiสถานะ(r.status),
-              หัวข้อ:   isNew ? '🚨 รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
-              ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-              เวลา:     แปลงเวลา(r.created_at),
-              isNew,
-            }
-          })
+          // อ่าน ID ที่เคยลบจาก localStorage
+          const delKey = `noti_deleted_${user?.id || 'anon'}`
+          let deletedSet = new Set()
+          try {
+            const raw = localStorage.getItem(delKey)
+            if (raw) deletedSet = new Set(JSON.parse(raw))
+          } catch {}
+
+          const items = (data || [])
+            .filter(function (r) { return !deletedSet.has(r.id) })
+            .map(function (r) {
+              const isNew = r.status === 'รอดำเนินการ'
+              return {
+                id:       r.id,
+                emoji:    emojiสถานะ(r.status),
+                หัวข้อ:   isNew ? '🚨 รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
+                ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+                เวลา:     แปลงเวลา(r.created_at),
+                isNew,
+              }
+            })
           // รอดำเนินการขึ้นก่อนเสมอ
           items.sort(function (a, b) { return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) })
           setรายการ(items)
@@ -144,26 +154,38 @@ function NotificationPage({ user }) {
           .order('created_at', { ascending: false })
           .limit(10),
       ]).then(function ([ร1, ร2]) {
-        const reportItems = (ร1.data || []).map(function (r) {
-          return {
-            id:      'r' + r.id,
-            emoji:   emojiสถานะ(r.status),
-            หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
-            ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-            เวลา:    แปลงเวลา(r.created_at),
-            isNew:   r.status === 'รอดำเนินการ',
-          }
-        })
-        const userItems = (ร2.data || []).map(function (u) {
-          return {
-            id:      'u' + u.id,
-            emoji:   '👤',
-            หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
-            ข้อความ: u.name || 'ผู้ใช้ใหม่',
-            เวลา:    แปลงเวลา(u.created_at),
-            isNew:   false,
-          }
-        })
+        // อ่าน ID ที่เคยลบจาก localStorage
+        const delKey = `noti_deleted_${user?.id || 'anon'}`
+        let deletedSet = new Set()
+        try {
+          const raw = localStorage.getItem(delKey)
+          if (raw) deletedSet = new Set(JSON.parse(raw))
+        } catch {}
+
+        const reportItems = (ร1.data || [])
+          .filter(function (r) { return !deletedSet.has('r' + r.id) })
+          .map(function (r) {
+            return {
+              id:      'r' + r.id,
+              emoji:   emojiสถานะ(r.status),
+              หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
+              ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+              เวลา:    แปลงเวลา(r.created_at),
+              isNew:   r.status === 'รอดำเนินการ',
+            }
+          })
+        const userItems = (ร2.data || [])
+          .filter(function (u) { return !deletedSet.has('u' + u.id) })
+          .map(function (u) {
+            return {
+              id:      'u' + u.id,
+              emoji:   '👤',
+              หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
+              ข้อความ: u.name || 'ผู้ใช้ใหม่',
+              เวลา:    แปลงเวลา(u.created_at),
+              isNew:   false,
+            }
+          })
         // รวมแล้วเรียงตามเวลาล่าสุด
         const all = [...reportItems, ...userItems].sort(function (a, b) {
           return 0  // already sorted by fetch order
@@ -223,6 +245,15 @@ function NotificationPage({ user }) {
       if (item.dbId) {
         await supabase.from('notifications').delete().eq('id', item.dbId)
       }
+    } else {
+      // volunteer/admin — บันทึก ID ที่ลบลง localStorage เพื่อกรองหลัง refresh
+      const key = `noti_deleted_${user?.id || 'anon'}`
+      try {
+        const raw = localStorage.getItem(key)
+        const set = raw ? new Set(JSON.parse(raw)) : new Set()
+        set.add(item.id)
+        localStorage.setItem(key, JSON.stringify([...set]))
+      } catch {}
     }
     // ลบออกจาก local state (ทุก role)
     setรายการ(function (prev) { return prev.filter(function (n) { return n.id !== item.id }) })
