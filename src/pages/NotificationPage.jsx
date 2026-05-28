@@ -4,7 +4,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
-// บวก UTC+7 ด้วยตัวเองทุกครั้ง ไม่พึ่ง Intl timezone ของ browser
+// parse string เป็น UTC เสมอ — ถ้าไม่มี timezone suffix ให้ต่อ Z เข้าไป
+function parseUTC(str) {
+  if (!str) return new Date(NaN)
+  // มี +xx:xx หรือ Z อยู่แล้ว → parse ตามปกติ
+  if (/[Zz]$/.test(str) || /[+-]\d{2}:\d{2}$/.test(str)) return new Date(str)
+  // ไม่มี → บังคับเป็น UTC โดยต่อ Z
+  return new Date(str + 'Z')
+}
+
+// บวก UTC+7 → ได้เวลาไทย
 function toBKK(d) {
   return new Date(d.getTime() + 7 * 60 * 60 * 1000)
 }
@@ -14,7 +23,7 @@ const เดือนสั้น = ['ม.ค.','ก.พ.','มี.ค.','เม
 function แปลงเวลา(str) {
   if (!str) return ''
 
-  const bkk  = toBKK(new Date(str))   // timestamp → Bangkok UTC+7
+  const bkk  = toBKK(parseUTC(str))   // UTC → Bangkok UTC+7
   const now  = toBKK(new Date())       // ตอนนี้ใน Bangkok
 
   const hh   = String(bkk.getUTCHours()).padStart(2, '0')
