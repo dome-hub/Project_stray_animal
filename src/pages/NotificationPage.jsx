@@ -6,24 +6,26 @@ import { supabase } from '../supabase'
 
 function แปลงเวลา(str) {
   if (!str) return ''
-  const d   = new Date(str)
-  const now = new Date()
+  const tz = 'Asia/Bangkok'
+  const d  = new Date(str)
 
-  const time = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+  // เวลาใน timezone ไทยเสมอ ไม่ว่า browser จะตั้ง timezone อะไร
+  const time = d.toLocaleTimeString('th-TH', {
+    hour: '2-digit', minute: '2-digit', timeZone: tz,
+  }) + ' น.'
 
-  // วันเดียวกัน
-  if (d.toDateString() === now.toDateString()) return `วันนี้ ${time}`
+  // เปรียบเทียบวันใน timezone ไทย
+  const fmt        = { timeZone: tz }
+  const thaiDate   = d.toLocaleDateString('th-TH', fmt)
+  const thaiToday  = new Date().toLocaleDateString('th-TH', fmt)
+  const thaiYest   = new Date(Date.now() - 86400000).toLocaleDateString('th-TH', fmt)
 
-  // เมื่อวาน
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return `เมื่อวาน ${time}`
+  if (thaiDate === thaiToday) return `วันนี้ ${time}`
+  if (thaiDate === thaiYest)  return `เมื่อวาน ${time}`
 
-  // วันอื่น → แสดงวันที่ + เวลาเต็ม
-  return (
-    d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) +
-    ' ' + time
-  )
+  return d.toLocaleDateString('th-TH', {
+    day: 'numeric', month: 'short', timeZone: tz,
+  }) + ' ' + time
 }
 
 // emoji ตามสถานะรายงาน
