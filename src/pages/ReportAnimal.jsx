@@ -44,6 +44,27 @@ function ReportAnimal({ user }) {
   const [กล้องพร้อม,  setกล้องพร้อม]  = useState(false)
   const [errorกล้อง,  setErrorกล้อง]  = useState('')
 
+  // ---- Phone modal state ----
+  const [แสดงModalโทรศัพท์,     setแสดงModalโทรศัพท์]     = useState(false)
+  const [inputโทรศัพท์,          setInputโทรศัพท์]          = useState('')
+  const [กำลังบันทึกโทรศัพท์,   setกำลังบันทึกโทรศัพท์]   = useState(false)
+  const [errorโทรศัพท์,          setErrorโทรศัพท์]          = useState('')
+
+  // ตรวจสอบเบอร์โทรศัพท์ของ user ตอน mount — ถ้าไม่มีบังคับกรอกก่อน
+  useEffect(function () {
+    if (!user?.id) return
+    supabase
+      .from('users')
+      .select('phone')
+      .eq('id', user.id)
+      .single()
+      .then(function ({ data }) {
+        if (!data?.phone || data.phone.trim() === '') {
+          setแสดงModalโทรศัพท์(true)
+        }
+      })
+  }, [user?.id])
+
   // cleanup stream เมื่อ component unmount
   useEffect(function () {
     return function () { ปิดกล้อง() }
@@ -156,6 +177,22 @@ function ReportAnimal({ user }) {
     )
   }
 
+  // ---- บันทึกเบอร์โทรศัพท์ลง DB ----
+  async function บันทึกโทรศัพท์() {
+    const tel = inputโทรศัพท์.trim()
+    if (!tel) { setErrorโทรศัพท์('กรุณากรอกเบอร์โทรศัพท์'); return }
+    if (!/^0[0-9]{8,9}$/.test(tel)) { setErrorโทรศัพท์('รูปแบบเบอร์ไม่ถูกต้อง (เช่น 0812345678)'); return }
+    setกำลังบันทึกโทรศัพท์(true)
+    setErrorโทรศัพท์('')
+    const { error } = await supabase.from('users').update({ phone: tel }).eq('id', user.id)
+    setกำลังบันทึกโทรศัพท์(false)
+    if (error) {
+      setErrorโทรศัพท์('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+    } else {
+      setแสดงModalโทรศัพท์(false)
+    }
+  }
+
   // ---- ส่งรายงาน ----
   async function ส่งรายงาน() {
     if (!ตำแหน่ง) return
@@ -208,8 +245,9 @@ function ReportAnimal({ user }) {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center px-6 text-center">
         <div className="text-7xl mb-4">✅</div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">ส่งรายงานสำเร็จ!</h2>
-        <p className="text-gray-600 mb-6">เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง</p>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">แจ้งสำเร็จแล้ว!</h2>
+        <p className="text-gray-600 mb-1 font-medium">เดี๋ยวจะมีเจ้าหน้าที่ติดต่อกลับในไม่ช้า</p>
+        <p className="text-gray-400 text-sm mb-6">กรุณาเตรียมรับสาย / ข้อความจากเจ้าหน้าที่</p>
         <div className="bg-white rounded-2xl p-4 w-full max-w-xs mb-6 shadow-sm">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-500">รหัสรายงาน</span>
@@ -290,6 +328,66 @@ function ReportAnimal({ user }) {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ============================================================
+          MODAL: บังคับกรอกเบอร์โทรศัพท์ก่อนแจ้ง
+          ============================================================ */}
+      {แสดงModalโทรศัพท์ && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
+          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-10">
+
+            {/* handle */}
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            {/* icon + หัวข้อ */}
+            <div className="text-center mb-5">
+              <div className="text-5xl mb-3">📱</div>
+              <h2 className="text-lg font-bold text-gray-800">กรอกเบอร์โทรศัพท์ก่อน</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                เจ้าหน้าที่จะติดต่อกลับผ่านเบอร์นี้เมื่อรับเรื่องแล้ว
+              </p>
+            </div>
+
+            {/* input */}
+            <div className="mb-3">
+              <input
+                type="tel"
+                inputMode="numeric"
+                placeholder="เช่น 0812345678"
+                value={inputโทรศัพท์}
+                onChange={function (e) {
+                  setInputโทรศัพท์(e.target.value)
+                  setErrorโทรศัพท์('')
+                }}
+                className={`w-full border-2 rounded-xl px-4 py-3 text-base text-center tracking-widest font-medium focus:outline-none ${
+                  errorโทรศัพท์ ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-orange-400'
+                }`}
+                maxLength={10}
+              />
+              {errorโทรศัพท์ && (
+                <p className="text-red-500 text-xs mt-1.5 text-center">{errorโทรศัพท์}</p>
+              )}
+            </div>
+
+            {/* ปุ่มบันทึก */}
+            <button
+              onClick={บันทึกโทรศัพท์}
+              disabled={กำลังบันทึกโทรศัพท์ || !inputโทรศัพท์}
+              className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {กำลังบันทึกโทรศัพท์
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> บันทึก...</>
+                : '✅ บันทึกเบอร์โทรศัพท์'}
+            </button>
+
+            <p className="text-center text-xs text-gray-400 mt-3">
+              ข้อมูลนี้จะถูกเก็บไว้ในโปรไฟล์ของคุณ
+            </p>
+          </div>
         </div>
       )}
 
