@@ -49,6 +49,7 @@ function ReportAnimal({ user }) {
   const [inputโทรศัพท์,          setInputโทรศัพท์]          = useState('')
   const [กำลังบันทึกโทรศัพท์,   setกำลังบันทึกโทรศัพท์]   = useState(false)
   const [errorโทรศัพท์,          setErrorโทรศัพท์]          = useState('')
+  const [ต้องกรอกเบอร์,          setต้องกรอกเบอร์]          = useState(false)
 
   // cleanup stream เมื่อ component unmount
   useEffect(function () {
@@ -211,9 +212,12 @@ function ReportAnimal({ user }) {
   // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นส่งเลย ----
   async function ส่งรายงาน() {
     if (!ตำแหน่ง) return
+    // ถ้ารู้แล้วว่าต้องกรอกเบอร์ → เปิด modal โดยไม่ query DB ซ้ำ
+    if (ต้องกรอกเบอร์) { setแสดงModalโทรศัพท์(true); return }
     const { data: userData } = await supabase
       .from('users').select('phone').eq('id', user.id).single()
     if (!userData?.phone || userData.phone.trim() === '') {
+      setต้องกรอกเบอร์(true)
       setแสดงModalโทรศัพท์(true)
       return
     }
@@ -232,6 +236,7 @@ function ReportAnimal({ user }) {
     if (error) {
       setErrorโทรศัพท์('บันทึกไม่สำเร็จ กรุณาลองใหม่')
     } else {
+      setต้องกรอกเบอร์(false)
       setแสดงModalโทรศัพท์(false)
       await doSubmit()   // ← ส่งรายงานต่อเลยหลังบันทึกเบอร์
     }
@@ -332,12 +337,19 @@ function ReportAnimal({ user }) {
           MODAL: บังคับกรอกเบอร์โทรศัพท์ก่อนแจ้ง
           ============================================================ */}
       {แสดงModalโทรศัพท์ && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-10">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end"
+             onClick={() => setแสดงModalโทรศัพท์(false)}>
+          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-10"
+               onClick={function (e) { e.stopPropagation() }}>
 
-            {/* handle */}
-            <div className="flex justify-center mb-3">
+            {/* handle + ปุ่มปิด */}
+            <div className="flex items-center justify-between mb-1">
+              <div className="w-7" />
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
+              <button
+                onClick={() => setแสดงModalโทรศัพท์(false)}
+                className="w-7 h-7 flex items-center justify-center text-gray-400 text-lg"
+              >✕</button>
             </div>
 
             {/* icon + หัวข้อ */}
@@ -370,10 +382,10 @@ function ReportAnimal({ user }) {
               )}
             </div>
 
-            {/* ปุ่มบันทึก */}
+            {/* ปุ่มบันทึก — disable จนกว่าจะครบ 10 หลัก */}
             <button
               onClick={บันทึกโทรศัพท์}
-              disabled={กำลังบันทึกโทรศัพท์ || !inputโทรศัพท์}
+              disabled={กำลังบันทึกโทรศัพท์ || inputโทรศัพท์.trim().length < 10}
               className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {กำลังบันทึกโทรศัพท์
@@ -509,10 +521,22 @@ function ReportAnimal({ user }) {
         </div>
 
         {/* ส่ง */}
-        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || กำลังส่ง || กำลังวิเคราะห์}
+        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
           className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {กำลังส่ง ? '⏳ กำลังอัปโหลดและบันทึก...' : 'ส่งรายงานให้เจ้าหน้าที่'}
         </button>
+
+        {/* แสดงเมื่อปิด modal โดยไม่กรอกเบอร์ */}
+        {ต้องกรอกเบอร์ && (
+          <button
+            onClick={() => setแสดงModalโทรศัพท์(true)}
+            className="w-full flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl py-3 text-sm text-red-600 font-medium"
+          >
+            <span>📱</span>
+            <span>กรุณากรอกเบอร์โทรศัพท์ก่อนส่ง</span>
+            <span className="text-red-400">→ กรอกเบอร์</span>
+          </button>
+        )}
 
       </div>
     </div>
