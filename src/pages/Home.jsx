@@ -127,7 +127,7 @@ function Home({ user, onLogout }) {
         <div className="flex items-center gap-3">
           <div className="text-3xl">🐕</div>
           <div>
-            <p className="font-bold text-gray-800 text-sm">ระบบจัดการหมาจร</p>
+            <p className="font-bold text-gray-800 text-sm">แจ้งจร</p>
             <p className={`text-xs font-medium ${roleInfo.สี}`}>
               {roleInfo.emoji} {roleInfo.ชื่อ}
             </p>
