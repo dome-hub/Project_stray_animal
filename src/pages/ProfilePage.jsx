@@ -403,11 +403,6 @@ function ProfilePage({ user }) {
               {กำลังแก้ไขเบอร์ && errorเบอร์ && (
                 <p className="text-red-500 text-xs mt-1 text-right">{errorเบอร์}</p>
               )}
-              {กำลังแก้ไขเบอร์ && !errorเบอร์ && (
-                <p className="text-gray-400 text-xs mt-1 text-right">
-                  {เบอร์ชั่วคราว.length}/10 หลัก
-                </p>
-              )}
             </div>
 
           </div>
