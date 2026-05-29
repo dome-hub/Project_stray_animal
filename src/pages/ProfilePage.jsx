@@ -55,6 +55,7 @@ function ProfilePage({ user }) {
   const [กำลังแก้ไขเบอร์,  setกำลังแก้ไขเบอร์]  = useState(false)
   const [เบอร์ชั่วคราว,    setเบอร์ชั่วคราว]    = useState('')
   const [กำลังบันทึกเบอร์, setกำลังบันทึกเบอร์] = useState(false)
+  const [errorเบอร์,        setErrorเบอร์]        = useState('')
 
   // ---- ข้อมูลศูนย์พักพิง (volunteer/admin เท่านั้น) ----
   const [shelterName,         setShelterName]         = useState('')
@@ -197,16 +198,22 @@ function ProfilePage({ user }) {
     }
   }
 
-  // ---- บันทึกเบอร์ลง DB ----
+  // ---- บันทึกเบอร์ลง DB (บังคับ 10 หลัก) ----
   async function บันทึกเบอร์() {
+    const tel = เบอร์ชั่วคราว.trim()
+    if (!/^0[0-9]{9}$/.test(tel)) {
+      setErrorเบอร์('ต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0')
+      return
+    }
+    setErrorเบอร์('')
     setกำลังบันทึกเบอร์(true)
     try {
-      const { error } = await supabase.from('users').update({ phone: เบอร์ชั่วคราว.trim() }).eq('id', user.id)
+      const { error } = await supabase.from('users').update({ phone: tel }).eq('id', user.id)
       if (error) throw new Error(error.message)
-      setเบอร์ติดต่อ(เบอร์ชั่วคราว.trim() || 'กดแก้ไขเพื่อเพิ่มเบอร์')
+      setเบอร์ติดต่อ(tel)
       setกำลังแก้ไขเบอร์(false)
     } catch (err) {
-      alert('บันทึกเบอร์ไม่สำเร็จ: ' + err.message)
+      setErrorเบอร์('บันทึกไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setกำลังบันทึกเบอร์(false)
     }
@@ -349,34 +356,58 @@ function ProfilePage({ user }) {
             </div>
 
             {/* เบอร์ติดต่อ */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">เบอร์ติดต่อ</span>
-              <div className="flex items-center gap-2">
-                {กำลังแก้ไขเบอร์ ? (
-                  <>
-                    <input
-                      value={เบอร์ชั่วคราว}
-                      onChange={(e) => setเบอร์ชั่วคราว(e.target.value)}
-                      placeholder="เช่น 081-234-5678"
-                      className="border border-blue-300 rounded-lg px-2 py-1 text-sm text-right w-36 focus:outline-none"
-                      autoFocus
-                    />
-                    <button onClick={บันทึกเบอร์} disabled={กำลังบันทึกเบอร์}
-                      className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg disabled:opacity-60">
-                      {กำลังบันทึกเบอร์ ? '...' : 'บันทึก'}
-                    </button>
-                    <button onClick={() => setกำลังแก้ไขเบอร์(false)} className="text-xs text-gray-400">ยกเลิก</button>
-                  </>
-                ) : (
-                  <>
-                    <span className={`text-sm font-medium ${เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? 'text-gray-400 italic' : 'text-gray-800'}`}>
-                      {เบอร์ติดต่อ}
-                    </span>
-                    <button onClick={() => { setเบอร์ชั่วคราว(เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? '' : เบอร์ติดต่อ); setกำลังแก้ไขเบอร์(true) }}
-                      className="text-xs text-blue-500">แก้ไข</button>
-                  </>
-                )}
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">เบอร์ติดต่อ</span>
+                <div className="flex items-center gap-2">
+                  {กำลังแก้ไขเบอร์ ? (
+                    <>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={เบอร์ชั่วคราว}
+                        onChange={function (e) {
+                          // รับเฉพาะตัวเลข ไม่เกิน 10 หลัก
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10)
+                          setเบอร์ชั่วคราว(val)
+                          setErrorเบอร์('')
+                        }}
+                        placeholder="0XXXXXXXXX"
+                        className={`border rounded-lg px-2 py-1 text-sm text-right w-32 focus:outline-none tracking-widest ${
+                          errorเบอร์ ? 'border-red-400 bg-red-50' : 'border-blue-300'
+                        }`}
+                        maxLength={10}
+                        autoFocus
+                      />
+                      <button
+                        onClick={บันทึกเบอร์}
+                        disabled={กำลังบันทึกเบอร์ || เบอร์ชั่วคราว.length < 10}
+                        className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg disabled:opacity-40">
+                        {กำลังบันทึกเบอร์ ? '...' : 'บันทึก'}
+                      </button>
+                      <button onClick={() => { setกำลังแก้ไขเบอร์(false); setErrorเบอร์('') }}
+                        className="text-xs text-gray-400">ยกเลิก</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className={`text-sm font-medium ${เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                        {เบอร์ติดต่อ}
+                      </span>
+                      <button onClick={() => { setเบอร์ชั่วคราว(เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? '' : เบอร์ติดต่อ); setกำลังแก้ไขเบอร์(true) }}
+                        className="text-xs text-blue-500">แก้ไข</button>
+                    </>
+                  )}
+                </div>
               </div>
+              {/* error ใต้แถว */}
+              {กำลังแก้ไขเบอร์ && errorเบอร์ && (
+                <p className="text-red-500 text-xs mt-1 text-right">{errorเบอร์}</p>
+              )}
+              {กำลังแก้ไขเบอร์ && !errorเบอร์ && (
+                <p className="text-gray-400 text-xs mt-1 text-right">
+                  {เบอร์ชั่วคราว.length}/10 หลัก
+                </p>
+              )}
             </div>
 
           </div>
