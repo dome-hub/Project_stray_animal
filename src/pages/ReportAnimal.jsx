@@ -50,21 +50,6 @@ function ReportAnimal({ user }) {
   const [กำลังบันทึกโทรศัพท์,   setกำลังบันทึกโทรศัพท์]   = useState(false)
   const [errorโทรศัพท์,          setErrorโทรศัพท์]          = useState('')
 
-  // ตรวจสอบเบอร์โทรศัพท์ของ user ตอน mount — ถ้าไม่มีบังคับกรอกก่อน
-  useEffect(function () {
-    if (!user?.id) return
-    supabase
-      .from('users')
-      .select('phone')
-      .eq('id', user.id)
-      .single()
-      .then(function ({ data }) {
-        if (!data?.phone || data.phone.trim() === '') {
-          setแสดงModalโทรศัพท์(true)
-        }
-      })
-  }, [user?.id])
-
   // cleanup stream เมื่อ component unmount
   useEffect(function () {
     return function () { ปิดกล้อง() }
@@ -177,25 +162,8 @@ function ReportAnimal({ user }) {
     )
   }
 
-  // ---- บันทึกเบอร์โทรศัพท์ลง DB ----
-  async function บันทึกโทรศัพท์() {
-    const tel = inputโทรศัพท์.trim()
-    if (!tel) { setErrorโทรศัพท์('กรุณากรอกเบอร์โทรศัพท์'); return }
-    if (!/^0[0-9]{8,9}$/.test(tel)) { setErrorโทรศัพท์('รูปแบบเบอร์ไม่ถูกต้อง (เช่น 0812345678)'); return }
-    setกำลังบันทึกโทรศัพท์(true)
-    setErrorโทรศัพท์('')
-    const { error } = await supabase.from('users').update({ phone: tel }).eq('id', user.id)
-    setกำลังบันทึกโทรศัพท์(false)
-    if (error) {
-      setErrorโทรศัพท์('บันทึกไม่สำเร็จ กรุณาลองใหม่')
-    } else {
-      setแสดงModalโทรศัพท์(false)
-    }
-  }
-
-  // ---- ส่งรายงาน ----
-  async function ส่งรายงาน() {
-    if (!ตำแหน่ง) return
+  // ---- ส่งรายงานจริง (ถูกเรียกหลังผ่านเช็คเบอร์แล้ว) ----
+  async function doSubmit() {
     setกำลังส่ง(true)
 
     let imageUrl = null
@@ -237,6 +205,35 @@ function ReportAnimal({ user }) {
       }
       setรหัสรายงาน(data.id)
       setส่งสำเร็จ(true)
+    }
+  }
+
+  // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นส่งเลย ----
+  async function ส่งรายงาน() {
+    if (!ตำแหน่ง) return
+    const { data: userData } = await supabase
+      .from('users').select('phone').eq('id', user.id).single()
+    if (!userData?.phone || userData.phone.trim() === '') {
+      setแสดงModalโทรศัพท์(true)
+      return
+    }
+    await doSubmit()
+  }
+
+  // ---- บันทึกเบอร์โทรศัพท์ → แล้วส่งรายงานต่อเลย ----
+  async function บันทึกโทรศัพท์() {
+    const tel = inputโทรศัพท์.trim()
+    if (!tel) { setErrorโทรศัพท์('กรุณากรอกเบอร์โทรศัพท์'); return }
+    if (!/^0[0-9]{8,9}$/.test(tel)) { setErrorโทรศัพท์('รูปแบบเบอร์ไม่ถูกต้อง (เช่น 0812345678)'); return }
+    setกำลังบันทึกโทรศัพท์(true)
+    setErrorโทรศัพท์('')
+    const { error } = await supabase.from('users').update({ phone: tel }).eq('id', user.id)
+    setกำลังบันทึกโทรศัพท์(false)
+    if (error) {
+      setErrorโทรศัพท์('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+    } else {
+      setแสดงModalโทรศัพท์(false)
+      await doSubmit()   // ← ส่งรายงานต่อเลยหลังบันทึกเบอร์
     }
   }
 
