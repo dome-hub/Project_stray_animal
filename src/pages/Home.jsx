@@ -46,7 +46,6 @@ function Home({ user, onLogout }) {
   const roleInfo = ข้อมูลRole[role]
 
   // ดึง avatar_url ใหม่ทุกครั้งที่กลับมาหน้า Home
-  // เพราะผู้ใช้อาจเพิ่งอัปโหลดรูปจาก ProfilePage
   const [avatarUrl, setAvatarUrl] = useState(null)
 
   useEffect(function () {
@@ -60,6 +59,65 @@ function Home({ user, onLogout }) {
         if (data?.avatar_url) setAvatarUrl(data.avatar_url)
       })
   }, [user?.id])
+
+  // ---- นับการแจ้งเตือนที่ยังไม่อ่าน (ทุก role) ----
+  const [ยังไม่อ่าน, setยังไม่อ่าน] = useState(0)
+
+  useEffect(function () {
+    if (!user?.id) return
+
+    const lsDelKey  = `noti_deleted_${user.id}`
+    const lsReadKey = `noti_read_${user.id}`
+    let deletedSet = new Set()
+    let readSet    = new Set()
+    try {
+      const d = localStorage.getItem(lsDelKey)
+      const r = localStorage.getItem(lsReadKey)
+      if (d) deletedSet = new Set(JSON.parse(d))
+      if (r) readSet    = new Set(JSON.parse(r))
+    } catch {}
+
+    if (role === 'user') {
+      // นับจาก notifications table โดยตรง
+      supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false)
+        .then(function ({ count }) { setยังไม่อ่าน(count || 0) })
+      return
+    }
+
+    if (role === 'volunteer') {
+      // unread = รอดำเนินการ ที่ยังไม่ถูกอ่านหรือลบ
+      supabase
+        .from('reports')
+        .select('id')
+        .eq('status', 'รอดำเนินการ')
+        .then(function ({ data }) {
+          const n = (data || []).filter(function (r) {
+            return !deletedSet.has(r.id) && !readSet.has(r.id)
+          }).length
+          setยังไม่อ่าน(n)
+        })
+      return
+    }
+
+    if (role === 'admin') {
+      // unread = รอดำเนินการ ที่ยังไม่ถูกอ่านหรือลบ (id prefix 'r')
+      supabase
+        .from('reports')
+        .select('id')
+        .eq('status', 'รอดำเนินการ')
+        .then(function ({ data }) {
+          const n = (data || []).filter(function (r) {
+            return !deletedSet.has('r' + r.id) && !readSet.has('r' + r.id)
+          }).length
+          setยังไม่อ่าน(n)
+        })
+      return
+    }
+  }, [user?.id, role])
 
   return (
     <div className="min-h-screen bg-blue-50 pb-8">
@@ -82,10 +140,22 @@ function Home({ user, onLogout }) {
           {/* กระดิ่งแจ้งเตือน — กดแล้วไปหน้า Notifications */}
           <button
             onClick={() => navigate('/notifications')}
-            className="w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center text-lg hover:bg-yellow-200 transition-colors"
+            className="relative w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center text-lg hover:bg-yellow-200 transition-colors"
             title="การแจ้งเตือน"
           >
             🔔
+            {ยังไม่อ่าน > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                {/* วงแสงกระพริบ */}
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                {/* ตัวเลข */}
+                <span className="relative inline-flex h-4 w-4 rounded-full bg-red-500 items-center justify-center">
+                  <span className="text-[9px] text-white font-bold leading-none">
+                    {ยังไม่อ่าน > 9 ? '9+' : ยังไม่อ่าน}
+                  </span>
+                </span>
+              </span>
+            )}
           </button>
 
           {/* วงกลมโปรไฟล์ — กดแล้วไปหน้า Profile */}
