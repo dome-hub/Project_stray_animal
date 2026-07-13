@@ -1,16 +1,14 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from ai_edge_litert.interpreter import Interpreter
+import onnxruntime as ort
 import numpy as np
 from PIL import Image
 import io, json
 
-# ── โหลดโมเดล (TFLite — เบากว่า TensorFlow เต็มตัวมาก ไม่กิน RAM เกิน) และ metadata ──
-print("กำลังโหลดโมเดล (TFLite)...")
-interpreter = Interpreter(model_path='./model/final_model.tflite')
-interpreter.allocate_tensors()
-INPUT_DETAILS  = interpreter.get_input_details()
-OUTPUT_DETAILS = interpreter.get_output_details()
+# ── โหลดโมเดล (ONNX Runtime — เบากว่า TensorFlow เต็มตัว รองรับ op ได้กว้างกว่า TFLite) ──
+print("กำลังโหลดโมเดล (ONNX)...")
+session = ort.InferenceSession('./model/final_model.onnx', providers=['CPUExecutionProvider'])
+INPUT_NAME = session.get_inputs()[0].name
 
 with open('./model/metadata.json', 'r', encoding='utf-8') as f:
     metadata = json.load(f)
@@ -21,7 +19,7 @@ IMG_SIZE    = metadata['img_size']
 print(f"✅ โหลดสำเร็จ | {len(CLASS_NAMES)} สายพันธุ์ | Test Acc {metadata['test_accuracy']*100:.1f}%")
 
 # ── FastAPI ───────────────────────────────────────────────────────────────────
-app = FastAPI(title="Stray Animal Analyzer API", version="2.1-tflite")
+app = FastAPI(title="Stray Animal Analyzer API", version="2.2-onnx")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,10 +38,8 @@ def แปลงรูป(image_bytes: bytes) -> np.ndarray:
     return np.expand_dims(arr, axis=0)
 
 def ทำนาย(img_array: np.ndarray) -> np.ndarray:
-    interpreter.set_tensor(INPUT_DETAILS[0]['index'], img_array)
-    interpreter.invoke()
-    output = interpreter.get_tensor(OUTPUT_DETAILS[0]['index'])
-    return output[0]
+    result = session.run(None, {INPUT_NAME: img_array})
+    return result[0][0]
 
 def วิเคราะห์ผล(predictions: np.ndarray) -> dict:
     top3_idx   = predictions.argsort()[-3:][::-1]

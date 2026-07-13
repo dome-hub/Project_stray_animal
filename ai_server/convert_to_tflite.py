@@ -6,6 +6,10 @@
 #   venv\Scripts\activate
 #   python convert_to_tflite.py
 
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')  # กัน UnicodeEncodeError บน Windows console
+
 import tensorflow as tf
 
 MODEL_PATH = 'model/final_model.keras'
