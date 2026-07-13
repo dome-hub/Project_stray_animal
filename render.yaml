@@ -4,7 +4,21 @@ services:
     env: static
     buildCommand: npm run build
     staticPublishPath: ./dist
+    envVars:
+      - key: VITE_AI_API_URL
+        value: https://project-stray-animal-ai.onrender.com
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  - type: web
+    name: project-stray-animal-ai
+    env: python
+    plan: free
+    rootDir: ai_server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

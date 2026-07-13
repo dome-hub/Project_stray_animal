@@ -17,6 +17,11 @@ dist-ssr
 .env.local
 .env.production
 
+# Python (ai_server)
+ai_server/venv
+ai_server/__pycache__
+*.pyc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
