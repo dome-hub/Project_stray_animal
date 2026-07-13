@@ -47,8 +47,8 @@ function FindPet() {
         const แปลงแล้ว = data.map(function (สัตว์) {
           return {
             id: สัตว์.id,
-            // ถ้า breed มีคำว่า "แมว" → ใช้ emoji แมว, ไม่งั้นใช้สุนัข
             emoji: สัตว์.breed?.includes('แมว') ? '🐈' : '🐕',
+            รูป: สัตว์.photo_url || null,
             ชื่อ: สัตว์.name,
             สายพันธุ์: สัตว์.breed || 'ไม่ระบุ',
             อายุ: สัตว์.age || 'ไม่ระบุ',
@@ -57,10 +57,8 @@ function FindPet() {
             สุขภาพ: สัตว์.health,
             ลักษณะ: สัตว์.description || '',
             วัคซีน: สัตว์.vaccine_info || '',
-            // traits เก็บเป็น "เป็นมิตร,ขี้เล่น" → แปลงเป็น array ['เป็นมิตร','ขี้เล่น']
-            นิสัย: สัตว์.traits ? สัตว์.traits.split(',') : ['เป็นมิตร'],
+            นิสัย: สัตว์.traits ? สัตว์.traits.split(',').map(function (t) { return t.trim() }).filter(Boolean) : [],
             สถานที่: สัตว์.location || 'กำแพงแสน นครปฐม',
-            // คะแนนสุ่มชั่วคราว (ของจริงควรคำนวณจาก AI)
             คะแนน: Math.floor(Math.random() * 20) + 75,
           }
         })
@@ -312,8 +310,11 @@ function การ์ดสัตว์({ สัตว์, แสดงBadge, on
     >
       <div className="flex items-start gap-4">
         {/* รูปสัตว์ */}
-        <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center text-3xl shrink-0">
-          {สัตว์.emoji}
+        <div className="w-16 h-16 bg-green-100 rounded-2xl overflow-hidden flex items-center justify-center text-3xl shrink-0">
+          {สัตว์.รูป
+            ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
+            : สัตว์.emoji
+          }
         </div>
 
         <div className="flex-1">

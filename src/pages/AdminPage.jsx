@@ -25,6 +25,17 @@ function AdminPage({ หน้า, user }) {
   const [ค้นหาผู้ใช้, setค้นหาผู้ใช้] = useState('')
   const [โหลดผู้ใช้, setโหลดผู้ใช้] = useState(true)
 
+  // ---- State: User Detail Sheet ----
+  const [userที่เลือก,   setUserที่เลือก]   = useState(null)
+  const [userDetail,     setUserDetail]     = useState(null)
+  const [โหลดDetail,    setโหลดDetail]    = useState(false)
+
+  // ---- State: Inline Edit (Admin แก้ข้อมูล user) ----
+  const [editField,   setEditField]   = useState(null)   // ชื่อ field ที่กำลัง edit
+  const [editValue,   setEditValue]   = useState('')
+  const [savingField, setSavingField] = useState(false)
+  const [errorEdit,   setErrorEdit]   = useState('')
+
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
   const [โหลดExport, setโหลดExport] = useState(true)
@@ -112,6 +123,60 @@ function AdminPage({ หน้า, user }) {
     } else {
       alert('เปลี่ยนสถานะไม่สำเร็จ: ' + error.message)
     }
+  }
+
+  // ---- เปิด User Detail Sheet ----
+  async function เปิดUserDetail(u) {
+    setUserที่เลือก(u)
+    setUserDetail(null)
+    setโหลดDetail(true)
+
+    // ดึงข้อมูลเพิ่มเติม: นับรายงาน + ข้อมูลศูนย์พักพิง
+    const [ร1] = await Promise.all([
+      supabase
+        .from('reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('reporter_id', u.id),
+    ])
+
+    setUserDetail({
+      รายงานทั้งหมด: ร1.count || 0,
+    })
+    setโหลดDetail(false)
+  }
+
+  // ---- Admin: บันทึก field ที่แก้ไข ----
+  async function adminSaveField(field, value) {
+    if (field === 'phone' && value && !/^0[0-9]{9}$/.test(value)) {
+      setErrorEdit('เบอร์ต้อง 10 หลัก ขึ้นต้นด้วย 0')
+      return
+    }
+    if (field === 'name' && !value.trim()) {
+      setErrorEdit('ชื่อห้ามว่าง')
+      return
+    }
+    setErrorEdit('')
+    setSavingField(true)
+    const { error } = await supabase.from('users').update({ [field]: value || null }).eq('id', userที่เลือก.id)
+    setSavingField(false)
+    if (error) { setErrorEdit('บันทึกไม่สำเร็จ: ' + error.message); return }
+    const updated = { ...userที่เลือก, [field]: value || null }
+    setUserที่เลือก(updated)
+    setรายการผู้ใช้(function (prev) {
+      return prev.map(function (u) { return u.id === userที่เลือก.id ? updated : u })
+    })
+    setEditField(null)
+  }
+
+  // ---- Admin: ล้างค่า field (set null) ----
+  async function adminClearField(field) {
+    const { error } = await supabase.from('users').update({ [field]: null }).eq('id', userที่เลือก.id)
+    if (error) { alert('ล้างข้อมูลไม่สำเร็จ: ' + error.message); return }
+    const updated = { ...userที่เลือก, [field]: null }
+    setUserที่เลือก(updated)
+    setรายการผู้ใช้(function (prev) {
+      return prev.map(function (u) { return u.id === userที่เลือก.id ? updated : u })
+    })
   }
 
   // ---- ดึงจำนวนสำหรับ Export ----
@@ -294,67 +359,39 @@ function AdminPage({ หน้า, user }) {
               )}
 
               {ผู้ใช้กรอง.map((u) => {
-                // ตรวจว่าแถวนี้คือ admin ที่กำลังใช้งานอยู่หรือเปล่า
                 const คือตัวเอง = u.id === user?.id
-
                 return (
-                  <div key={u.id} className={`bg-white rounded-2xl p-4 shadow-sm ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}>
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
+                  <div
+                    key={u.id}
+                    onClick={() => เปิดUserDetail(u)}
+                    className={`bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all cursor-pointer ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                        {u.avatar_url
+                          ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                          : <span className="text-xl">👤</span>
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-800">{u.name || '(ไม่ระบุชื่อ)'}</p>
-                          {/* badge "คุณ" ให้รู้ว่าแถวนี้คือตัวเอง */}
+                          <p className="font-bold text-gray-800 text-sm truncate">{u.name || '(ไม่ระบุชื่อ)'}</p>
                           {คือตัวเอง && (
-                            <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">
-                              คุณ
-                            </span>
+                            <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{u.email}</p>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
                         <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
                       </div>
-                      {/* Badge สถานะบัญชี */}
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        u.status === 'suspended'
-                          ? 'bg-red-50 text-red-600'
-                          : 'bg-green-50 text-green-600'
-                      }`}>
-                        {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {คือตัวเอง ? (
-                        // ถ้าเป็นแถวของตัวเอง → แสดงข้อความแทน ไม่ให้แก้ role/ระงับตัวเอง
-                        <p className="flex-1 text-xs text-gray-400 italic text-center py-1">
-                          🔒 ไม่สามารถแก้ไขบัญชีตัวเองได้
-                        </p>
-                      ) : (
-                        <>
-                          {/* Dropdown เปลี่ยน Role → บันทึกลง Supabase */}
-                          <select
-                            value={u.role || 'user'}
-                            onChange={(e) => เปลี่ยนRole(u.id, e.target.value)}
-                            className={`flex-1 text-xs px-2 py-1.5 rounded-lg border-0 font-medium ${สีRole[u.role] || สีRole.user}`}
-                          >
-                            <option value="user">👤 ผู้ใช้งาน</option>
-                            <option value="volunteer">🦺 เจ้าหน้าที่</option>
-                            <option value="admin">🛡️ Admin</option>
-                          </select>
-
-                          {/* ปุ่มระงับ / ยกเลิกระงับ → บันทึกลง Supabase */}
-                          <button
-                            onClick={() => สลับสถานะ(u.id, u.status || 'active')}
-                            className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
-                              u.status === 'suspended'
-                                ? 'bg-green-50 text-green-600'
-                                : 'bg-red-50 text-red-600'
-                            }`}
-                          >
-                            {u.status === 'suspended' ? 'ยกเลิกระงับ' : 'ระงับ'}
-                          </button>
-                        </>
-                      )}
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
+                          {u.role === 'admin' ? '🛡️ Admin' : u.role === 'volunteer' ? '🦺 เจ้าหน้าที่' : '👤 ผู้ใช้'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )
@@ -458,6 +495,249 @@ function AdminPage({ หน้า, user }) {
               <span className="text-sm text-gray-500">{item.ค่า}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ======== User Detail Bottom Sheet ======== */}
+      {userที่เลือก && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/40" onClick={() => setUserที่เลือก(null)} />
+
+          {/* Sheet */}
+          <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            <div className="px-5 pb-8 space-y-4">
+              {/* Header: Avatar + ชื่อ */}
+              <div className="flex items-center gap-4 py-2">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                  {userที่เลือก.avatar_url
+                    ? <img src={userที่เลือก.avatar_url} alt={userที่เลือก.name} className="w-full h-full object-cover" />
+                    : <span className="text-4xl">👤</span>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-bold text-gray-800 text-lg">{userที่เลือก.name || '(ไม่ระบุชื่อ)'}</h2>
+                  <p className="text-sm text-gray-500">{userที่เลือก.email}</p>
+                  <div className="flex gap-2 mt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[userที่เลือก.role] || สีRole.user}`}>
+                      {userที่เลือก.role === 'admin' ? '🛡️ Admin' : userที่เลือก.role === 'volunteer' ? '🦺 เจ้าหน้าที่' : '👤 ผู้ใช้งาน'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${userที่เลือก.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                      {userที่เลือก.status === 'suspended' ? '🚫 ระงับ' : '✅ ใช้งาน'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ข้อมูลส่วนตัว */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ข้อมูลส่วนตัว</p>
+
+                {/* helper render editable row */}
+                {(function () {
+                  const canEdit = userที่เลือก.id !== user?.id
+
+                  function EditableRow({ label, field, value, inputType, maxLen }) {
+                    const isEditing = editField === field
+                    return (
+                      <div>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-sm text-gray-500 shrink-0">{label}</span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-1.5 flex-1 justify-end">
+                              <input
+                                type={inputType || 'text'}
+                                inputMode={inputType === 'tel' ? 'numeric' : undefined}
+                                value={editValue}
+                                onChange={function (e) {
+                                  const v = inputType === 'tel'
+                                    ? e.target.value.replace(/\D/g, '').slice(0, 10)
+                                    : e.target.value
+                                  setEditValue(v)
+                                  setErrorEdit('')
+                                }}
+                                maxLength={maxLen}
+                                autoFocus
+                                className="border border-purple-300 rounded-lg px-2 py-1 text-sm w-32 text-right focus:outline-none"
+                              />
+                              <button
+                                onClick={() => adminSaveField(field, editValue)}
+                                disabled={savingField}
+                                className="text-xs bg-purple-500 text-white px-2 py-1 rounded-lg disabled:opacity-50 shrink-0"
+                              >{savingField ? '...' : 'บันทึก'}</button>
+                              <button onClick={() => { setEditField(null); setErrorEdit('') }}
+                                className="text-xs text-gray-400 shrink-0">ยกเลิก</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-sm font-medium text-right break-all ${!value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                                {value || '-'}
+                              </span>
+                              {canEdit && (
+                                <>
+                                  <button
+                                    onClick={() => { setEditField(field); setEditValue(value || ''); setErrorEdit('') }}
+                                    className="text-purple-400 hover:bg-purple-50 rounded p-0.5 text-xs shrink-0"
+                                    title="แก้ไข"
+                                  >✏️</button>
+                                  {value && (
+                                    <button
+                                      onClick={() => adminClearField(field)}
+                                      className="text-red-400 hover:bg-red-50 rounded p-0.5 text-xs shrink-0"
+                                      title="ลบข้อมูล"
+                                    >🗑️</button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {isEditing && errorEdit && (
+                          <p className="text-red-500 text-xs text-right mt-1">{errorEdit}</p>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <>
+                      <EditableRow label="ชื่อ"       field="name"  value={userที่เลือก.name}  />
+                      {/* อีเมล — ไม่แก้ไขได้ */}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500">อีเมล</span>
+                        <span className="text-sm font-medium text-gray-800 text-right max-w-[60%] break-all">{userที่เลือก.email || '-'}</span>
+                      </div>
+                      <EditableRow label="เบอร์ติดต่อ" field="phone" value={userที่เลือก.phone} inputType="tel" maxLen={10} />
+                      {/* วันที่สมัคร + User ID — ไม่แก้ไขได้ */}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500">วันที่สมัคร</span>
+                        <span className="text-sm font-medium text-gray-800">{แปลงวันที่(userที่เลือก.created_at)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500">User ID</span>
+                        <span className="text-sm font-medium text-gray-800">{String(userที่เลือก.id).slice(0, 8)}...</span>
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+
+              {/* สถิติ */}
+              {โหลดDetail ? (
+                <div className="bg-blue-50 rounded-2xl p-4 text-center">
+                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : userDetail && (
+                <div className="bg-blue-50 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">สถิติการใช้งาน</p>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">รายงานที่แจ้ง</span>
+                    <span className="text-sm font-bold text-blue-700">{userDetail.รายงานทั้งหมด} รายการ</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) */}
+              {userที่เลือก.role === 'volunteer' && (
+                <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
+                  <p className="text-xs font-bold text-orange-600 uppercase tracking-wide">🏠 ข้อมูลศูนย์พักพิง</p>
+                  {[
+                    { label: 'ชื่อศูนย์',       field: 'shelter_name',     value: userที่เลือก.shelter_name },
+                    { label: 'ที่ตั้ง',           field: 'shelter_location', value: userที่เลือก.shelter_location },
+                    { label: 'พื้นที่รับผิดชอบ', field: 'service_area',     value: userที่เลือก.service_area },
+                  ].map(function (row) {
+                    const isEditing = editField === row.field
+                    return (
+                      <div key={row.field}>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-sm text-gray-500 shrink-0">{row.label}</span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-1.5 flex-1 justify-end">
+                              <input
+                                value={editValue}
+                                onChange={function (e) { setEditValue(e.target.value); setErrorEdit('') }}
+                                autoFocus
+                                className="border border-orange-300 rounded-lg px-2 py-1 text-sm w-36 text-right focus:outline-none"
+                              />
+                              <button onClick={() => adminSaveField(row.field, editValue)} disabled={savingField}
+                                className="text-xs bg-orange-500 text-white px-2 py-1 rounded-lg disabled:opacity-50 shrink-0">
+                                {savingField ? '...' : 'บันทึก'}
+                              </button>
+                              <button onClick={() => { setEditField(null); setErrorEdit('') }} className="text-xs text-gray-400 shrink-0">ยกเลิก</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-sm font-medium text-right max-w-[55%] ${!row.value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                                {row.value || '-'}
+                              </span>
+                              <button
+                                onClick={() => { setEditField(row.field); setEditValue(row.value || ''); setErrorEdit('') }}
+                                className="text-orange-400 hover:bg-orange-100 rounded p-0.5 text-xs shrink-0" title="แก้ไข">✏️</button>
+                              {row.value && (
+                                <button onClick={() => adminClearField(row.field)}
+                                  className="text-red-400 hover:bg-red-50 rounded p-0.5 text-xs shrink-0" title="ลบ">🗑️</button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {isEditing && errorEdit && <p className="text-red-500 text-xs text-right mt-1">{errorEdit}</p>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Actions — ไม่แสดงถ้าเป็นตัวเอง */}
+              {userที่เลือก.id !== user?.id && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">จัดการบัญชี</p>
+                  {/* เปลี่ยน Role */}
+                  <select
+                    value={userที่เลือก.role || 'user'}
+                    onChange={function (e) {
+                      เปลี่ยนRole(userที่เลือก.id, e.target.value)
+                      setUserที่เลือก(function (p) { return { ...p, role: e.target.value } })
+                      setรายการผู้ใช้(function (prev) {
+                        return prev.map(function (u) { return u.id === userที่เลือก.id ? { ...u, role: e.target.value } : u })
+                      })
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
+                  >
+                    <option value="user">👤 ผู้ใช้งานทั่วไป</option>
+                    <option value="volunteer">🦺 เจ้าหน้าที่ / อาสาสมัคร</option>
+                    <option value="admin">🛡️ ผู้ดูแลระบบ (Admin)</option>
+                  </select>
+
+                  {/* ระงับ / ยกเลิกระงับ */}
+                  <button
+                    onClick={function () {
+                      const สถานะใหม่ = userที่เลือก.status === 'suspended' ? 'active' : 'suspended'
+                      สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
+                      setUserที่เลือก(function (p) { return { ...p, status: สถานะใหม่ } })
+                    }}
+                    className={`w-full py-3 rounded-xl text-sm font-bold ${
+                      userที่เลือก.status === 'suspended'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {userที่เลือก.status === 'suspended' ? '✅ ยกเลิกการระงับบัญชี' : '🚫 ระงับบัญชีนี้'}
+                  </button>
+                </div>
+              )}
+
+              {userที่เลือก.id === user?.id && (
+                <div className="bg-purple-50 rounded-2xl p-3 text-center">
+                  <p className="text-xs text-purple-500">🔒 ไม่สามารถแก้ไขบัญชีตัวเองได้</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

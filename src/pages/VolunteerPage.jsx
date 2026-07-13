@@ -224,13 +224,15 @@ function VolunteerPage({ หน้า }) {
     if (!error) {
       // ส่ง notification ให้ผู้แจ้ง
       if (report.reporter_id) {
-        await supabase.from('notifications').insert({
+        const { error: notiErr } = await supabase.from('notifications').insert({
           user_id: report.reporter_id,
           title:   'เจ้าหน้าที่รับเรื่องแล้ว 🦺',
           body:    `รายงาน #${String(report.id).padStart(6, '0')} ของคุณได้รับการดูแลแล้ว เจ้าหน้าที่จะลงพื้นที่เพื่อรับสัตว์โดยเร็ว`,
           type:    'report_update',
           is_read: false,
         })
+        if (notiErr) console.error('❌ ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+        else console.log('✅ ส่ง notification ให้ผู้แจ้งสำเร็จ (reporter_id:', report.reporter_id, ')')
       }
       // อัปเดต local state
       setรายงานทั้งหมด(function (prev) {
@@ -280,15 +282,17 @@ function VolunteerPage({ หน้า }) {
         .maybeSingle()
 
       if (!existing) {
-        await supabase.from('animals').insert({
+        const { error: animalErr } = await supabase.from('animals').insert({
           name:      'ยังไม่ตั้งชื่อ',
           breed:     report.animal_type || 'ไม่ระบุ',
           status:    'อยู่ศูนย์พักพิง',
           health:    'ยังไม่ตรวจ',
-          image_url: report.image_url || null,
+          photo_url: report.image_url || null,
           location:  report.location_text || 'กำแพงแสน นครปฐม',
           report_id: report.id,
         })
+        if (animalErr) console.error('❌ เพิ่มสัตว์ไม่สำเร็จ:', animalErr.message)
+        else console.log('✅ เพิ่มสัตว์ในระบบอัตโนมัติสำเร็จ (report_id:', report.id, ')')
       }
     }
 
@@ -300,13 +304,15 @@ function VolunteerPage({ หน้า }) {
       'มีผู้รับเลี้ยง':   `สัตว์ที่คุณแจ้ง (#${String(report.id).padStart(6, '0')}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
     }
     if (report.reporter_id && msgMap[สถานะใหม่]) {
-      await supabase.from('notifications').insert({
+      const { error: notiErr } = await supabase.from('notifications').insert({
         user_id: report.reporter_id,
         title:   `อัปเดตรายงาน #${String(report.id).padStart(6, '0')}`,
         body:    msgMap[สถานะใหม่],
         type:    'report_update',
         is_read: false,
       })
+      if (notiErr) console.error('❌ ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+      else console.log('✅ ส่ง notification ให้ผู้แจ้งสำเร็จ (reporter_id:', report.reporter_id, ')')
     }
 
     // อัปเดต local state
@@ -348,12 +354,14 @@ function VolunteerPage({ หน้า }) {
   async function บันทึกแก้ไขสัตว์() {
     if (!สัตว์ที่แก้ไข) return
     const { error } = await supabase.from('animals').update({
-      name:   สัตว์ที่แก้ไข.name,
-      breed:  สัตว์ที่แก้ไข.breed,
-      age:    สัตว์ที่แก้ไข.age,
-      gender: สัตว์ที่แก้ไข.gender,
-      health: สัตว์ที่แก้ไข.health,
-      status: สัตว์ที่แก้ไข.status,
+      name:         สัตว์ที่แก้ไข.name,
+      breed:        สัตว์ที่แก้ไข.breed,
+      age:          สัตว์ที่แก้ไข.age,
+      gender:       สัตว์ที่แก้ไข.gender,
+      health:       สัตว์ที่แก้ไข.health,
+      status:       สัตว์ที่แก้ไข.status,
+      traits:       สัตว์ที่แก้ไข.traits       || null,
+      vaccine_info: สัตว์ที่แก้ไข.vaccine_info || null,
     }).eq('id', สัตว์ที่แก้ไข.id)
 
     if (!error) {
@@ -378,7 +386,7 @@ function VolunteerPage({ หน้า }) {
     setโหลดรายงานสัตว์(true)
     const { data: report } = await supabase
       .from('reports')
-      .select('id, animal_type, location_text, detail, reporter_id, created_at')
+      .select('id, animal_type, location_text, latitude, longitude, detail, reporter_id, created_at')
       .eq('id', สัตว์.report_id)
       .single()
 
@@ -494,10 +502,11 @@ function VolunteerPage({ หน้า }) {
               const isNew  = ร.status === 'รอดำเนินการ'
               const isDone = ร.status === 'มีผู้รับเลี้ยง'
               return (
-                <button key={ร.id} onClick={() => เปิดรายละเอียด(ร)}
-                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 ${
+                <div key={ร.id}
+                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer ${
                     isNew ? 'ring-2 ring-orange-300' : ''
                   }`}
+                  onClick={() => เปิดรายละเอียด(ร)}
                 >
                   <div className={`h-1.5 w-full ${isNew ? 'bg-yellow-400' : isDone ? 'bg-green-400' : 'bg-blue-400'}`} />
                   <div className="p-4 flex items-center gap-3">
@@ -509,15 +518,31 @@ function VolunteerPage({ หน้า }) {
                           {ร.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">📍 {ร.location_text || '-'}</p>
-                      <p className="text-xs text-gray-400">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
+
+                      {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
+                      {ร.latitude && ร.longitude ? (
+                        <a
+                          href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
+                          target="_blank" rel="noreferrer"
+                          onClick={function (e) { e.stopPropagation() }}
+                          className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                        >
+                          <span className="text-sm">📍</span>
+                          <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
+                          <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">Maps ↗</span>
+                        </a>
+                      ) : (
+                        <p className="text-xs text-gray-500 truncate">📍 {ร.location_text || '-'}</p>
+                      )}
+
+                      <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
                       {ร.detail && (
                         <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
                       )}
                     </div>
                     <span className="text-gray-300 text-xl shrink-0">›</span>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -553,15 +578,32 @@ function VolunteerPage({ หน้า }) {
 
               {รายงานActive.map(function (ร) {
                 return (
-                  <button key={ร.id} onClick={() => เปิดรายละเอียด(ร)}
-                    className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all"
+                  <div key={ร.id}
+                    className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer"
+                    onClick={() => เปิดรายละเอียด(ร)}
                   >
                     <div className={`h-1.5 ${ร.status === 'รอดำเนินการ' ? 'bg-yellow-400' : 'bg-blue-400'}`} />
                     <div className="p-4 flex items-center gap-3">
                       <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุ'}</p>
-                        <p className="text-xs text-gray-500 truncate">📍 {ร.location_text}</p>
+
+                        {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
+                        {ร.latitude && ร.longitude ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
+                            target="_blank" rel="noreferrer"
+                            onClick={function (e) { e.stopPropagation() }}
+                            className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                          >
+                            <span className="text-sm">📍</span>
+                            <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
+                            <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">Maps ↗</span>
+                          </a>
+                        ) : (
+                          <p className="text-xs text-gray-500 truncate">📍 {ร.location_text}</p>
+                        )}
+
                         <p className="text-xs text-gray-400">{แปลงวันที่เวลา(ร.created_at)}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium border mt-1 inline-block ${สีสถานะ[ร.status] || ''}`}>
                           {ร.status}
@@ -569,7 +611,7 @@ function VolunteerPage({ หน้า }) {
                       </div>
                       <span className="text-gray-300 text-xl shrink-0">›</span>
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </>
@@ -661,8 +703,8 @@ function VolunteerPage({ หน้า }) {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl bg-green-50 overflow-hidden flex items-center justify-center shrink-0">
-                      {สัตว์.image_url
-                        ? <img src={สัตว์.image_url} alt={สัตว์.name} className="w-full h-full object-cover" />
+                      {สัตว์.photo_url
+                        ? <img src={สัตว์.photo_url} alt={สัตว์.name} className="w-full h-full object-cover" />
                         : <span className="text-3xl">{สัตว์.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
                       }
                     </div>
@@ -749,9 +791,18 @@ function VolunteerPage({ หน้า }) {
               {/* ตำแหน่ง */}
               <div className="flex items-start gap-3 bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
                 <span className="text-xl mt-0.5">📍</span>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-400 mb-0.5">ตำแหน่งที่พบสัตว์</p>
                   <p className="text-sm font-semibold text-gray-800">{รายงานที่เปิด.location_text || '-'}</p>
+                  {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
+                    <a
+                      href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
+                      target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                    >
+                      🗺️ เปิดใน Google Maps →
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -855,12 +906,21 @@ function VolunteerPage({ หน้า }) {
 
             <div className="px-5 pb-8 space-y-4">
               {/* รูป + ข้อมูล */}
-              <div className="flex gap-3 items-center bg-gray-50 rounded-2xl p-3">
+              <div className="flex gap-3 items-start bg-gray-50 rounded-2xl p-3">
                 <AnimalThumb imageUrl={รายงานที่เปิด.image_url} type={รายงานที่เปิด.animal_type} />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-800">{รายงานที่เปิด.animal_type || 'ไม่ระบุ'}</p>
                   <p className="text-xs text-gray-500 truncate">📍 {รายงานที่เปิด.location_text}</p>
                   <p className="text-xs text-gray-400">{แปลงวันที่เวลา(รายงานที่เปิด.created_at)}</p>
+                  {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
+                    <a
+                      href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
+                      target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                    >
+                      🗺️ Google Maps →
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -987,8 +1047,8 @@ function VolunteerPage({ หน้า }) {
             <div className="px-5 pb-8 space-y-4">
               {/* รูป */}
               <div className="w-full h-44 rounded-2xl overflow-hidden bg-green-50 flex items-center justify-center">
-                {สัตว์ที่แก้ไข.image_url
-                  ? <img src={สัตว์ที่แก้ไข.image_url} alt={สัตว์ที่แก้ไข.name} className="w-full h-full object-cover" />
+                {สัตว์ที่แก้ไข.photo_url
+                  ? <img src={สัตว์ที่แก้ไข.photo_url} alt={สัตว์ที่แก้ไข.name} className="w-full h-full object-cover" />
                   : <span className="text-7xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
                 }
               </div>
@@ -1014,9 +1074,18 @@ function VolunteerPage({ หน้า }) {
                       {ข้อมูลรายงานสัตว์.location_text && (
                         <div className="flex items-start gap-2 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
                           <span className="text-base mt-0.5">📍</span>
-                          <div>
+                          <div className="flex-1">
                             <p className="text-xs text-gray-400">ตำแหน่งที่พบสัตว์</p>
                             <p className="text-sm font-semibold text-gray-800">{ข้อมูลรายงานสัตว์.location_text}</p>
+                            {ข้อมูลรายงานสัตว์.latitude && ข้อมูลรายงานสัตว์.longitude && (
+                              <a
+                                href={`https://www.google.com/maps?q=${ข้อมูลรายงานสัตว์.latitude},${ข้อมูลรายงานสัตว์.longitude}`}
+                                target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                              >
+                                🗺️ เปิดใน Google Maps →
+                              </a>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1113,6 +1182,39 @@ function VolunteerPage({ หน้า }) {
                         className={`py-2.5 rounded-xl text-xs font-medium border-2 ${
                           สัตว์ที่แก้ไข.status === ส ? 'border-green-500 bg-green-500 text-white' : 'border-gray-200 text-gray-700'
                         }`}>{ส}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ลักษณะนิสัย */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1">ลักษณะนิสัย</p>
+                <input
+                  value={สัตว์ที่แก้ไข.traits || ''}
+                  placeholder="เช่น เป็นมิตร, ขี้เล่น, สงบเสงี่ยม (คั่นด้วยจุลภาค)"
+                  onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, traits: e.target.value } }) }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-400"
+                />
+                <p className="text-xs text-gray-400 mt-1">คั่นนิสัยหลายข้อด้วย " , " เช่น เป็นมิตร, ขี้เล่น</p>
+              </div>
+
+              {/* ประวัติการฉีดวัคซีน */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ประวัติการฉีดวัคซีน</p>
+                <div className="flex gap-2">
+                  {['ฉีดแล้ว', 'ยังไม่ฉีด', 'ไม่ทราบ'].map(function (ว) {
+                    const สี = ว === 'ฉีดแล้ว' ? 'border-green-500 bg-green-500 text-white'
+                              : ว === 'ยังไม่ฉีด' ? 'border-red-400 bg-red-400 text-white'
+                              : 'border-gray-400 bg-gray-400 text-white'
+                    return (
+                      <button key={ว}
+                        onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, vaccine_info: ว } }) }}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-medium border-2 ${
+                          สัตว์ที่แก้ไข.vaccine_info === ว ? สี : 'border-gray-200 text-gray-600'
+                        }`}>
+                        {ว === 'ฉีดแล้ว' ? '✅ ฉีดแล้ว' : ว === 'ยังไม่ฉีด' ? '❌ ยังไม่ฉีด' : '❓ ไม่ทราบ'}
+                      </button>
                     )
                   })}
                 </div>

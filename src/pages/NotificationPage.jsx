@@ -4,17 +4,39 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
+// parse string เป็น UTC เสมอ — ถ้าไม่มี timezone suffix ให้ต่อ Z เข้าไป
+function parseUTC(str) {
+  if (!str) return new Date(NaN)
+  // มี +xx:xx หรือ Z อยู่แล้ว → parse ตามปกติ
+  if (/[Zz]$/.test(str) || /[+-]\d{2}:\d{2}$/.test(str)) return new Date(str)
+  // ไม่มี → บังคับเป็น UTC โดยต่อ Z
+  return new Date(str + 'Z')
+}
+
+// บวก UTC+7 → ได้เวลาไทย
+function toBKK(d) {
+  return new Date(d.getTime() + 7 * 60 * 60 * 1000)
+}
+
+const เดือนสั้น = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+
 function แปลงเวลา(str) {
   if (!str) return ''
-  const diff = Date.now() - new Date(str).getTime()
-  const min  = Math.floor(diff / 60000)
-  const hr   = Math.floor(min / 60)
-  const day  = Math.floor(hr / 24)
-  if (min < 1)   return 'เมื่อกี้'
-  if (min < 60)  return `${min} นาทีที่แล้ว`
-  if (hr < 24)   return `${hr} ชั่วโมงที่แล้ว`
-  if (day < 7)   return `${day} วันที่แล้ว`
-  return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+
+  const bkk  = toBKK(parseUTC(str))   // UTC → Bangkok UTC+7
+  const now  = toBKK(new Date())       // ตอนนี้ใน Bangkok
+
+  const hh   = String(bkk.getUTCHours()).padStart(2, '0')
+  const mm   = String(bkk.getUTCMinutes()).padStart(2, '0')
+  const time = `${hh}:${mm} น.`
+
+  const key  = (d) => `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
+  const yest = new Date(now.getTime() - 86400000)
+
+  if (key(bkk) === key(now))  return `วันนี้ ${time}`
+  if (key(bkk) === key(yest)) return `เมื่อวาน ${time}`
+
+  return `${bkk.getUTCDate()} ${เดือนสั้น[bkk.getUTCMonth()]} ${time}`
 }
 
 // emoji ตามสถานะรายงาน
@@ -39,8 +61,16 @@ function NotificationPage({ user }) {
 
   const [รายการ, setรายการ]   = useState([])
   const [โหลด, setโหลด]       = useState(true)
-  // volunteer/admin ใช้ local read-state (ไม่บันทึก DB)
-  const [อ่านแล้วLocal, setอ่านแล้วLocal] = useState(new Set())
+  const [เมนูเปิด, setเมนูเปิด] = useState(null)   // id ของ item ที่เปิด ⋮ อยู่
+
+  // volunteer/admin — เก็บ read-state ใน localStorage เพื่อคงค่าข้าม navigate
+  const lsKey = `noti_read_${user?.id || 'anon'}`
+  const [อ่านแล้วLocal, setอ่านแล้วLocal] = useState(function () {
+    try {
+      const saved = localStorage.getItem(lsKey)
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch { return new Set() }
+  })
 
   useEffect(function () {
     if (!user?.id) return
@@ -80,17 +110,30 @@ function NotificationPage({ user }) {
         .order('created_at', { ascending: false })
         .limit(30)
         .then(function ({ data }) {
-          setรายการ((data || []).map(function (r) {
-            const isNew = r.status === 'รอดำเนินการ'
-            return {
-              id:       r.id,
-              emoji:    emojiสถานะ(r.status),
-              หัวข้อ:   isNew ? '🚨 มีรายงานใหม่รอดำเนินการ' : `อัปเดต: ${r.status}`,
-              ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-              เวลา:     แปลงเวลา(r.created_at),
-              isNew,
-            }
-          }))
+          // อ่าน ID ที่เคยลบจาก localStorage
+          const delKey = `noti_deleted_${user?.id || 'anon'}`
+          let deletedSet = new Set()
+          try {
+            const raw = localStorage.getItem(delKey)
+            if (raw) deletedSet = new Set(JSON.parse(raw))
+          } catch {}
+
+          const items = (data || [])
+            .filter(function (r) { return !deletedSet.has(r.id) })
+            .map(function (r) {
+              const isNew = r.status === 'รอดำเนินการ'
+              return {
+                id:       r.id,
+                emoji:    emojiสถานะ(r.status),
+                หัวข้อ:   isNew ? '🚨 รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
+                ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+                เวลา:     แปลงเวลา(r.created_at),
+                isNew,
+              }
+            })
+          // รอดำเนินการขึ้นก่อนเสมอ
+          items.sort(function (a, b) { return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) })
+          setรายการ(items)
           setโหลด(false)
         })
         .catch(function () { setโหลด(false) })
@@ -111,26 +154,38 @@ function NotificationPage({ user }) {
           .order('created_at', { ascending: false })
           .limit(10),
       ]).then(function ([ร1, ร2]) {
-        const reportItems = (ร1.data || []).map(function (r) {
-          return {
-            id:      'r' + r.id,
-            emoji:   emojiสถานะ(r.status),
-            หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
-            ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-            เวลา:    แปลงเวลา(r.created_at),
-            isNew:   r.status === 'รอดำเนินการ',
-          }
-        })
-        const userItems = (ร2.data || []).map(function (u) {
-          return {
-            id:      'u' + u.id,
-            emoji:   '👤',
-            หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
-            ข้อความ: u.name || 'ผู้ใช้ใหม่',
-            เวลา:    แปลงเวลา(u.created_at),
-            isNew:   false,
-          }
-        })
+        // อ่าน ID ที่เคยลบจาก localStorage
+        const delKey = `noti_deleted_${user?.id || 'anon'}`
+        let deletedSet = new Set()
+        try {
+          const raw = localStorage.getItem(delKey)
+          if (raw) deletedSet = new Set(JSON.parse(raw))
+        } catch {}
+
+        const reportItems = (ร1.data || [])
+          .filter(function (r) { return !deletedSet.has('r' + r.id) })
+          .map(function (r) {
+            return {
+              id:      'r' + r.id,
+              emoji:   emojiสถานะ(r.status),
+              หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
+              ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+              เวลา:    แปลงเวลา(r.created_at),
+              isNew:   r.status === 'รอดำเนินการ',
+            }
+          })
+        const userItems = (ร2.data || [])
+          .filter(function (u) { return !deletedSet.has('u' + u.id) })
+          .map(function (u) {
+            return {
+              id:      'u' + u.id,
+              emoji:   '👤',
+              หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
+              ข้อความ: u.name || 'ผู้ใช้ใหม่',
+              เวลา:    แปลงเวลา(u.created_at),
+              isNew:   false,
+            }
+          })
         // รวมแล้วเรียงตามเวลาล่าสุด
         const all = [...reportItems, ...userItems].sort(function (a, b) {
           return 0  // already sorted by fetch order
@@ -161,7 +216,11 @@ function NotificationPage({ user }) {
         await supabase.from('notifications').update({ is_read: true }).eq('id', item.dbId)
       }
     } else {
-      setอ่านแล้วLocal(function (prev) { return new Set([...prev, item.id]) })
+      setอ่านแล้วLocal(function (prev) {
+        const next = new Set([...prev, item.id])
+        try { localStorage.setItem(lsKey, JSON.stringify([...next])) } catch {}
+        return next
+      })
     }
   }
 
@@ -172,12 +231,36 @@ function NotificationPage({ user }) {
         await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id)
       }
     } else {
-      setอ่านแล้วLocal(new Set(รายการ.map(function (n) { return n.id })))
+      const allIds = รายการ.map(function (n) { return n.id })
+      const next = new Set(allIds)
+      try { localStorage.setItem(lsKey, JSON.stringify(allIds)) } catch {}
+      setอ่านแล้วLocal(next)
     }
   }
 
+  async function ลบแจ้งเตือน(item) {
+    setเมนูเปิด(null)
+    if (role === 'user') {
+      // ลบจาก DB
+      if (item.dbId) {
+        await supabase.from('notifications').delete().eq('id', item.dbId)
+      }
+    } else {
+      // volunteer/admin — บันทึก ID ที่ลบลง localStorage เพื่อกรองหลัง refresh
+      const key = `noti_deleted_${user?.id || 'anon'}`
+      try {
+        const raw = localStorage.getItem(key)
+        const set = raw ? new Set(JSON.parse(raw)) : new Set()
+        set.add(item.id)
+        localStorage.setItem(key, JSON.stringify([...set]))
+      } catch {}
+    }
+    // ลบออกจาก local state (ทุก role)
+    setรายการ(function (prev) { return prev.filter(function (n) { return n.id !== item.id }) })
+  }
+
   return (
-    <div className="min-h-screen bg-yellow-50 pb-8">
+    <div className="min-h-screen bg-yellow-50 pb-8" onClick={() => setเมนูเปิด(null)}>
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
@@ -223,7 +306,13 @@ function NotificationPage({ user }) {
         <div className="text-center py-16 text-gray-400">
           <p className="text-5xl mb-3">🔔</p>
           <p className="font-medium">ยังไม่มีการแจ้งเตือน</p>
-          <p className="text-xs mt-1">การแจ้งเตือนจะปรากฏเมื่อเจ้าหน้าที่รับเรื่อง</p>
+          <p className="text-xs mt-1">
+            {role === 'user'
+              ? 'การแจ้งเตือนจะปรากฏเมื่อส่งรายงาน หรือเจ้าหน้าที่ดำเนินการ'
+              : role === 'volunteer'
+              ? 'การแจ้งเตือนจะปรากฏเมื่อมีรายงานสัตว์จรเข้ามา'
+              : 'การแจ้งเตือนจะปรากฏเมื่อมีกิจกรรมในระบบ'}
+          </p>
         </div>
       )}
 
@@ -231,33 +320,65 @@ function NotificationPage({ user }) {
       {!โหลด && (
         <div className="px-4 pt-3 space-y-3">
           {รายการ.map(function (n) {
-            const read = isอ่านแล้ว(n)
+            const read    = isอ่านแล้ว(n)
+            const isOpen  = เมนูเปิด === n.id
             return (
-              <button
+              <div
                 key={n.id}
-                onClick={() => กดอ่าน(n)}
-                className={`w-full text-left rounded-2xl p-4 shadow-sm transition-all active:scale-95 ${
+                className={`relative rounded-2xl shadow-sm ${
                   read ? 'bg-white' : 'bg-yellow-50 border-2 border-yellow-200'
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl shrink-0">{n.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    {n.หัวข้อ && (
-                      <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
-                        {n.หัวข้อ}
+                {/* พื้นที่กดอ่าน */}
+                <button
+                  onClick={() => กดอ่าน(n)}
+                  className="w-full text-left p-4 pr-10"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl shrink-0">{n.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      {n.หัวข้อ && (
+                        <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
+                          {n.หัวข้อ}
+                        </p>
+                      )}
+                      <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
+                        {n.ข้อความ}
                       </p>
+                      <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
+                    </div>
+                    {!read && (
+                      <div className="w-2.5 h-2.5 bg-orange-400 rounded-full mt-1 shrink-0" />
                     )}
-                    <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
-                      {n.ข้อความ}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
                   </div>
-                  {!read && (
-                    <div className="w-2.5 h-2.5 bg-orange-400 rounded-full mt-1 shrink-0" />
-                  )}
-                </div>
-              </button>
+                </button>
+
+                {/* ปุ่ม ⋮ */}
+                <button
+                  onClick={function (e) {
+                    e.stopPropagation()
+                    setเมนูเปิด(isOpen ? null : n.id)
+                  }}
+                  className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                >
+                  ⋮
+                </button>
+
+                {/* Dropdown เมื่อกด ⋮ */}
+                {isOpen && (
+                  <div
+                    className="absolute top-10 right-3 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden"
+                    onClick={function (e) { e.stopPropagation() }}
+                  >
+                    <button
+                      onClick={() => ลบแจ้งเตือน(n)}
+                      className="flex items-center gap-2 px-4 py-3 text-sm text-red-500 font-medium hover:bg-red-50 w-full text-left"
+                    >
+                      🗑️ ลบการแจ้งเตือน
+                    </button>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
