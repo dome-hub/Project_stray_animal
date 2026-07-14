@@ -3,7 +3,24 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
+
+// แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+})
+
+// ศูนย์กลางตำบลกำแพงแสน อ.กำแพงแสน จ.นครปฐม
+const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
 
 // สีของแต่ละ Role
 const สีRole = {
@@ -39,6 +56,10 @@ function AdminPage({ หน้า, user }) {
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
   const [โหลดExport, setโหลดExport] = useState(true)
+
+  // ---- State: แผนที่รายงาน (พื้นที่) ----
+  const [รายงานพิกัด, setรายงานพิกัด] = useState([])
+  const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
 
   // ---- ดึงสถิติ Dashboard ----
   useEffect(function () {
@@ -178,6 +199,22 @@ function AdminPage({ หน้า, user }) {
       return prev.map(function (u) { return u.id === userที่เลือก.id ? updated : u })
     })
   }
+
+  // ---- ดึงรายงานที่มีพิกัด GPS สำหรับปักหมุดบนแผนที่ ----
+  useEffect(function () {
+    if (หน้า !== 'areas') return
+    async function ดึงรายงานพิกัด() {
+      setโหลดแผนที่(true)
+      const { data, error } = await supabase
+        .from('reports')
+        .select('id, animal_type, location_text, detail, status, latitude, longitude, created_at')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+      if (!error && data) setรายงานพิกัด(data)
+      setโหลดแผนที่(false)
+    }
+    ดึงรายงานพิกัด()
+  }, [หน้า])
 
   // ---- ดึงจำนวนสำหรับ Export ----
   useEffect(function () {
@@ -409,6 +446,45 @@ function AdminPage({ หน้า, user }) {
             <p className="text-xs font-bold text-indigo-600 mb-1">📍 ขอบเขตพื้นที่ของระบบ</p>
             <p className="text-sm font-semibold text-gray-800">จังหวัดนครปฐม</p>
             <p className="text-sm text-gray-600">ตำบลกำแพงแสน</p>
+          </div>
+
+          {/* แผนที่ภาพรวมรายงาน */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-bold text-gray-800">🗺️ แผนที่รายงานทั้งหมด</p>
+              {!โหลดแผนที่ && (
+                <span className="text-xs text-gray-400">{รายงานพิกัด.length} จุด</span>
+              )}
+            </div>
+
+            {โหลดแผนที่ ? (
+              <div className="text-center py-10">
+                <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-400">กำลังโหลดตำแหน่งรายงาน...</p>
+              </div>
+            ) : (
+              <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: 350 }}>
+                <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {รายงานพิกัด.map((r) => (
+                    <Marker key={r.id} position={[r.latitude, r.longitude]}>
+                      <Popup>
+                        <div className="text-sm">
+                          <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
+                          <p className="text-gray-600">{r.location_text}</p>
+                          {r.detail && <p className="text-xs text-gray-600 mt-1">📝 {r.detail}</p>}
+                          <p className="text-xs mt-1">สถานะ: {r.status}</p>
+                          <p className="text-xs text-gray-400">{แปลงวันที่(r.created_at)}</p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              </div>
+            )}
           </div>
 
           {[
