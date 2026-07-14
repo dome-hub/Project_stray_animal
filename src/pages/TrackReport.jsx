@@ -269,7 +269,7 @@ function TrackReport({ user }) {
               {/* รูปสัตว์ */}
               <div className="w-full h-52 rounded-2xl overflow-hidden bg-indigo-50 flex items-center justify-center">
                 {รายงานที่เปิด.image_url
-                  ? <img src={รายงานที่เปิด.image_url} alt="สัตว์" className="w-full h-full object-cover" />
+                  ? <img src={รายงานที่เปิด.image_url} alt="สัตว์" className="w-full h-full object-contain" />
                   : <span className="text-8xl">{รายงานที่เปิด.animal_type?.includes('แมว') ? '🐈' : '🐕'}</span>
                 }
               </div>
