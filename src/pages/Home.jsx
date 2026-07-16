@@ -8,6 +8,20 @@ import {
   BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen, Phone,
 } from 'lucide-react'
 
+// โทนสีหลักของแต่ละ role — ผู้ใช้ทั่วไป = ส้ม (อบอุ่น/ขอความช่วยเหลือ), เจ้าหน้าที่ = ทีล (มืออาชีพ/น่าเชื่อถือ), แอดมิน = ม่วง
+const โทนRole = {
+  user:      { hero: 'from-orange-400 to-orange-600', กล่อง: 'bg-orange-50', สี: 'text-orange-500' },
+  volunteer: { hero: 'from-teal-600 to-teal-800',      กล่อง: 'bg-teal-50',   สี: 'text-teal-600' },
+  admin:     { hero: 'from-purple-500 to-purple-700',  กล่อง: 'bg-purple-50', สี: 'text-purple-500' },
+}
+
+// หัวข้อบนสุด — ปรับคำให้เหมาะกับผู้ใช้แต่ละ role
+const หัวข้อRole = {
+  user:      'เลือกบริการที่ต้องการ',
+  volunteer: 'เมนูการทำงาน',
+  admin:     'เลือกบริการที่ต้องการ',
+}
+
 // เมนูของแต่ละ Role — รายการแรกของแต่ละ role คือ Hero Action (ฟีเจอร์หลัก)
 const เมนูแต่ละRole = {
 
@@ -22,10 +36,11 @@ const เมนูแต่ละRole = {
 
   // เจ้าหน้าที่ / อาสาสมัคร
   volunteer: [
-    { Icon: ClipboardList, ชื่อ: 'รายการแจ้งสัตว์จร',    รายละเอียด: 'ดูรายงานที่รอดำเนินการ',        ฟีเจอร์: ['กรองตามพื้นที่', 'เรียงตามความเร่งด่วน', 'ดูพิกัดบนแผนที่'], path: '/volunteer/reports', ไอคอนพื้นหลัง: 'bg-orange-50', ไอคอนสี: 'text-orange-500' },
-    { Icon: RefreshCw,     ชื่อ: 'อัปเดตสถานะสัตว์',     รายละเอียด: 'อัปเดตความคืบหน้าการช่วยเหลือ', ฟีเจอร์: [], path: '/volunteer/update',  ไอคอนพื้นหลัง: 'bg-blue-50',   ไอคอนสี: 'text-blue-500' },
-    { Icon: PawPrint,      ชื่อ: 'จัดการข้อมูลสัตว์',    รายละเอียด: 'เพิ่ม แก้ไข ข้อมูลสัตว์ในระบบ', ฟีเจอร์: [], path: '/volunteer/animals', ไอคอนพื้นหลัง: 'bg-green-50',  ไอคอนสี: 'text-green-500' },
-    { Icon: BarChart3,     ชื่อ: 'สถิติพื้นที่รับผิดชอบ', รายละเอียด: 'ดูข้อมูลสัตว์ในพื้นที่ของคุณ', ฟีเจอร์: [], path: '/volunteer/stats', ไอคอนพื้นหลัง: 'bg-purple-50', ไอคอนสี: 'text-purple-500' },
+    { Icon: ClipboardList, ชื่อ: 'รายการแจ้งสัตว์จร',    รายละเอียด: 'ดูรายงานที่รอดำเนินการ',        ฟีเจอร์: ['กรองตามพื้นที่', 'เรียงตามความเร่งด่วน', 'ดูพิกัดบนแผนที่'], path: '/volunteer/reports', ไอคอนพื้นหลัง: 'bg-teal-50',  ไอคอนสี: 'text-teal-600' },
+    { Icon: RefreshCw,     ชื่อ: 'อัปเดตสถานะสัตว์',     รายละเอียด: 'อัปเดตความคืบหน้าการช่วยเหลือ', ฟีเจอร์: [], path: '/volunteer/update',  ไอคอนพื้นหลัง: 'bg-cyan-50',   ไอคอนสี: 'text-cyan-600' },
+    { Icon: PawPrint,      ชื่อ: 'จัดการข้อมูลสัตว์',    รายละเอียด: 'เพิ่ม แก้ไข ข้อมูลสัตว์ในระบบ', ฟีเจอร์: [], path: '/volunteer/animals', ไอคอนพื้นหลัง: 'bg-blue-50',   ไอคอนสี: 'text-blue-600' },
+    { Icon: BarChart3,     ชื่อ: 'สถิติพื้นที่รับผิดชอบ', รายละเอียด: 'ดูข้อมูลสัตว์ในพื้นที่ของคุณ', ฟีเจอร์: [], path: '/volunteer/stats', ไอคอนพื้นหลัง: 'bg-slate-100', ไอคอนสี: 'text-slate-600' },
+    { Icon: Map,           ชื่อ: 'แผนที่จุดเกิดเหตุ',     รายละเอียด: 'ดูพิกัดรายงานทั้งหมดบนแผนที่',   ฟีเจอร์: [], path: '/volunteer/map',    ไอคอนพื้นหลัง: 'bg-teal-50',  ไอคอนสี: 'text-teal-600' },
   ],
 
   // ผู้ดูแลระบบ
@@ -40,7 +55,7 @@ const เมนูแต่ละRole = {
 
 const ข้อมูลRole = {
   user:      { ชื่อ: 'ผู้ใช้งานทั่วไป',        Icon: User,    สี: 'text-blue-600' },
-  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', Icon: HardHat, สี: 'text-orange-600' },
+  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', Icon: HardHat, สี: 'text-teal-600' },
   admin:     { ชื่อ: 'ผู้ดูแลระบบ',            Icon: Shield,  สี: 'text-purple-600' },
 }
 
@@ -50,6 +65,7 @@ function Home({ user, onLogout }) {
   const เมนู = เมนูแต่ละRole[role]
   const [เมนูหลัก, ...เมนูรอง] = เมนู
   const roleInfo = ข้อมูลRole[role]
+  const โทน = โทนRole[role]
 
   // ดึง avatar_url ใหม่ทุกครั้งที่กลับมาหน้า Home
   const [avatarUrl, setAvatarUrl] = useState(null)
@@ -131,7 +147,7 @@ function Home({ user, onLogout }) {
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+          <div className={`w-9 h-9 rounded-full ${โทน.กล่อง} flex items-center justify-center ${โทน.สี}`}>
             <Dog size={22} strokeWidth={2} />
           </div>
           <div>
@@ -148,7 +164,7 @@ function Home({ user, onLogout }) {
           {/* กระดิ่งแจ้งเตือน — กดแล้วไปหน้า Notifications */}
           <button
             onClick={() => navigate('/notifications')}
-            className="relative w-9 h-9 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 hover:bg-orange-100 transition-colors"
+            className={`relative w-9 h-9 ${โทน.กล่อง} rounded-full flex items-center justify-center ${โทน.สี} hover:opacity-80 transition-opacity`}
             title="การแจ้งเตือน"
           >
             <Bell size={18} strokeWidth={2} />
@@ -187,7 +203,7 @@ function Home({ user, onLogout }) {
 
       {/* หัวข้อ */}
       <div className="px-4 pt-6 pb-4">
-        <h2 className="text-2xl font-bold text-gray-800">เลือกบริการที่ต้องการ</h2>
+        <h2 className="text-2xl font-bold text-gray-800">{หัวข้อRole[role]}</h2>
         <p className="text-gray-500 text-sm mt-1">
           {role === 'user'      && 'ช่วยเหลือสัตว์จรหรือค้นหาเพื่อนสี่ขาตัวใหม่'}
           {role === 'volunteer' && 'จัดการและช่วยเหลือสัตว์จรในพื้นที่รับผิดชอบ'}
@@ -200,7 +216,7 @@ function Home({ user, onLogout }) {
         {/* Hero Action — ฟีเจอร์หลักของ role นี้ เด่นสุด */}
         <button
           onClick={() => navigate(เมนูหลัก.path)}
-          className="relative w-full text-left bg-gradient-to-br from-orange-400 to-orange-600 rounded-3xl p-6 shadow-md hover:shadow-lg active:scale-[0.98] transition-all text-white overflow-hidden"
+          className={`relative w-full text-left bg-gradient-to-br ${โทน.hero} rounded-3xl p-6 shadow-md hover:shadow-lg active:scale-[0.98] transition-all text-white overflow-hidden`}
         >
           <เมนูหลัก.Icon
             size={140} strokeWidth={1}

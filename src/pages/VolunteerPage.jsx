@@ -7,7 +7,25 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Circle, CircleDot } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
+
+// แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+})
+
+// ศูนย์กลางตำบลกำแพงแสน อ.กำแพงแสน จ.นครปฐม
+const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
 
 // ---- ค่าคงที่ ----
 const ขั้นตอนตามสถานะ = {
@@ -19,12 +37,22 @@ const ขั้นตอนตามสถานะ = {
 }
 const ขั้นตอนทั้งหมด = ['แจ้งเข้า', 'รับเรื่อง', 'ลงพื้นที่', 'ศูนย์พักพิง', 'มีผู้รับเลี้ยง']
 
+// สีสถานะ — สอดคล้องกับตัวกรองด้านบน: แดง=ใหม่, เหลือง=กำลังดำเนินการ, น้ำเงิน=ศูนย์พักพิง, เขียว=สำเร็จ
 const สีสถานะ = {
-  'รอดำเนินการ':    'text-yellow-700 bg-yellow-50 border-yellow-200',
-  'รับเรื่องแล้ว':   'text-blue-700 bg-blue-50 border-blue-200',
-  'ลงพื้นที่แล้ว':   'text-indigo-700 bg-indigo-50 border-indigo-200',
-  'อยู่ศูนย์พักพิง': 'text-purple-700 bg-purple-50 border-purple-200',
+  'รอดำเนินการ':    'text-red-700 bg-red-50 border-red-200',
+  'รับเรื่องแล้ว':   'text-yellow-700 bg-yellow-50 border-yellow-200',
+  'ลงพื้นที่แล้ว':   'text-yellow-700 bg-yellow-50 border-yellow-200',
+  'อยู่ศูนย์พักพิง': 'text-blue-700 bg-blue-50 border-blue-200',
   'มีผู้รับเลี้ยง':   'text-green-700 bg-green-50 border-green-200',
+}
+
+// แถบสีขอบซ้ายของการ์ด — ใช้โทนเดียวกับ สีสถานะ ด้านบน
+const แถบสีสถานะ = {
+  'รอดำเนินการ':    'border-l-red-400',
+  'รับเรื่องแล้ว':   'border-l-yellow-400',
+  'ลงพื้นที่แล้ว':   'border-l-yellow-400',
+  'อยู่ศูนย์พักพิง': 'border-l-blue-400',
+  'มีผู้รับเลี้ยง':   'border-l-green-400',
 }
 
 const สีสถานะสัตว์ = {
@@ -136,6 +164,10 @@ function VolunteerPage({ หน้า }) {
   // ---- Stats ----
   const [สถิติ, setSถิติ] = useState({ รายงาน: 0, รอดำเนินการ: 0, สัตว์: 0, รับเลี้ยงแล้ว: 0 })
 
+  // ---- แผนที่จุดเกิดเหตุ ----
+  const [รายงานพิกัด, setรายงานพิกัด] = useState([])
+  const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
+
   // ================================================================
   // FETCH
   // ================================================================
@@ -143,7 +175,19 @@ function VolunteerPage({ หน้า }) {
     if (หน้า === 'reports' || หน้า === 'update') ดึงรายงาน()
     if (หน้า === 'animals') ดึงสัตว์()
     if (หน้า === 'stats')   ดึงสถิติ()
+    if (หน้า === 'map')     ดึงรายงานพิกัด()
   }, [หน้า])
+
+  async function ดึงรายงานพิกัด() {
+    setโหลดแผนที่(true)
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, animal_type, location_text, detail, status, latitude, longitude, created_at')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+    if (!error && data) setรายงานพิกัด(data)
+    setโหลดแผนที่(false)
+  }
 
   async function ดึงรายงาน() {
     setโหลดรายงาน(true)
@@ -409,9 +453,10 @@ function VolunteerPage({ หน้า }) {
   // กรองรายงาน
   // ================================================================
   const รายงานกรอง = รายงานทั้งหมด.filter(function (ร) {
-    if (filterTab === 'pending') return ร.status === 'รอดำเนินการ'
-    if (filterTab === 'active')  return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'อยู่ศูนย์พักพิง'].includes(ร.status)
-    if (filterTab === 'done')    return ร.status === 'มีผู้รับเลี้ยง'
+    if (filterTab === 'pending')    return ร.status === 'รอดำเนินการ'
+    if (filterTab === 'inprogress') return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว'].includes(ร.status)
+    if (filterTab === 'sheltered')  return ร.status === 'อยู่ศูนย์พักพิง'
+    if (filterTab === 'done')       return ร.status === 'มีผู้รับเลี้ยง'
     return true
   })
 
@@ -424,13 +469,14 @@ function VolunteerPage({ หน้า }) {
     update:  'อัปเดตสถานะสัตว์',
     animals: 'จัดการข้อมูลสัตว์',
     stats:   'สถิติพื้นที่รับผิดชอบ',
+    map:     'แผนที่จุดเกิดเหตุ',
   }
 
   // ================================================================
   // RENDER
   // ================================================================
   return (
-    <div className="min-h-screen bg-orange-50 pb-8">
+    <div className="min-h-screen bg-teal-50 pb-8">
 
       {/* Toast */}
       {แจ้งสำเร็จ && (
@@ -444,7 +490,7 @@ function VolunteerPage({ หน้า }) {
         <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
         <div>
           <h1 className="font-bold text-gray-800">{titleMap[หน้า]}</h1>
-          <p className="text-xs text-orange-600">🦺 เจ้าหน้าที่ / อาสาสมัคร</p>
+          <p className="text-xs text-teal-600">🦺 เจ้าหน้าที่ / อาสาสมัคร</p>
         </div>
       </div>
 
@@ -454,24 +500,26 @@ function VolunteerPage({ หน้า }) {
       {หน้า === 'reports' && (
         <div className="pt-4">
 
-          {/* Filter Tabs */}
+          {/* Filter Tabs — สีตรงกับป้ายสถานะบนการ์ด */}
           <div className="px-4 mb-4">
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-1 overflow-x-auto">
               {[
-                { key: 'all',     label: 'ทั้งหมด',       count: รายงานทั้งหมด.length },
-                { key: 'pending', label: '🔴 ใหม่',        count: รายงานทั้งหมด.filter(function (r) { return r.status === 'รอดำเนินการ' }).length },
-                { key: 'active',  label: '🔵 ดำเนินการ',  count: รายงานทั้งหมด.filter(function (r) { return ['รับเรื่องแล้ว','ลงพื้นที่แล้ว','อยู่ศูนย์พักพิง'].includes(r.status) }).length },
-                { key: 'done',    label: '✅ เสร็จ',       count: รายงานทั้งหมด.filter(function (r) { return r.status === 'มีผู้รับเลี้ยง' }).length },
+                { key: 'all',        label: 'ทั้งหมด',        dot: null,      count: รายงานทั้งหมด.length },
+                { key: 'pending',    label: 'ใหม่',           dot: 'bg-red-500',    count: รายงานทั้งหมด.filter(function (r) { return r.status === 'รอดำเนินการ' }).length },
+                { key: 'inprogress', label: 'ดำเนินการ',      dot: 'bg-yellow-500', count: รายงานทั้งหมด.filter(function (r) { return ['รับเรื่องแล้ว','ลงพื้นที่แล้ว'].includes(r.status) }).length },
+                { key: 'sheltered',  label: 'ศูนย์พักพิง',    dot: 'bg-blue-500',   count: รายงานทั้งหมด.filter(function (r) { return r.status === 'อยู่ศูนย์พักพิง' }).length },
+                { key: 'done',       label: 'เสร็จ',          dot: 'bg-green-500',  count: รายงานทั้งหมด.filter(function (r) { return r.status === 'มีผู้รับเลี้ยง' }).length },
               ].map(function (tab) {
                 return (
                   <button key={tab.key} onClick={() => setFilterTab(tab.key)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      filterTab === tab.key ? 'bg-white text-orange-700 shadow-sm' : 'text-gray-500'
+                    className={`flex-1 shrink-0 min-w-fit px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
+                      filterTab === tab.key ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
                     }`}
                   >
+                    {tab.dot && <span className={`w-1.5 h-1.5 rounded-full ${tab.dot}`} />}
                     {tab.label}
                     {tab.count > 0 && (
-                      <span className={`ml-1 font-bold ${filterTab === tab.key ? 'text-orange-600' : 'text-gray-400'}`}>
+                      <span className={`font-bold ${filterTab === tab.key ? 'text-teal-600' : 'text-gray-400'}`}>
                         ({tab.count})
                       </span>
                     )}
@@ -499,19 +547,20 @@ function VolunteerPage({ หน้า }) {
           {/* รายการการ์ด */}
           <div className="px-4 space-y-3">
             {รายงานกรอง.map(function (ร) {
-              const isNew  = ร.status === 'รอดำเนินการ'
-              const isDone = ร.status === 'มีผู้รับเลี้ยง'
+              const เร่งด่วน = ร.urgency === 'ด่วน' || ร.urgency === 'ด่วนมาก'
               return (
                 <div key={ร.id}
-                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer ${
-                    isNew ? 'ring-2 ring-orange-300' : ''
-                  }`}
+                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${แถบสีสถานะ[ร.status] || 'border-l-gray-300'}`}
                   onClick={() => เปิดรายละเอียด(ร)}
                 >
-                  <div className={`h-1.5 w-full ${isNew ? 'bg-yellow-400' : isDone ? 'bg-green-400' : 'bg-blue-400'}`} />
                   <div className="p-4 flex items-center gap-3">
                     <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                     <div className="flex-1 min-w-0">
+                      {เร่งด่วน && (
+                        <p className="text-xs font-bold text-red-600 flex items-center gap-1 mb-0.5">
+                          ⚠️ {ร.urgency === 'ด่วนมาก' ? 'เร่งด่วนมาก — เสี่ยงอันตราย' : 'เร่งด่วน — สัตว์บาดเจ็บ'}
+                        </p>
+                      )}
                       <div className="flex items-start justify-between gap-2 mb-0.5">
                         <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200'}`}>
@@ -557,15 +606,15 @@ function VolunteerPage({ หน้า }) {
 
           {โหลดรายงาน && (
             <div className="text-center py-12">
-              <div className="w-8 h-8 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
             </div>
           )}
 
           {!โหลดรายงาน && (
             <>
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3">
-                <p className="text-xs text-orange-700 font-medium">⚙️ เลือกรายงานเพื่ออัปเดตสถานะ</p>
-                <p className="text-xs text-orange-500 mt-0.5">{รายงานActive.length} รายการรอดำเนินการ</p>
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-3">
+                <p className="text-xs text-teal-700 font-medium">⚙️ เลือกรายงานเพื่ออัปเดตสถานะ</p>
+                <p className="text-xs text-teal-600 mt-0.5">{รายงานActive.length} รายการรอดำเนินการ</p>
               </div>
 
               {รายงานActive.length === 0 && (
@@ -579,10 +628,9 @@ function VolunteerPage({ หน้า }) {
               {รายงานActive.map(function (ร) {
                 return (
                   <div key={ร.id}
-                    className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer"
+                    className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer border-l-4 ${แถบสีสถานะ[ร.status] || 'border-l-gray-300'}`}
                     onClick={() => เปิดรายละเอียด(ร)}
                   >
-                    <div className={`h-1.5 ${ร.status === 'รอดำเนินการ' ? 'bg-yellow-400' : 'bg-blue-400'}`} />
                     <div className="p-4 flex items-center gap-3">
                       <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                       <div className="flex-1 min-w-0">
@@ -753,6 +801,51 @@ function VolunteerPage({ หน้า }) {
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <p className="font-bold text-gray-800 mb-1">พื้นที่รับผิดชอบ</p>
             <p className="text-sm text-gray-600">📍 จังหวัดนครปฐม ตำบลกำแพงแสน</p>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          MAP — แผนที่จุดเกิดเหตุ
+          ============================================================ */}
+      {หน้า === 'map' && (
+        <div className="px-4 pt-4 space-y-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-bold text-gray-800">🗺️ จุดที่มีรายงานทั้งหมด</p>
+              {!โหลดแผนที่ && (
+                <span className="text-xs text-gray-400">{รายงานพิกัด.length} จุด</span>
+              )}
+            </div>
+
+            {โหลดแผนที่ ? (
+              <div className="text-center py-10">
+                <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-400">กำลังโหลดตำแหน่งรายงาน...</p>
+              </div>
+            ) : (
+              <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: 420 }}>
+                <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {รายงานพิกัด.map((r) => (
+                    <Marker key={r.id} position={[r.latitude, r.longitude]}>
+                      <Popup>
+                        <div className="text-sm">
+                          <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
+                          <p className="text-gray-600">{r.location_text}</p>
+                          {r.detail && <p className="text-xs text-gray-600 mt-1">📝 {r.detail}</p>}
+                          <p className="text-xs mt-1">สถานะ: {r.status}</p>
+                          <p className="text-xs text-gray-400">{แปลงวันที่เวลา(r.created_at)}</p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -982,19 +1075,23 @@ function VolunteerPage({ หน้า }) {
                     const isSelected = สถานะใหม่ === ส
                     return (
                       <button key={ส} onClick={() => setSถานะใหม่(ส)} disabled={isCurrent}
-                        className={`w-full py-3 px-4 rounded-xl text-sm font-medium border-2 text-left flex items-center justify-between transition-all ${
+                        className={`w-full py-3 px-4 rounded-xl text-sm font-medium border-2 text-left flex items-center gap-2.5 transition-all ${
                           isCurrent
                             ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
                             : isSelected
-                            ? 'border-orange-500 bg-orange-500 text-white'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-orange-200'
+                            ? 'border-teal-500 bg-teal-50 text-teal-700'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-teal-200'
                         }`}
                       >
-                        <span>{ส}</span>
+                        {isCurrent
+                          ? <Circle size={16} className="shrink-0 text-gray-300" />
+                          : isSelected
+                          ? <CircleDot size={16} className="shrink-0 text-teal-500" />
+                          : <Circle size={16} className="shrink-0 text-gray-300" />}
+                        <span className="flex-1">{ส}</span>
                         {isCurrent && <span className="text-xs">← ปัจจุบัน</span>}
-                        {isSelected && !isCurrent && <span>✓</span>}
                         {ส === 'อยู่ศูนย์พักพิง' && !isCurrent && !isSelected && (
-                          <span className="text-xs text-orange-400">→ เพิ่มเข้าจัดการสัตว์อัตโนมัติ</span>
+                          <span className="text-xs text-teal-500">→ เพิ่มเข้าจัดการสัตว์อัตโนมัติ</span>
                         )}
                       </button>
                     )
@@ -1006,22 +1103,21 @@ function VolunteerPage({ หน้า }) {
               <div>
                 <p className="text-sm font-semibold text-gray-700 mb-2">
                   บันทึกหมายเหตุ
-                  <span className="text-xs font-normal text-gray-400 ml-2">(เก็บใน database)</span>
                 </p>
                 <textarea value={หมายเหตุ} onChange={(e) => setหมายเหตุ(e.target.value)}
                   placeholder="เช่น ลงพื้นที่แล้ว สัตว์มีบาดแผล นำส่งสัตวแพทย์เรียบร้อย..."
                   rows={3}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-400 resize-none" />
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-400 resize-none" />
               </div>
 
               {/* ปุ่มบันทึก */}
               <button onClick={บันทึกการอัปเดต} disabled={!สถานะใหม่ || กำลังบันทึก}
-                className="w-full bg-orange-500 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all">
+                className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all">
                 {กำลังบันทึก ? '⏳ กำลังบันทึก...' : '💾 บันทึกการอัปเดต'}
               </button>
 
               {สถานะใหม่ === 'อยู่ศูนย์พักพิง' && (
-                <p className="text-xs text-center text-orange-500">
+                <p className="text-xs text-center text-teal-600">
                   ⚡ เมื่อบันทึก ข้อมูลสัตว์จะถูกเพิ่มใน "จัดการข้อมูลสัตว์" โดยอัตโนมัติ
                 </p>
               )}

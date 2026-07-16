@@ -156,6 +156,7 @@ function App() {
         <Route path="/volunteer/update"  element={ต้องLogin(<VolunteerPage หน้า="update" />)} />
         <Route path="/volunteer/animals" element={ต้องLogin(<VolunteerPage หน้า="animals" />)} />
         <Route path="/volunteer/stats"   element={ต้องLogin(<VolunteerPage หน้า="stats" />)} />
+        <Route path="/volunteer/map"     element={ต้องLogin(<VolunteerPage หน้า="map" />)} />
 
         {/* === Admin === */}
         <Route path="/admin/dashboard" element={ต้องLogin(<AdminPage หน้า="dashboard" user={user} />)} />
