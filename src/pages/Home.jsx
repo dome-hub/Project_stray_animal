@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import {
-  Camera, Search, ClipboardList, Heart, RefreshCw, PawPrint,
-  BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen,
+  Camera, Search, ClipboardList, RefreshCw, PawPrint,
+  BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen, Phone,
 } from 'lucide-react'
 
 // เมนูของแต่ละ Role — รายการแรกของแต่ละ role คือ Hero Action (ฟีเจอร์หลัก)
@@ -16,8 +16,8 @@ const เมนูแต่ละRole = {
     { Icon: Camera,        ชื่อ: 'แจ้งสัตว์จร',        รายละเอียด: 'ถ่ายภาพและแจ้งให้หน่วยงานทราบ', ฟีเจอร์: ['AI วิเคราะห์สายพันธุ์', 'ปักหมุด GPS อัตโนมัติ', 'ส่งให้ อบต./เทศบาล'], path: '/report',   ไอคอนพื้นหลัง: 'bg-orange-50', ไอคอนสี: 'text-orange-500' },
     { Icon: Search,        ชื่อ: 'ค้นหาสัตว์เลี้ยง',    รายละเอียด: 'ค้นหาเพื่อนที่เหมาะสมกับคุณ',   ฟีเจอร์: [], path: '/find-pet', ไอคอนพื้นหลัง: 'bg-green-50',  ไอคอนสี: 'text-green-500' },
     { Icon: ClipboardList, ชื่อ: 'ติดตามรายงาน',       รายละเอียด: 'ตรวจสอบสถานะที่คุณส่งไป',       ฟีเจอร์: [], path: '/track',    ไอคอนพื้นหลัง: 'bg-indigo-50', ไอคอนสี: 'text-indigo-500' },
-    { Icon: Heart,         ชื่อ: 'สัตว์ที่บันทึกไว้',   รายละเอียด: 'รายการสัตว์ที่คุณกดถูกใจไว้',   ฟีเจอร์: [], path: '/wishlist', ไอคอนพื้นหลัง: 'bg-red-50',    ไอคอนสี: 'text-red-500' },
-    { Icon: BookOpen,      ชื่อ: 'บทความน่ารู้',        รายละเอียด: 'เกร็ดความรู้และวิธีดูแลสัตว์',   ฟีเจอร์: [], path: '/pet-guide', ไอคอนพื้นหลัง: 'bg-indigo-50', ไอคอนสี: 'text-indigo-500' },
+    { Icon: BookOpen,      ชื่อ: 'บทความน่ารู้',        รายละเอียด: 'เกร็ดความรู้และวิธีดูแลสัตว์',   ฟีเจอร์: [], path: '/pet-guide', ไอคอนพื้นหลัง: 'bg-purple-50', ไอคอนสี: 'text-purple-500' },
+    { Icon: Phone,         ชื่อ: 'ติดต่อหน่วยงาน',      รายละเอียด: 'เบอร์โทรและที่อยู่หน่วยงานที่เกี่ยวข้อง', ฟีเจอร์: [], path: '/contact', ไอคอนพื้นหลัง: 'bg-emerald-50', ไอคอนสี: 'text-emerald-500' },
   ],
 
   // เจ้าหน้าที่ / อาสาสมัคร
