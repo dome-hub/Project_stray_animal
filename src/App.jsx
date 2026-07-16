@@ -13,6 +13,7 @@ import TrackReport      from './pages/TrackReport'
 import PetDetail        from './pages/PetDetail'
 import ProfilePage      from './pages/ProfilePage'
 import WishlistPage     from './pages/WishlistPage'
+import PetGuide         from './pages/PetGuide'
 import NotificationPage from './pages/NotificationPage'
 import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
@@ -145,6 +146,7 @@ function App() {
         <Route path="/pet/:id"       element={ต้องLogin(<PetDetail />)} />
         <Route path="/profile"       element={ต้องLogin(<ProfilePage user={user} />)} />
         <Route path="/wishlist"      element={ต้องLogin(<WishlistPage />)} />
+        <Route path="/pet-guide"     element={ต้องLogin(<PetGuide />)} />
         <Route path="/notifications" element={ต้องLogin(<NotificationPage user={user} />)} />
 
         {/* === เจ้าหน้าที่ / อาสาสมัคร === */}

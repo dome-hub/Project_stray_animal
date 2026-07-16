@@ -1046,10 +1046,10 @@ function VolunteerPage({ หน้า }) {
 
             <div className="px-5 pb-8 space-y-4">
               {/* รูป */}
-              <div className="w-full h-44 rounded-2xl overflow-hidden bg-green-50 flex items-center justify-center">
+              <div className="w-full h-36 rounded-2xl overflow-hidden bg-green-50 flex items-center justify-center">
                 {สัตว์ที่แก้ไข.photo_url
-                  ? <img src={สัตว์ที่แก้ไข.photo_url} alt={สัตว์ที่แก้ไข.name} className="w-full h-full object-cover" />
-                  : <span className="text-7xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
+                  ? <img src={สัตว์ที่แก้ไข.photo_url} alt={สัตว์ที่แก้ไข.name} className="w-full h-full object-contain" />
+                  : <span className="text-6xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
                 }
               </div>
 

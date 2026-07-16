@@ -3,46 +3,52 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
+import {
+  Camera, Search, ClipboardList, Heart, RefreshCw, PawPrint,
+  BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen,
+} from 'lucide-react'
 
-// เมนูของแต่ละ Role
+// เมนูของแต่ละ Role — รายการแรกของแต่ละ role คือ Hero Action (ฟีเจอร์หลัก)
 const เมนูแต่ละRole = {
 
   // ผู้ใช้งานทั่วไป
   user: [
-    { emoji: '📷', ชื่อ: 'แจ้งสัตว์จร', รายละเอียด: 'ถ่ายภาพและแจ้งให้หน่วยงานทราบ', ฟีเจอร์: ['AI วิเคราะห์สายพันธุ์', 'ปักหมุด GPS อัตโนมัติ', 'ส่งให้ อบต./เทศบาล'], path: '/report', สี: 'bg-orange-50' },
-    { emoji: '🔍', ชื่อ: 'ค้นหาสัตว์เลี้ยง', รายละเอียด: 'ค้นหาเพื่อนที่เหมาะสมกับคุณ', ฟีเจอร์: ['AI แนะนำสัตว์ที่เหมาะสม', 'ดูสัตว์ทั้งหมดในระบบ', 'บันทึกสัตว์ที่สนใจ'], path: '/find-pet', สี: 'bg-green-50' },
-    { emoji: '📋', ชื่อ: 'ติดตามรายงาน', รายละเอียด: 'ตรวจสอบสถานะที่คุณส่งไป', ฟีเจอร์: [], path: '/track', สี: 'bg-white' },
-    { emoji: '❤️', ชื่อ: 'สัตว์ที่บันทึกไว้', รายละเอียด: 'รายการสัตว์ที่คุณกดถูกใจไว้', ฟีเจอร์: [], path: '/wishlist', สี: 'bg-red-50' },
+    { Icon: Camera,        ชื่อ: 'แจ้งสัตว์จร',        รายละเอียด: 'ถ่ายภาพและแจ้งให้หน่วยงานทราบ', ฟีเจอร์: ['AI วิเคราะห์สายพันธุ์', 'ปักหมุด GPS อัตโนมัติ', 'ส่งให้ อบต./เทศบาล'], path: '/report',   ไอคอนพื้นหลัง: 'bg-orange-50', ไอคอนสี: 'text-orange-500' },
+    { Icon: Search,        ชื่อ: 'ค้นหาสัตว์เลี้ยง',    รายละเอียด: 'ค้นหาเพื่อนที่เหมาะสมกับคุณ',   ฟีเจอร์: [], path: '/find-pet', ไอคอนพื้นหลัง: 'bg-green-50',  ไอคอนสี: 'text-green-500' },
+    { Icon: ClipboardList, ชื่อ: 'ติดตามรายงาน',       รายละเอียด: 'ตรวจสอบสถานะที่คุณส่งไป',       ฟีเจอร์: [], path: '/track',    ไอคอนพื้นหลัง: 'bg-indigo-50', ไอคอนสี: 'text-indigo-500' },
+    { Icon: Heart,         ชื่อ: 'สัตว์ที่บันทึกไว้',   รายละเอียด: 'รายการสัตว์ที่คุณกดถูกใจไว้',   ฟีเจอร์: [], path: '/wishlist', ไอคอนพื้นหลัง: 'bg-red-50',    ไอคอนสี: 'text-red-500' },
+    { Icon: BookOpen,      ชื่อ: 'บทความน่ารู้',        รายละเอียด: 'เกร็ดความรู้และวิธีดูแลสัตว์',   ฟีเจอร์: [], path: '/pet-guide', ไอคอนพื้นหลัง: 'bg-indigo-50', ไอคอนสี: 'text-indigo-500' },
   ],
 
   // เจ้าหน้าที่ / อาสาสมัคร
   volunteer: [
-    { emoji: '📋', ชื่อ: 'รายการแจ้งสัตว์จร', รายละเอียด: 'ดูรายงานที่รอดำเนินการ', ฟีเจอร์: ['กรองตามพื้นที่', 'เรียงตามความเร่งด่วน', 'ดูพิกัดบนแผนที่'], path: '/volunteer/reports', สี: 'bg-orange-50' },
-    { emoji: '🔄', ชื่อ: 'อัปเดตสถานะสัตว์', รายละเอียด: 'อัปเดตความคืบหน้าการช่วยเหลือ', ฟีเจอร์: ['ลงพื้นที่แล้ว', 'อยู่ศูนย์พักพิง', 'มีผู้รับเลี้ยง'], path: '/volunteer/update', สี: 'bg-blue-50' },
-    { emoji: '🐾', ชื่อ: 'จัดการข้อมูลสัตว์', รายละเอียด: 'เพิ่ม แก้ไข ข้อมูลสัตว์ในระบบ', ฟีเจอร์: ['เพิ่มสัตว์ใหม่', 'แก้ไขข้อมูล', 'บันทึกประวัติรักษา'], path: '/volunteer/animals', สี: 'bg-green-50' },
-    { emoji: '📊', ชื่อ: 'สถิติพื้นที่รับผิดชอบ', รายละเอียด: 'ดูข้อมูลสัตว์ในพื้นที่ของคุณ', ฟีเจอร์: [], path: '/volunteer/stats', สี: 'bg-purple-50' },
+    { Icon: ClipboardList, ชื่อ: 'รายการแจ้งสัตว์จร',    รายละเอียด: 'ดูรายงานที่รอดำเนินการ',        ฟีเจอร์: ['กรองตามพื้นที่', 'เรียงตามความเร่งด่วน', 'ดูพิกัดบนแผนที่'], path: '/volunteer/reports', ไอคอนพื้นหลัง: 'bg-orange-50', ไอคอนสี: 'text-orange-500' },
+    { Icon: RefreshCw,     ชื่อ: 'อัปเดตสถานะสัตว์',     รายละเอียด: 'อัปเดตความคืบหน้าการช่วยเหลือ', ฟีเจอร์: [], path: '/volunteer/update',  ไอคอนพื้นหลัง: 'bg-blue-50',   ไอคอนสี: 'text-blue-500' },
+    { Icon: PawPrint,      ชื่อ: 'จัดการข้อมูลสัตว์',    รายละเอียด: 'เพิ่ม แก้ไข ข้อมูลสัตว์ในระบบ', ฟีเจอร์: [], path: '/volunteer/animals', ไอคอนพื้นหลัง: 'bg-green-50',  ไอคอนสี: 'text-green-500' },
+    { Icon: BarChart3,     ชื่อ: 'สถิติพื้นที่รับผิดชอบ', รายละเอียด: 'ดูข้อมูลสัตว์ในพื้นที่ของคุณ', ฟีเจอร์: [], path: '/volunteer/stats', ไอคอนพื้นหลัง: 'bg-purple-50', ไอคอนสี: 'text-purple-500' },
   ],
 
   // ผู้ดูแลระบบ
   admin: [
-    { emoji: '📊', ชื่อ: 'ภาพรวมระบบ', รายละเอียด: 'สถิติและ Dashboard ของระบบ', ฟีเจอร์: ['จำนวนสัตว์', 'รายงานทั้งหมด', 'อัตราการรับเลี้ยง'], path: '/admin/dashboard', สี: 'bg-indigo-50' },
-    { emoji: '👥', ชื่อ: 'จัดการผู้ใช้งาน', รายละเอียด: 'ดูและจัดการบัญชีทั้งหมด', ฟีเจอร์: ['กำหนด Role', 'ระงับบัญชี', 'ดูประวัติ'], path: '/admin/users', สี: 'bg-purple-50' },
-    { emoji: '🗺️', ชื่อ: 'จัดการพื้นที่', รายละเอียด: 'กำหนดพื้นที่รับผิดชอบของเจ้าหน้าที่', ฟีเจอร์: [], path: '/admin/areas', สี: 'bg-green-50' },
-    { emoji: '📁', ชื่อ: 'Export รายงาน', รายละเอียด: 'ดาวน์โหลดข้อมูลในรูปแบบไฟล์', ฟีเจอร์: [], path: '/admin/export', สี: 'bg-yellow-50' },
-    { emoji: '⚙️', ชื่อ: 'ตั้งค่าระบบ', รายละเอียด: 'แก้ไขการตั้งค่าต่างๆ', ฟีเจอร์: [], path: '/admin/settings', สี: 'bg-gray-50' },
+    { Icon: BarChart3,  ชื่อ: 'ภาพรวมระบบ',      รายละเอียด: 'สถิติและ Dashboard ของระบบ',          ฟีเจอร์: ['จำนวนสัตว์', 'รายงานทั้งหมด', 'อัตราการรับเลี้ยง'], path: '/admin/dashboard', ไอคอนพื้นหลัง: 'bg-indigo-50', ไอคอนสี: 'text-indigo-500' },
+    { Icon: Users,      ชื่อ: 'จัดการผู้ใช้งาน',  รายละเอียด: 'ดูและจัดการบัญชีทั้งหมด',             ฟีเจอร์: [], path: '/admin/users',    ไอคอนพื้นหลัง: 'bg-purple-50', ไอคอนสี: 'text-purple-500' },
+    { Icon: Map,        ชื่อ: 'จัดการพื้นที่',    รายละเอียด: 'กำหนดพื้นที่รับผิดชอบของเจ้าหน้าที่', ฟีเจอร์: [], path: '/admin/areas',    ไอคอนพื้นหลัง: 'bg-green-50',  ไอคอนสี: 'text-green-500' },
+    { Icon: FolderDown, ชื่อ: 'Export รายงาน',   รายละเอียด: 'ดาวน์โหลดข้อมูลในรูปแบบไฟล์',         ฟีเจอร์: [], path: '/admin/export',   ไอคอนพื้นหลัง: 'bg-yellow-50', ไอคอนสี: 'text-yellow-600' },
+    { Icon: Settings,   ชื่อ: 'ตั้งค่าระบบ',      รายละเอียด: 'แก้ไขการตั้งค่าต่างๆ',                ฟีเจอร์: [], path: '/admin/settings', ไอคอนพื้นหลัง: 'bg-gray-100',  ไอคอนสี: 'text-gray-500' },
   ],
 }
 
 const ข้อมูลRole = {
-  user:      { ชื่อ: 'ผู้ใช้งานทั่วไป', emoji: '👤', สี: 'text-blue-600' },
-  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', emoji: '🦺', สี: 'text-orange-600' },
-  admin:     { ชื่อ: 'ผู้ดูแลระบบ', emoji: '🛡️', สี: 'text-purple-600' },
+  user:      { ชื่อ: 'ผู้ใช้งานทั่วไป',        Icon: User,    สี: 'text-blue-600' },
+  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', Icon: HardHat, สี: 'text-orange-600' },
+  admin:     { ชื่อ: 'ผู้ดูแลระบบ',            Icon: Shield,  สี: 'text-purple-600' },
 }
 
 function Home({ user, onLogout }) {
   const navigate = useNavigate()
   const role = user.role || 'user'
   const เมนู = เมนูแต่ละRole[role]
+  const [เมนูหลัก, ...เมนูรอง] = เมนู
   const roleInfo = ข้อมูลRole[role]
 
   // ดึง avatar_url ใหม่ทุกครั้งที่กลับมาหน้า Home
@@ -120,16 +126,18 @@ function Home({ user, onLogout }) {
   }, [user?.id, role])
 
   return (
-    <div className="min-h-screen bg-blue-50 pb-8">
+    <div className="min-h-screen bg-gray-50 pb-8">
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="text-3xl">🐕</div>
+          <div className="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+            <Dog size={22} strokeWidth={2} />
+          </div>
           <div>
             <p className="font-bold text-gray-800 text-sm">แจ้งจร</p>
-            <p className={`text-xs font-medium ${roleInfo.สี}`}>
-              {roleInfo.emoji} {roleInfo.ชื่อ}
+            <p className={`text-xs font-medium flex items-center gap-1 ${roleInfo.สี}`}>
+              <roleInfo.Icon size={12} strokeWidth={2.5} /> {roleInfo.ชื่อ}
             </p>
           </div>
         </div>
@@ -140,10 +148,10 @@ function Home({ user, onLogout }) {
           {/* กระดิ่งแจ้งเตือน — กดแล้วไปหน้า Notifications */}
           <button
             onClick={() => navigate('/notifications')}
-            className="relative w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center text-lg hover:bg-yellow-200 transition-colors"
+            className="relative w-9 h-9 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 hover:bg-orange-100 transition-colors"
             title="การแจ้งเตือน"
           >
-            🔔
+            <Bell size={18} strokeWidth={2} />
             {ยังไม่อ่าน > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4">
                 {/* วงแสงกระพริบ */}
@@ -161,13 +169,13 @@ function Home({ user, onLogout }) {
           {/* วงกลมโปรไฟล์ — กดแล้วไปหน้า Profile */}
           <button
             onClick={() => navigate('/profile')}
-            className="w-9 h-9 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center text-lg hover:bg-blue-200 transition-colors border-2 border-white shadow-sm"
+            className="w-9 h-9 bg-gray-100 rounded-full overflow-hidden flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors border-2 border-white shadow-sm"
             title="โปรไฟล์ของฉัน"
           >
             {avatarUrl ? (
               <img src={avatarUrl} alt="โปรไฟล์" className="w-full h-full object-cover" />
             ) : (
-              '👤'
+              <User size={18} strokeWidth={2} />
             )}
           </button>
 
@@ -187,26 +195,51 @@ function Home({ user, onLogout }) {
         </p>
       </div>
 
-      {/* การ์ดเมนู */}
       <div className="px-4 space-y-4">
-        {เมนู.map((item, i) => (
-          <button
-            key={i}
-            onClick={() => navigate(item.path)}
-            className={`w-full text-left ${item.สี} rounded-2xl p-5 shadow-sm hover:shadow-md active:scale-[0.98] transition-all`}
-          >
-            <div className="text-4xl mb-3">{item.emoji}</div>
-            <h3 className="text-lg font-bold text-gray-800">{item.ชื่อ}</h3>
-            <p className="text-gray-500 text-sm mt-1">{item.รายละเอียด}</p>
-            {item.ฟีเจอร์.length > 0 && (
-              <ul className="mt-3 space-y-1">
-                {item.ฟีเจอร์.map((f, fi) => (
-                  <li key={fi} className="text-sm text-gray-600">• {f}</li>
+
+        {/* Hero Action — ฟีเจอร์หลักของ role นี้ เด่นสุด */}
+        <button
+          onClick={() => navigate(เมนูหลัก.path)}
+          className="relative w-full text-left bg-gradient-to-br from-orange-400 to-orange-600 rounded-3xl p-6 shadow-md hover:shadow-lg active:scale-[0.98] transition-all text-white overflow-hidden"
+        >
+          <เมนูหลัก.Icon
+            size={140} strokeWidth={1}
+            className="absolute -right-6 -bottom-8 text-white/10 pointer-events-none"
+          />
+          <div className="relative">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
+              <เมนูหลัก.Icon size={28} strokeWidth={1.75} />
+            </div>
+            <h3 className="text-xl font-bold">{เมนูหลัก.ชื่อ}</h3>
+            <p className="text-white/80 text-sm mt-1">{เมนูหลัก.รายละเอียด}</p>
+            {เมนูหลัก.ฟีเจอร์.length > 0 && (
+              <ul className="mt-4 space-y-1.5">
+                {เมนูหลัก.ฟีเจอร์.map((f, fi) => (
+                  <li key={fi} className="text-sm text-white/90 flex items-center gap-2">
+                    <Check size={14} strokeWidth={2.5} /> {f}
+                  </li>
                 ))}
               </ul>
             )}
-          </button>
-        ))}
+          </div>
+        </button>
+
+        {/* Secondary Actions — จัดเป็น Grid 2 คอลัมน์ */}
+        <div className="grid grid-cols-2 gap-3">
+          {เมนูรอง.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => navigate(item.path)}
+              className="text-left bg-white rounded-2xl p-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all border border-gray-100"
+            >
+              <div className={`w-10 h-10 rounded-xl ${item.ไอคอนพื้นหลัง} ${item.ไอคอนสี} flex items-center justify-center mb-2.5`}>
+                <item.Icon size={20} strokeWidth={1.75} />
+              </div>
+              <h3 className="font-bold text-gray-800 text-sm">{item.ชื่อ}</h3>
+              <p className="text-gray-500 text-xs mt-0.5">{item.รายละเอียด}</p>
+            </button>
+          ))}
+        </div>
       </div>
 
     </div>

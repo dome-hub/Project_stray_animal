@@ -248,7 +248,7 @@ function FindPet() {
               เพศ <span className="text-red-400">*</span>
             </p>
             <div className="flex gap-3 flex-wrap">
-              {['ตัวผู้', 'ตัวเมีย', 'ไม่จำกัด'].map((ตัวเลือก) => (
+              {['เพศผู้', 'เพศเมีย', 'ไม่ทราบ'].map((ตัวเลือก) => (
                 <button
                   key={ตัวเลือก}
                   onClick={() => setเพศ(ตัวเลือก)}

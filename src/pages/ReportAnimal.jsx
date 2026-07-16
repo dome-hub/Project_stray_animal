@@ -3,9 +3,20 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Footprints, HeartPulse, ShieldAlert, Circle, CircleDot,
+  MapPin, LocateFixed, Loader2, Map,
+} from 'lucide-react'
 import { supabase } from '../supabase'
 
 const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000'
+
+// ตัวเลือกประเภทการแจ้ง — ใช้กำหนดความเร่งด่วน (urgency) ของรายงาน
+const เหตุผลตัวเลือก = [
+  { label: 'พบสัตว์พลัดหลง / สัตว์จรจัด', Icon: Footprints,  urgency: 'ปานกลาง' },
+  { label: 'สัตว์บาดเจ็บ',                 Icon: HeartPulse,  urgency: 'ด่วน' },
+  { label: 'สัตว์ดุร้าย / เสี่ยงก่ออันตราย', Icon: ShieldAlert, urgency: 'ด่วนมาก' },
+]
 
 function ReportAnimal({ user }) {
   const navigate = useNavigate()
@@ -16,6 +27,7 @@ function ReportAnimal({ user }) {
   const [รูปภาพPreview, setรูปภาพPreview] = useState(null)
   const [ไฟล์รูปภาพ,   setไฟล์รูปภาพ]   = useState(null)
   const [ตำแหน่ง,      setตำแหน่ง]      = useState('')
+  const [เหตุผลแจ้ง,   setเหตุผลแจ้ง]   = useState(null)
   const [รายละเอียด,   setรายละเอียด]   = useState('')
   const [ผลAI,         setผลAI]         = useState(null)
   const [กำลังวิเคราะห์, setกำลังวิเคราะห์] = useState(false)
@@ -213,7 +225,7 @@ function ReportAnimal({ user }) {
       animal_type:   ผลAI?.สายพันธุ์ || 'ไม่ระบุ',
       location_text: ตำแหน่ง,
       detail:        รายละเอียด,
-      urgency:       'ปานกลาง',
+      urgency:       เหตุผลแจ้ง?.urgency || 'ปานกลาง',
       status:        'รอดำเนินการ',
       image_url:     imageUrl,
       reporter_id:   user?.id,
@@ -241,7 +253,7 @@ function ReportAnimal({ user }) {
 
   // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นส่งเลย ----
   async function ส่งรายงาน() {
-    if (!ตำแหน่ง) return
+    if (!ตำแหน่ง || !เหตุผลแจ้ง) return
     // ถ้ารู้แล้วว่าต้องกรอกเบอร์ → เปิด modal โดยไม่ query DB ซ้ำ
     if (ต้องกรอกเบอร์) { setแสดงModalโทรศัพท์(true); return }
     const { data: userData } = await supabase
@@ -302,7 +314,7 @@ function ReportAnimal({ user }) {
   }
 
   return (
-    <div className="min-h-screen bg-orange-50 pb-8">
+    <div className="min-h-screen bg-gray-50 pb-8">
 
       {/* Camera Modal */}
       {แสดงกล้อง && (
@@ -455,14 +467,15 @@ function ReportAnimal({ user }) {
                   <p className="text-sm">AI กำลังวิเคราะห์...</p>
                 </div>
               )}
-              <div className="absolute bottom-0 inset-x-0 bg-black/50 flex items-center justify-between px-5 py-3">
+              <div className="absolute bottom-0 inset-x-0 bg-black/50 flex items-center justify-center gap-3 px-5 py-3">
                 <button onClick={เปิดกล้อง}
                   className="flex items-center gap-1.5 text-white text-sm font-medium">
-                  <span className="text-xl">📷</span> ถ่ายใหม่
+                  <span className="text-xl">📷</span> ถ่ายรูป
                 </button>
+                <span className="w-px h-4 bg-white/30" />
                 <button onClick={() => inputGallery.current.click()}
                   className="flex items-center gap-1.5 text-white text-sm font-medium">
-                  <span className="text-xl">🖼️</span> คลัง
+                  <span className="text-xl">🖼️</span> เลือกจากคลัง
                 </button>
               </div>
             </div>
@@ -515,18 +528,54 @@ function ReportAnimal({ user }) {
           </div>
         )}
 
-        {/* ตำแหน่ง */}
+        {/* ประเภทการแจ้ง */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">
-            📍 สถานที่พบ <span className="text-red-400">*</span>
+            ประเภทการแจ้ง <span className="text-red-400">*</span>
           </p>
-          <input type="text" value={ตำแหน่ง} onChange={(e) => setตำแหน่ง(e.target.value)}
-            placeholder="เช่น หน้าวัดกำแพงแสน หรือ ถนนสาย 1"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-orange-400" />
-          <button onClick={ใช้GPSปัจจุบัน} disabled={กำลังหาตำแหน่ง}
-            className="mt-2 w-full bg-orange-500 text-white rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">
-            {กำลังหาตำแหน่ง ? '⏳ กำลังระบุตำแหน่ง...' : '📍 ใช้ตำแหน่งปัจจุบัน (GPS)'}
-          </button>
+          <div className="space-y-2">
+            {เหตุผลตัวเลือก.map((ตัวเลือก) => {
+              const เลือกอยู่ = เหตุผลแจ้ง?.label === ตัวเลือก.label
+              return (
+                <button
+                  key={ตัวเลือก.label}
+                  onClick={() => setเหตุผลแจ้ง(ตัวเลือก)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border-2 transition-all ${
+                    เลือกอยู่ ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  {เลือกอยู่
+                    ? <CircleDot size={18} className="shrink-0 text-orange-500" />
+                    : <Circle size={18} className="shrink-0 text-gray-300" />}
+                  <ตัวเลือก.Icon size={18} strokeWidth={2} className="shrink-0" />
+                  <span className="text-left">{ตัวเลือก.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ตำแหน่ง */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
+            <MapPin size={15} className="text-gray-500" /> สถานที่พบ <span className="text-red-400">*</span>
+          </p>
+          <div className="relative">
+            <input type="text" value={ตำแหน่ง} onChange={(e) => setตำแหน่ง(e.target.value)}
+              placeholder="เช่น หน้าวัดกำแพงแสน หรือ ถนนสาย 1"
+              className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-white focus:outline-none focus:border-orange-400" />
+            <button
+              onClick={ใช้GPSปัจจุบัน}
+              disabled={กำลังหาตำแหน่ง}
+              title="ดึงตำแหน่งปัจจุบัน"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center disabled:opacity-60"
+            >
+              {กำลังหาตำแหน่ง
+                ? <Loader2 size={16} className="animate-spin" />
+                : <LocateFixed size={16} />}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">แตะไอคอนเป้าเล็งเพื่อดึงตำแหน่งปัจจุบัน</p>
 
           {/* แสดง link Google Maps เมื่อมีพิกัด */}
           {latitude && longitude && (
@@ -535,7 +584,7 @@ function ReportAnimal({ user }) {
               target="_blank" rel="noreferrer"
               className="mt-2 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-700 font-medium"
             >
-              <span className="text-lg">🗺️</span>
+              <Map size={16} />
               <span className="flex-1">ดูตำแหน่งใน Google Maps</span>
               <span className="text-xs text-green-500">→</span>
             </a>
@@ -554,7 +603,7 @@ function ReportAnimal({ user }) {
         </div>
 
         {/* ส่ง */}
-        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
+        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !เหตุผลแจ้ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
           className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {กำลังส่ง ? '⏳ กำลังอัปโหลดและบันทึก...' : 'ส่งรายงานให้เจ้าหน้าที่'}
         </button>
