@@ -200,6 +200,8 @@ function VolunteerPage({ หน้า }) {
   // ---- Stats ----
   const [สถิติ, setSถิติ] = useState({ รายงาน: 0, รอดำเนินการ: 0, สัตว์: 0, รับเลี้ยงแล้ว: 0 })
   const [กำลังExport, setกำลังExport] = useState(false)
+  const [วันที่เริ่ม,   setวันที่เริ่ม]   = useState('')  // ว่าง = ไม่กรอง
+  const [วันที่สิ้นสุด, setวันที่สิ้นสุด] = useState('')
 
   // ---- แผนที่จุดเกิดเหตุ ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
@@ -258,17 +260,22 @@ function VolunteerPage({ หน้า }) {
     setSถิติ({ รายงาน: ร1.count || 0, รอดำเนินการ: ร2.count || 0, สัตว์: ร3.count || 0, รับเลี้ยงแล้ว: ร4.count || 0 })
   }
 
-  // ---- ดาวน์โหลดข้อมูลสัตว์ทั้งหมดเป็น CSV (เปิดได้ด้วย Excel) ----
+  // ---- ดาวน์โหลดข้อมูลสัตว์เป็น CSV (เปิดได้ด้วย Excel) — กรองตามช่วงวันที่ได้ ----
   async function ดาวน์โหลดข้อมูลสัตว์() {
+    if (วันที่เริ่ม && วันที่สิ้นสุด && วันที่เริ่ม > วันที่สิ้นสุด) {
+      alert('วันที่เริ่มต้องไม่มากกว่าวันที่สิ้นสุด')
+      return
+    }
+
     setกำลังExport(true)
-    const { data, error } = await supabase
-      .from('animals')
-      .select('*')
-      .order('created_at', { ascending: false })
+    let query = supabase.from('animals').select('*').order('created_at', { ascending: false })
+    if (วันที่เริ่ม)   query = query.gte('created_at', `${วันที่เริ่ม}T00:00:00`)
+    if (วันที่สิ้นสุด) query = query.lte('created_at', `${วันที่สิ้นสุด}T23:59:59`)
+    const { data, error } = await query
 
     setกำลังExport(false)
     if (error) { alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message); return }
-    if (!data || data.length === 0) { alert('ยังไม่มีข้อมูลสัตว์ในระบบ'); return }
+    if (!data || data.length === 0) { alert('ไม่มีข้อมูลสัตว์ในช่วงวันที่ที่เลือก'); return }
 
     const headers = Object.keys(data[0]).join(',')
     const rows = data.map((row) =>
@@ -282,7 +289,8 @@ function VolunteerPage({ หน้า }) {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `ข้อมูลสัตว์_${new Date().toLocaleDateString('th-TH')}.csv`
+    const ช่วงชื่อไฟล์ = (วันที่เริ่ม || วันที่สิ้นสุด) ? `_${วันที่เริ่ม || 'เริ่ม'}_ถึง_${วันที่สิ้นสุด || 'ล่าสุด'}` : ''
+    a.download = `ข้อมูลสัตว์${ช่วงชื่อไฟล์}_${new Date().toLocaleDateString('th-TH')}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -876,15 +884,51 @@ function VolunteerPage({ หน้า }) {
               )
             })}
           </div>
+
+          {/* เลือกช่วงวันที่สำหรับ Export */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <p className="text-sm font-semibold text-gray-700">เลือกช่วงวันที่ (ไม่บังคับ)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">จากวันที่</label>
+                <input
+                  type="date"
+                  value={วันที่เริ่ม}
+                  max={วันที่สิ้นสุด || undefined}
+                  onChange={(e) => setวันที่เริ่ม(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">ถึงวันที่</label>
+                <input
+                  type="date"
+                  value={วันที่สิ้นสุด}
+                  min={วันที่เริ่ม || undefined}
+                  onChange={(e) => setวันที่สิ้นสุด(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-400"
+                />
+              </div>
+            </div>
+            {(วันที่เริ่ม || วันที่สิ้นสุด) && (
+              <button onClick={() => { setวันที่เริ่ม(''); setวันที่สิ้นสุด('') }}
+                className="text-xs text-teal-600 font-medium">✕ ล้างช่วงวันที่ (ดึงข้อมูลทั้งหมด)</button>
+            )}
+          </div>
+
           <button
             onClick={ดาวน์โหลดข้อมูลสัตว์}
             disabled={กำลังExport}
             className="w-full flex items-center justify-center gap-2 bg-teal-600 text-white rounded-2xl py-4 font-bold text-base shadow-sm active:scale-95 transition-all disabled:opacity-60"
           >
             <FileSpreadsheet size={20} />
-            {กำลังExport ? 'กำลังเตรียมไฟล์...' : 'ดาวน์โหลดข้อมูลสัตว์ทั้งหมด (Excel)'}
+            {กำลังExport ? 'กำลังเตรียมไฟล์...' : 'ดาวน์โหลดข้อมูลสัตว์ (Excel)'}
           </button>
-          <p className="text-xs text-gray-400 text-center">ไฟล์ CSV เปิดได้ด้วย Excel มีข้อมูลสัตว์ทุกตัวในระบบ ณ เวลาที่กด</p>
+          <p className="text-xs text-gray-400 text-center">
+            {(วันที่เริ่ม || วันที่สิ้นสุด)
+              ? `เฉพาะข้อมูลที่เพิ่มในช่วง ${วันที่เริ่ม || 'เริ่มต้น'} ถึง ${วันที่สิ้นสุด || 'ล่าสุด'}`
+              : 'ไม่ได้เลือกช่วงวันที่ — จะดาวน์โหลดข้อมูลสัตว์ทุกตัวในระบบ'}
+          </p>
         </div>
       )}
 
