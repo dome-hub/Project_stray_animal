@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Circle, CircleDot, Plus, X } from 'lucide-react'
+import { Circle, CircleDot, Plus, X, FileSpreadsheet } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -164,6 +164,7 @@ function VolunteerPage({ หน้า }) {
 
   // ---- Stats ----
   const [สถิติ, setSถิติ] = useState({ รายงาน: 0, รอดำเนินการ: 0, สัตว์: 0, รับเลี้ยงแล้ว: 0 })
+  const [กำลังExport, setกำลังExport] = useState(false)
 
   // ---- แผนที่จุดเกิดเหตุ ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
@@ -218,6 +219,35 @@ function VolunteerPage({ หน้า }) {
       supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง'),
     ])
     setSถิติ({ รายงาน: ร1.count || 0, รอดำเนินการ: ร2.count || 0, สัตว์: ร3.count || 0, รับเลี้ยงแล้ว: ร4.count || 0 })
+  }
+
+  // ---- ดาวน์โหลดข้อมูลสัตว์ทั้งหมดเป็น CSV (เปิดได้ด้วย Excel) ----
+  async function ดาวน์โหลดข้อมูลสัตว์() {
+    setกำลังExport(true)
+    const { data, error } = await supabase
+      .from('animals')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    setกำลังExport(false)
+    if (error) { alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message); return }
+    if (!data || data.length === 0) { alert('ยังไม่มีข้อมูลสัตว์ในระบบ'); return }
+
+    const headers = Object.keys(data[0]).join(',')
+    const rows = data.map((row) =>
+      Object.values(row)
+        .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
+        .join(',')
+    )
+    const csv = '﻿' + [headers, ...rows].join('\n') // BOM สำหรับ Excel ภาษาไทย
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `ข้อมูลสัตว์_${new Date().toLocaleDateString('th-TH')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // ================================================================
@@ -470,7 +500,7 @@ function VolunteerPage({ หน้า }) {
     reports: 'รายการแจ้งสัตว์จร',
     update:  'อัปเดตสถานะสัตว์',
     animals: 'จัดการข้อมูลสัตว์',
-    stats:   'สถิติพื้นที่รับผิดชอบ',
+    stats:   'ภาพรวมและออกรายงาน',
     map:     'แผนที่จุดเกิดเหตุ',
   }
 
@@ -809,10 +839,15 @@ function VolunteerPage({ หน้า }) {
               )
             })}
           </div>
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="font-bold text-gray-800 mb-1">พื้นที่รับผิดชอบ</p>
-            <p className="text-sm text-gray-600">📍 จังหวัดนครปฐม ตำบลกำแพงแสน</p>
-          </div>
+          <button
+            onClick={ดาวน์โหลดข้อมูลสัตว์}
+            disabled={กำลังExport}
+            className="w-full flex items-center justify-center gap-2 bg-teal-600 text-white rounded-2xl py-4 font-bold text-base shadow-sm active:scale-95 transition-all disabled:opacity-60"
+          >
+            <FileSpreadsheet size={20} />
+            {กำลังExport ? 'กำลังเตรียมไฟล์...' : 'ดาวน์โหลดข้อมูลสัตว์ทั้งหมด (Excel)'}
+          </button>
+          <p className="text-xs text-gray-400 text-center">ไฟล์ CSV เปิดได้ด้วย Excel มีข้อมูลสัตว์ทุกตัวในระบบ ณ เวลาที่กด</p>
         </div>
       )}
 
