@@ -3,7 +3,7 @@
 
 import { ShieldOff, Mail } from 'lucide-react'
 
-const CONTACT_EMAILS = ['domezadome159@gmail.com', 'plamzaz7410@gmail.com']
+const CONTACT_EMAIL = 'plamzaz7410@gmail.com'
 
 function SuspendedPage({ onBackToLogin }) {
   return (
@@ -21,7 +21,7 @@ function SuspendedPage({ onBackToLogin }) {
       </p>
 
       <a
-        href={`mailto:${CONTACT_EMAILS.join(',')}?subject=${encodeURIComponent('สอบถามเรื่องบัญชีถูกระงับ')}`}
+        href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('สอบถามเรื่องบัญชีถูกระงับ')}`}
         className="mt-6 flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl font-medium shadow-sm active:scale-95 transition-all"
       >
         <Mail size={16} /> ติดต่อเรา
