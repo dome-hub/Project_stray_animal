@@ -27,11 +27,17 @@ L.Icon.Default.mergeOptions({
 // ศูนย์กลางตำบลกำแพงแสน อ.กำแพงแสน จ.นครปฐม
 const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
 
-// ---- หมุดสีตามสถานะ: แดง=แจ้งใหม่, เหลือง=กำลังดำเนินการ, เขียว=ช่วยเหลือแล้ว ----
-function สีหมุดตามสถานะ(status) {
-  if (status === 'รอดำเนินการ') return '#ef4444'        // แดง
-  if (status === 'รับเรื่องแล้ว' || status === 'ลงพื้นที่แล้ว') return '#eab308' // เหลือง
-  return '#22c55e' // เขียว (อยู่ศูนย์พักพิง / มีผู้รับเลี้ยง)
+// ---- ประเภทการแจ้ง (อิงจาก urgency ที่ผู้ใช้เลือกตอนแจ้ง) พร้อมสีเฉพาะ ----
+// แดง = สัตว์ดุร้าย/เสี่ยงอันตราย, ส้ม = สัตว์บาดเจ็บ, เหลือง = พบสัตว์พลัดหลง/จรจัด
+const ประเภทแจ้งเรียง = [
+  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย / เสี่ยงก่ออันตราย', hex: '#ef4444', dot: 'bg-red-500',    activeChip: 'border-red-500 bg-red-500 text-white' },
+  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ',                 hex: '#f97316', dot: 'bg-orange-500', activeChip: 'border-orange-500 bg-orange-500 text-white' },
+  { key: 'ปานกลาง', label: 'พบสัตว์พลัดหลง / สัตว์จรจัด',   hex: '#eab308', dot: 'bg-yellow-500', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
+]
+function ประเภทจาก(urgency) {
+  if (urgency === 'ด่วนมาก') return ประเภทแจ้งเรียง[0]
+  if (urgency === 'ด่วน')    return ประเภทแจ้งเรียง[1]
+  return ประเภทแจ้งเรียง[2] // ปานกลาง / null
 }
 
 // cache หมุด divIcon ตามสี เพื่อไม่สร้างใหม่ทุก render
@@ -936,28 +942,36 @@ function VolunteerPage({ หน้า }) {
           MAP — แผนที่จุดเกิดเหตุ
           ============================================================ */}
       {หน้า === 'map' && (function () {
-        // เคสด่วน = แจ้งใหม่ (รอดำเนินการ) หรือมี urgency เร่งด่วน
-        function เป็นเคสด่วน(r) {
-          return r.status === 'รอดำเนินการ' || r.urgency === 'ด่วน' || r.urgency === 'ด่วนมาก'
-        }
-        const จุดกรอง = filterMap === 'urgent' ? รายงานพิกัด.filter(เป็นเคสด่วน) : รายงานพิกัด
+        const จุดกรอง = filterMap === 'all'
+          ? รายงานพิกัด
+          : รายงานพิกัด.filter((r) => ประเภทจาก(r.urgency).key === filterMap)
+        // แสดง chip เฉพาะประเภทที่มีรายงานเข้ามาจริง (count > 0)
+        const ประเภทที่มี = ประเภทแจ้งเรียง
+          .map((p) => ({ ...p, count: รายงานพิกัด.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
+          .filter((p) => p.count > 0)
 
         return (
           <div className="pt-4 space-y-3">
 
-            {/* Filter chips */}
-            <div className="px-4 flex gap-2">
-              {[
-                { key: 'all',    label: 'ดูทั้งหมด',    count: รายงานพิกัด.length },
-                { key: 'urgent', label: '⚠️ เฉพาะเคสด่วน', count: รายงานพิกัด.filter(เป็นเคสด่วน).length },
-              ].map(function (chip) {
+            {/* Filter chips — แยกตามประเภทการแจ้ง */}
+            <div className="px-4 flex flex-wrap gap-2">
+              <button onClick={() => setFilterMap('all')}
+                className={`px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                  filterMap === 'all' ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
+                }`}
+              >
+                ดูทั้งหมด <span className={filterMap === 'all' ? 'text-white/80' : 'text-gray-400'}>({รายงานพิกัด.length})</span>
+              </button>
+              {ประเภทที่มี.map(function (p) {
+                const active = filterMap === p.key
                 return (
-                  <button key={chip.key} onClick={() => setFilterMap(chip.key)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
-                      filterMap === chip.key ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
+                  <button key={p.key} onClick={() => setFilterMap(p.key)}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                      active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
                     }`}
                   >
-                    {chip.label} <span className={filterMap === chip.key ? 'text-white/80' : 'text-gray-400'}>({chip.count})</span>
+                    {!active && <span className={`w-2 h-2 rounded-full ${p.dot}`} />}
+                    {p.label} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
                   </button>
                 )
               })}
@@ -980,11 +994,12 @@ function VolunteerPage({ หน้า }) {
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
                       {จุดกรอง.map((r) => (
-                        <Marker key={r.id} position={[r.latitude, r.longitude]} icon={หมุดสี(สีหมุดตามสถานะ(r.status))}>
+                        <Marker key={r.id} position={[r.latitude, r.longitude]} icon={หมุดสี(ประเภทจาก(r.urgency).hex)}>
                           <Popup>
                             <div className="text-sm">
                               <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
                               <p className="text-gray-600">{r.location_text}</p>
+                              <p className="text-xs mt-1" style={{ color: ประเภทจาก(r.urgency).hex }}>● {ประเภทจาก(r.urgency).label}</p>
                               {r.detail && <p className="text-xs text-gray-600 mt-1">📝 {r.detail}</p>}
                               <p className="text-xs mt-1">สถานะ: {r.status}</p>
                               <a
@@ -1002,11 +1017,11 @@ function VolunteerPage({ หน้า }) {
                   </div>
                 </div>
 
-                {/* คำอธิบายสีหมุด */}
-                <div className="px-4 flex items-center gap-4 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> แจ้งใหม่</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> กำลังดำเนินการ</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> ช่วยเหลือแล้ว</span>
+                {/* คำอธิบายสีหมุด — ตามประเภทการแจ้ง */}
+                <div className="px-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> สัตว์ดุร้าย/เสี่ยงอันตราย</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> สัตว์บาดเจ็บ</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> พบสัตว์พลัดหลง/จรจัด</span>
                 </div>
 
                 {/* List รายการเคส — กดแล้วแผนที่บินไปที่จุดนั้น */}
@@ -1018,10 +1033,11 @@ function VolunteerPage({ หน้า }) {
                   {จุดกรอง.map((r) => (
                     <div key={r.id}
                       onClick={() => setโฟกัสจุด({ lat: r.latitude, lng: r.longitude, id: r.id, t: Date.now() })}
-                      className={`bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-all border-l-4 ${แถบสีสถานะ[r.status] || 'border-l-gray-300'}`}
+                      style={{ borderLeftColor: ประเภทจาก(r.urgency).hex }}
+                      className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-all border-l-4"
                     >
                       <div className="p-3 flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full shrink-0" style={{ background: สีหมุดตามสถานะ(r.status) }} />
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ background: ประเภทจาก(r.urgency).hex }} />
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-gray-800 text-sm truncate">{r.animal_type || 'ไม่ระบุ'}</p>
                           <p className="text-xs text-gray-500 truncate">📍 {r.location_text || '-'} · #{String(r.id).padStart(6, '0')}</p>
