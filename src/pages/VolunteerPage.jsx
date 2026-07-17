@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Circle, CircleDot } from 'lucide-react'
+import { Circle, CircleDot, Plus, X } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -152,6 +152,7 @@ function VolunteerPage({ หน้า }) {
   const [สัตว์จากDB,        setSัตว์จากDB]        = useState([])
   const [โหลดสัตว์,         setโหลดสัตว์]         = useState(true)
   const [สัตว์ที่แก้ไข,      setSัตว์ที่แก้ไข]      = useState(null)
+  const [inputนิสัย,        setinputนิสัย]        = useState('')      // ช่องพิมพ์ก่อนกลายเป็น chip
   const [ข้อมูลรายงานสัตว์,  setข้อมูลรายงานสัตว์]  = useState(null)   // { report + reporter }
   const [โหลดรายงานสัตว์,   setโหลดรายงานสัตว์]   = useState(false)
   const [แสดงฟอร์มเพิ่ม, setแสดงฟอร์มเพิ่ม] = useState(false)
@@ -423,6 +424,7 @@ function VolunteerPage({ หน้า }) {
   // เปิด bottom sheet แก้ไขสัตว์ + ดึงข้อมูลรายงาน/ผู้แจ้ง (ถ้ามาจากรายงาน)
   async function เปิดแก้ไขสัตว์(สัตว์) {
     setSัตว์ที่แก้ไข({ ...สัตว์ })
+    setinputนิสัย('')
     setข้อมูลรายงานสัตว์(null)
 
     if (!สัตว์.report_id) return
@@ -671,10 +673,14 @@ function VolunteerPage({ หน้า }) {
           ANIMALS — จัดการสัตว์ในศูนย์
           ============================================================ */}
       {หน้า === 'animals' && (
-        <div className="px-4 pt-4 space-y-4">
+        <div className="px-4 pt-4 space-y-4 pb-20">
+
+          {/* FAB — เพิ่มสัตว์ใหม่ */}
           <button onClick={() => setแสดงฟอร์มเพิ่ม(!แสดงฟอร์มเพิ่ม)}
-            className="w-full bg-green-500 text-white rounded-xl py-3 font-medium">
-            {แสดงฟอร์มเพิ่ม ? '✕ ปิดฟอร์ม' : '+ เพิ่มสัตว์ใหม่ (manual)'}
+            className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-all"
+            title={แสดงฟอร์มเพิ่ม ? 'ปิดฟอร์ม' : 'เพิ่มสัตว์ใหม่'}
+          >
+            {แสดงฟอร์มเพิ่ม ? <X size={24} /> : <Plus size={24} />}
           </button>
 
           {แสดงฟอร์มเพิ่ม && (
@@ -691,7 +697,7 @@ function VolunteerPage({ หน้า }) {
                       {f.label} {f.required && <span className="text-red-400">*</span>}
                     </p>
                     <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.placeholder}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-400" />
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
                   </div>
                 )
               })}
@@ -702,7 +708,7 @@ function VolunteerPage({ หน้า }) {
                     return (
                       <button key={เพศ} onClick={() => setเพศสัตว์(เพศ)}
                         className={`flex-1 py-2 rounded-xl text-xs font-medium border-2 ${
-                          เพศสัตว์ === เพศ ? 'border-green-500 bg-green-500 text-white' : 'border-gray-200 text-gray-700'
+                          เพศสัตว์ === เพศ ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-700'
                         }`}>{เพศ}</button>
                     )
                   })}
@@ -719,7 +725,7 @@ function VolunteerPage({ หน้า }) {
                 </select>
               </div>
               <button onClick={บันทึกสัตว์ใหม่} disabled={!ชื่อสัตว์ || !เพศสัตว์}
-                className="w-full bg-green-500 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
+                className="w-full bg-teal-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
                 บันทึกข้อมูลสัตว์
               </button>
             </div>
@@ -732,7 +738,7 @@ function VolunteerPage({ หน้า }) {
 
           {โหลดสัตว์ && (
             <div className="text-center py-6">
-              <div className="w-8 h-8 border-4 border-green-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
           )}
 
@@ -745,12 +751,13 @@ function VolunteerPage({ หน้า }) {
 
           <div className="space-y-3">
             {สัตว์จากDB.map(function (สัตว์) {
+              const ยังไม่ตั้งชื่อ = สัตว์.name === 'ยังไม่ตั้งชื่อ'
               return (
                 <button key={สัตว์.id} onClick={() => เปิดแก้ไขสัตว์(สัตว์)}
                   className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-green-50 overflow-hidden flex items-center justify-center shrink-0">
+                    <div className="w-14 h-14 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center shrink-0">
                       {สัตว์.photo_url
                         ? <img src={สัตว์.photo_url} alt={สัตว์.name} className="w-full h-full object-cover" />
                         : <span className="text-3xl">{สัตว์.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
@@ -758,12 +765,16 @@ function VolunteerPage({ หน้า }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-gray-800">{สัตว์.name}</p>
+                        <p className="font-bold text-gray-800">{ยังไม่ตั้งชื่อ ? (สัตว์.breed || 'ไม่ระบุสายพันธุ์') : สัตว์.name}</p>
                         {สัตว์.report_id && (
                           <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">📋 จากรายงาน</span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500">{สัตว์.breed || 'ไม่ระบุ'} · {สัตว์.age || '-'} · {สัตว์.gender || '-'}</p>
+                      <p className="text-xs text-gray-500">
+                        {ยังไม่ตั้งชื่อ
+                          ? `${สัตว์.age || '-'} · ${สัตว์.gender || '-'}`
+                          : `${สัตว์.breed || 'ไม่ระบุ'} · ${สัตว์.age || '-'} · ${สัตว์.gender || '-'}`}
+                      </p>
                       <span className={`text-xs mt-1 px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
                         {สัตว์.status}
                       </span>
@@ -914,7 +925,7 @@ function VolunteerPage({ หน้า }) {
               <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                 <p className="text-xs font-bold text-blue-700 mb-3">👤 ข้อมูลผู้แจ้ง</p>
                 {!รายงานที่เปิด.reporter_id && (
-                  <p className="text-sm text-gray-400 italic">ไม่ระบุตัวตน (แจ้งโดยไม่ login)</p>
+                  <p className="text-sm text-gray-400 italic">🗑️ บัญชีผู้ใช้ถูกลบแล้ว (Deleted User)</p>
                 )}
                 {รายงานที่เปิด.reporter_id && โหลดผู้แจ้ง && (
                   <p className="text-sm text-gray-400">กำลังโหลดข้อมูล...</p>
@@ -1023,37 +1034,37 @@ function VolunteerPage({ หน้า }) {
               </div>
 
               {/* ข้อมูลผู้แจ้ง (compact) */}
-              {รายงานที่เปิด.reporter_id && (
-                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-                  <p className="text-xs font-semibold text-blue-600 mb-2">👤 ผู้แจ้ง</p>
-                  {โหลดผู้แจ้ง ? (
-                    <p className="text-xs text-gray-400">กำลังโหลด...</p>
-                  ) : ข้อมูลผู้แจ้ง ? (
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center shrink-0">
-                          {ข้อมูลผู้แจ้ง.avatar_url
-                            ? <img src={ข้อมูลผู้แจ้ง.avatar_url} alt="ผู้แจ้ง" className="w-full h-full object-cover" />
-                            : <span className="text-lg">👤</span>
-                          }
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{ข้อมูลผู้แจ้ง.name || '-'}</p>
-                          <p className="text-xs text-gray-500">{ข้อมูลผู้แจ้ง.email || '-'}</p>
-                        </div>
+              <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-600 mb-2">👤 ผู้แจ้ง</p>
+                {!รายงานที่เปิด.reporter_id ? (
+                  <p className="text-xs text-gray-400 italic">🗑️ บัญชีผู้ใช้ถูกลบแล้ว (Deleted User)</p>
+                ) : โหลดผู้แจ้ง ? (
+                  <p className="text-xs text-gray-400">กำลังโหลด...</p>
+                ) : ข้อมูลผู้แจ้ง ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                        {ข้อมูลผู้แจ้ง.avatar_url
+                          ? <img src={ข้อมูลผู้แจ้ง.avatar_url} alt="ผู้แจ้ง" className="w-full h-full object-cover" />
+                          : <span className="text-lg">👤</span>
+                        }
                       </div>
-                      {ข้อมูลผู้แจ้ง.phone && (
-                        <a href={`tel:${ข้อมูลผู้แจ้ง.phone}`}
-                           className="bg-blue-500 text-white text-xs px-3 py-2 rounded-xl font-semibold shrink-0">
-                          📞 {ข้อมูลผู้แจ้ง.phone}
-                        </a>
-                      )}
+                      <div>
+                        <p className="text-sm font-semibold">{ข้อมูลผู้แจ้ง.name || '-'}</p>
+                        <p className="text-xs text-gray-500">{ข้อมูลผู้แจ้ง.email || '-'}</p>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-xs text-gray-400">ไม่พบข้อมูล</p>
-                  )}
-                </div>
-              )}
+                    {ข้อมูลผู้แจ้ง.phone && (
+                      <a href={`tel:${ข้อมูลผู้แจ้ง.phone}`}
+                         className="bg-blue-500 text-white text-xs px-3 py-2 rounded-xl font-semibold shrink-0">
+                        📞 {ข้อมูลผู้แจ้ง.phone}
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">ไม่พบข้อมูล</p>
+                )}
+              </div>
 
               {/* รายละเอียดจากผู้แจ้ง */}
               {รายงานที่เปิด.detail && (
@@ -1142,7 +1153,7 @@ function VolunteerPage({ หน้า }) {
 
             <div className="px-5 pb-8 space-y-4">
               {/* รูป */}
-              <div className="w-full h-36 rounded-2xl overflow-hidden bg-green-50 flex items-center justify-center">
+              <div className="w-full h-36 rounded-2xl overflow-hidden bg-teal-50 flex items-center justify-center">
                 {สัตว์ที่แก้ไข.photo_url
                   ? <img src={สัตว์ที่แก้ไข.photo_url} alt={สัตว์ที่แก้ไข.name} className="w-full h-full object-contain" />
                   : <span className="text-6xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
@@ -1226,7 +1237,7 @@ function VolunteerPage({ หน้า }) {
                           )}
                         </div>
                       ) : (
-                        <p className="text-xs text-gray-400 italic">ไม่พบข้อมูลผู้แจ้ง</p>
+                        <p className="text-xs text-gray-400 italic">🗑️ บัญชีผู้ใช้ถูกลบแล้ว (Deleted User)</p>
                       )}
                     </>
                   )}
@@ -1236,6 +1247,12 @@ function VolunteerPage({ หน้า }) {
                   )}
                 </div>
               )}
+
+              {/* ---- ข้อมูลทั่วไป ---- */}
+              <div className="flex items-center gap-2 pt-1">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">ข้อมูลทั่วไป</p>
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
 
               {[
                 { label: 'ชื่อสัตว์', key: 'name',   placeholder: 'ชื่อสัตว์' },
@@ -1248,7 +1265,7 @@ function VolunteerPage({ หน้า }) {
                     <p className="text-xs font-semibold text-gray-600 mb-1">{f.label}</p>
                     <input value={สัตว์ที่แก้ไข[f.key] || ''} placeholder={f.placeholder}
                       onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, [f.key]: e.target.value } }) }}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-400" />
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
                   </div>
                 )
               })}
@@ -1261,11 +1278,17 @@ function VolunteerPage({ หน้า }) {
                       <button key={เพศ}
                         onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, gender: เพศ } }) }}
                         className={`flex-1 py-2 rounded-xl text-xs font-medium border-2 ${
-                          สัตว์ที่แก้ไข.gender === เพศ ? 'border-green-500 bg-green-500 text-white' : 'border-gray-200 text-gray-700'
+                          สัตว์ที่แก้ไข.gender === เพศ ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-700'
                         }`}>{เพศ}</button>
                     )
                   })}
                 </div>
+              </div>
+
+              {/* ---- สถานะและสุขภาพ ---- */}
+              <div className="flex items-center gap-2 pt-2">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">สถานะและสุขภาพ</p>
+                <div className="flex-1 h-px bg-gray-100" />
               </div>
 
               <div>
@@ -1276,23 +1299,59 @@ function VolunteerPage({ หน้า }) {
                       <button key={ส}
                         onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, status: ส } }) }}
                         className={`py-2.5 rounded-xl text-xs font-medium border-2 ${
-                          สัตว์ที่แก้ไข.status === ส ? 'border-green-500 bg-green-500 text-white' : 'border-gray-200 text-gray-700'
+                          สัตว์ที่แก้ไข.status === ส ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-700'
                         }`}>{ส}</button>
                     )
                   })}
                 </div>
               </div>
 
-              {/* ลักษณะนิสัย */}
+              {/* ลักษณะนิสัย — Tag/Chip input */}
               <div>
                 <p className="text-xs font-semibold text-gray-600 mb-1">ลักษณะนิสัย</p>
-                <input
-                  value={สัตว์ที่แก้ไข.traits || ''}
-                  placeholder="เช่น เป็นมิตร, ขี้เล่น, สงบเสงี่ยม (คั่นด้วยจุลภาค)"
-                  onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, traits: e.target.value } }) }}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-400"
-                />
-                <p className="text-xs text-gray-400 mt-1">คั่นนิสัยหลายข้อด้วย " , " เช่น เป็นมิตร, ขี้เล่น</p>
+                <div className="w-full border border-gray-200 rounded-xl px-3 py-2 flex flex-wrap gap-1.5 focus-within:border-teal-400">
+                  {(สัตว์ที่แก้ไข.traits || '').split(',').map(function (t) { return t.trim() }).filter(Boolean).map(function (tag, i) {
+                    return (
+                      <span key={tag + i} className="flex items-center gap-1 bg-teal-50 text-teal-700 text-xs font-medium pl-2.5 pr-1.5 py-1 rounded-full">
+                        {tag}
+                        <button
+                          onClick={function () {
+                            setSัตว์ที่แก้ไข(function (prev) {
+                              const เหลือ = (prev.traits || '').split(',').map(function (t) { return t.trim() }).filter(Boolean).filter(function (_, idx) { return idx !== i })
+                              return { ...prev, traits: เหลือ.join(', ') }
+                            })
+                          }}
+                          className="text-teal-400 hover:text-teal-700"
+                        ><X size={12} /></button>
+                      </span>
+                    )
+                  })}
+                  <input
+                    value={inputนิสัย}
+                    placeholder="พิมพ์แล้วกด Enter หรือเว้นวรรค"
+                    onChange={function (e) { setinputนิสัย(e.target.value) }}
+                    onKeyDown={function (e) {
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === ',') {
+                        e.preventDefault()
+                        const ค่าใหม่ = inputนิสัย.trim()
+                        if (!ค่าใหม่) return
+                        setSัตว์ที่แก้ไข(function (prev) {
+                          const เดิม = (prev.traits || '').split(',').map(function (t) { return t.trim() }).filter(Boolean)
+                          return { ...prev, traits: [...เดิม, ค่าใหม่].join(', ') }
+                        })
+                        setinputนิสัย('')
+                      } else if (e.key === 'Backspace' && !inputนิสัย) {
+                        setSัตว์ที่แก้ไข(function (prev) {
+                          const เดิม = (prev.traits || '').split(',').map(function (t) { return t.trim() }).filter(Boolean)
+                          เดิม.pop()
+                          return { ...prev, traits: เดิม.join(', ') }
+                        })
+                      }
+                    }}
+                    className="flex-1 min-w-[100px] text-sm focus:outline-none py-1"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">เช่น เป็นมิตร, ขี้เล่น, สงบเสงี่ยม</p>
               </div>
 
               {/* ประวัติการฉีดวัคซีน */}
@@ -1317,7 +1376,7 @@ function VolunteerPage({ หน้า }) {
               </div>
 
               <button onClick={บันทึกแก้ไขสัตว์}
-                className="w-full bg-green-500 text-white rounded-2xl py-4 font-bold text-base active:scale-95 transition-all">
+                className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base active:scale-95 transition-all">
                 💾 บันทึกการแก้ไข
               </button>
             </div>

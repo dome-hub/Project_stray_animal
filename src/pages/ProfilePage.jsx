@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Trash2, ShieldAlert, X } from 'lucide-react'
 import { supabase } from '../supabase'
 
 // Role display config
@@ -64,6 +65,11 @@ function ProfilePage({ user }) {
   const [กำลังแก้ไขShelter,  setกำลังแก้ไขShelter]  = useState(false)
   const [shelterTemp,         setShelterTemp]         = useState({ name: '', location: '', area: '' })
   const [กำลังบันทึกShelter, setกำลังบันทึกShelter] = useState(false)
+
+  // ---- ลบบัญชี ----
+  const [แสดงยืนยันลบบัญชี, setแสดงยืนยันลบบัญชี] = useState(false)
+  const [กำลังลบบัญชี,      setกำลังลบบัญชี]      = useState(false)
+  const [errorลบบัญชี,      setErrorลบบัญชี]      = useState('')
 
   // ---- ข้อมูลแต่ละ Tab ----
   const [ประวัติแจ้ง,    setประวัติแจ้ง]    = useState([])
@@ -240,6 +246,30 @@ function ProfilePage({ user }) {
     } finally {
       setกำลังอัปโหลดรูป(false)
       event.target.value = ''
+    }
+  }
+
+  // ---- ลบบัญชี (Right to be Forgotten) ----
+  // เรียก Edge Function "delete-account" ทำงานทั้งหมดฝั่งเซิร์ฟเวอร์ (service role):
+  //   unlink รายงาน (reporter_id -> null) → ลบ notifications → ลบ row users → ลบ auth user
+  // แล้วจึง sign out
+  async function ลบบัญชี() {
+    if (!user?.id) return
+    setกำลังลบบัญชี(true)
+    setErrorลบบัญชี('')
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('delete-account')
+      if (fnError) {
+        const รายละเอียด = fnError.context ? await fnError.context.text().catch(() => '') : ''
+        throw new Error(fnError.message + (รายละเอียด ? ` — ${รายละเอียด}` : ''))
+      }
+      if (fnData?.error) throw new Error(fnData.error)
+
+      await supabase.auth.signOut()
+      navigate('/')
+    } catch (err) {
+      setErrorลบบัญชี('ลบบัญชีไม่สำเร็จ: ' + err.message)
+      setกำลังลบบัญชี(false)
     }
   }
 
@@ -494,6 +524,79 @@ function ProfilePage({ user }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ======== Danger Zone: ลบบัญชี (ทุก role) ======== */}
+      {แท็บ === 'info' && (
+        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm border border-red-100">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldAlert size={16} className="text-red-500" />
+            <h3 className="font-bold text-red-600 text-sm">ลบบัญชีผู้ใช้</h3>
+          </div>
+          <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+            ข้อมูลส่วนตัว (ชื่อ, เบอร์โทร, รูปโปรไฟล์) จะถูกลบถาวรและกู้คืนไม่ได้
+            ส่วนรายงานที่เคยแจ้งไว้จะยังเก็บไว้ในระบบแต่จะไม่ผูกกับบัญชีนี้อีกต่อไป
+          </p>
+          <button
+            onClick={() => setแสดงยืนยันลบบัญชี(true)}
+            className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 rounded-xl py-2.5 text-sm font-medium hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={15} /> ลบบัญชีของฉัน
+          </button>
+        </div>
+      )}
+
+      {/* ======== Modal: ยืนยันการลบบัญชี ======== */}
+      {แสดงยืนยันลบบัญชี && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
+             onClick={() => { if (!กำลังลบบัญชี) setแสดงยืนยันลบบัญชี(false) }}>
+          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
+               onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <div className="w-7" />
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+              <button
+                onClick={() => setแสดงยืนยันลบบัญชี(false)}
+                disabled={กำลังลบบัญชี}
+                className="w-7 h-7 flex items-center justify-center text-gray-400"
+              ><X size={18} /></button>
+            </div>
+
+            <div className="text-center mb-5 mt-3">
+              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+                <ShieldAlert size={26} className="text-red-500" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-800">ยืนยันการลบบัญชี</h2>
+              <p className="text-sm text-gray-500 mt-2 leading-relaxed px-2">
+                การลบบัญชีไม่สามารถย้อนกลับได้ ชื่อ เบอร์โทร และรูปโปรไฟล์ของคุณจะถูกลบถาวร
+                และคุณจะออกจากระบบทันที
+              </p>
+            </div>
+
+            {errorลบบัญชี && (
+              <p className="text-red-500 text-xs text-center mb-3">{errorลบบัญชี}</p>
+            )}
+
+            <div className="space-y-2">
+              <button
+                onClick={ลบบัญชี}
+                disabled={กำลังลบบัญชี}
+                className="w-full bg-red-600 text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {กำลังลบบัญชี
+                  ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> กำลังลบบัญชี...</>
+                  : <><Trash2 size={16} /> ยืนยันลบบัญชีถาวร</>}
+              </button>
+              <button
+                onClick={() => setแสดงยืนยันลบบัญชี(false)}
+                disabled={กำลังลบบัญชี}
+                className="w-full text-gray-500 text-sm py-2"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
