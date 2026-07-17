@@ -3,7 +3,7 @@
 
 import { ShieldOff, Mail } from 'lucide-react'
 
-const CONTACT_EMAIL = 'plamzaz7410@gmail.com'
+const CONTACT_EMAIL = 'chanathip.ki@ku.th'
 
 function SuspendedPage({ onBackToLogin }) {
   return (
