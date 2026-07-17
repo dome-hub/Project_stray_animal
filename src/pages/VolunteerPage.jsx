@@ -7,8 +7,8 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Circle, CircleDot, Plus, X, FileSpreadsheet } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { Circle, CircleDot, Plus, X, FileSpreadsheet, Navigation } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -26,6 +26,41 @@ L.Icon.Default.mergeOptions({
 
 // ศูนย์กลางตำบลกำแพงแสน อ.กำแพงแสน จ.นครปฐม
 const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
+
+// ---- หมุดสีตามสถานะ: แดง=แจ้งใหม่, เหลือง=กำลังดำเนินการ, เขียว=ช่วยเหลือแล้ว ----
+function สีหมุดตามสถานะ(status) {
+  if (status === 'รอดำเนินการ') return '#ef4444'        // แดง
+  if (status === 'รับเรื่องแล้ว' || status === 'ลงพื้นที่แล้ว') return '#eab308' // เหลือง
+  return '#22c55e' // เขียว (อยู่ศูนย์พักพิง / มีผู้รับเลี้ยง)
+}
+
+// cache หมุด divIcon ตามสี เพื่อไม่สร้างใหม่ทุก render
+const _หมุดCache = {}
+function หมุดสี(color) {
+  if (_หมุดCache[color]) return _หมุดCache[color]
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="38" viewBox="0 0 26 38">
+    <path d="M13 0C5.8 0 0 5.8 0 13c0 9.2 13 25 13 25s13-15.8 13-25C26 5.8 20.2 0 13 0z" fill="${color}" stroke="white" stroke-width="2"/>
+    <circle cx="13" cy="13" r="5" fill="white"/>
+  </svg>`
+  const icon = L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [26, 38],
+    iconAnchor: [13, 38],
+    popupAnchor: [0, -34],
+  })
+  _หมุดCache[color] = icon
+  return icon
+}
+
+// ตัวคุมแผนที่ — บินไปที่จุดที่เลือกจาก List
+function MapController({ โฟกัส }) {
+  const map = useMap()
+  useEffect(function () {
+    if (โฟกัส) map.flyTo([โฟกัส.lat, โฟกัส.lng], 16, { duration: 0.8 })
+  }, [โฟกัส, map])
+  return null
+}
 
 // ---- ค่าคงที่ ----
 const ขั้นตอนตามสถานะ = {
@@ -169,6 +204,8 @@ function VolunteerPage({ หน้า }) {
   // ---- แผนที่จุดเกิดเหตุ ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
+  const [filterMap, setFilterMap]   = useState('all')  // all | urgent
+  const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
 
   // ================================================================
   // FETCH
@@ -184,7 +221,7 @@ function VolunteerPage({ หน้า }) {
     setโหลดแผนที่(true)
     const { data, error } = await supabase
       .from('reports')
-      .select('id, animal_type, location_text, detail, status, latitude, longitude, created_at')
+      .select('id, animal_type, location_text, detail, status, urgency, latitude, longitude, created_at')
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
     if (!error && data) setรายงานพิกัด(data)
@@ -854,14 +891,32 @@ function VolunteerPage({ หน้า }) {
       {/* ============================================================
           MAP — แผนที่จุดเกิดเหตุ
           ============================================================ */}
-      {หน้า === 'map' && (
-        <div className="px-4 pt-4 space-y-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-bold text-gray-800">🗺️ จุดที่มีรายงานทั้งหมด</p>
-              {!โหลดแผนที่ && (
-                <span className="text-xs text-gray-400">{รายงานพิกัด.length} จุด</span>
-              )}
+      {หน้า === 'map' && (function () {
+        // เคสด่วน = แจ้งใหม่ (รอดำเนินการ) หรือมี urgency เร่งด่วน
+        function เป็นเคสด่วน(r) {
+          return r.status === 'รอดำเนินการ' || r.urgency === 'ด่วน' || r.urgency === 'ด่วนมาก'
+        }
+        const จุดกรอง = filterMap === 'urgent' ? รายงานพิกัด.filter(เป็นเคสด่วน) : รายงานพิกัด
+
+        return (
+          <div className="pt-4 space-y-3">
+
+            {/* Filter chips */}
+            <div className="px-4 flex gap-2">
+              {[
+                { key: 'all',    label: 'ดูทั้งหมด',    count: รายงานพิกัด.length },
+                { key: 'urgent', label: '⚠️ เฉพาะเคสด่วน', count: รายงานพิกัด.filter(เป็นเคสด่วน).length },
+              ].map(function (chip) {
+                return (
+                  <button key={chip.key} onClick={() => setFilterMap(chip.key)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                      filterMap === chip.key ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
+                    }`}
+                  >
+                    {chip.label} <span className={filterMap === chip.key ? 'text-white/80' : 'text-gray-400'}>({chip.count})</span>
+                  </button>
+                )
+              })}
             </div>
 
             {โหลดแผนที่ ? (
@@ -870,31 +925,80 @@ function VolunteerPage({ หน้า }) {
                 <p className="text-sm text-gray-400">กำลังโหลดตำแหน่งรายงาน...</p>
               </div>
             ) : (
-              <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: 420 }}>
-                <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {รายงานพิกัด.map((r) => (
-                    <Marker key={r.id} position={[r.latitude, r.longitude]}>
-                      <Popup>
-                        <div className="text-sm">
-                          <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
-                          <p className="text-gray-600">{r.location_text}</p>
-                          {r.detail && <p className="text-xs text-gray-600 mt-1">📝 {r.detail}</p>}
-                          <p className="text-xs mt-1">สถานะ: {r.status}</p>
-                          <p className="text-xs text-gray-400">{แปลงวันที่เวลา(r.created_at)}</p>
+              <>
+                {/* แผนที่ */}
+                <div className="px-4">
+                  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 340 }}>
+                    <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
+                      <MapController โฟกัส={โฟกัสจุด} />
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      {จุดกรอง.map((r) => (
+                        <Marker key={r.id} position={[r.latitude, r.longitude]} icon={หมุดสี(สีหมุดตามสถานะ(r.status))}>
+                          <Popup>
+                            <div className="text-sm">
+                              <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
+                              <p className="text-gray-600">{r.location_text}</p>
+                              {r.detail && <p className="text-xs text-gray-600 mt-1">📝 {r.detail}</p>}
+                              <p className="text-xs mt-1">สถานะ: {r.status}</p>
+                              <a
+                                href={`https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`}
+                                target="_blank" rel="noreferrer"
+                                className="mt-2 inline-flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold no-underline"
+                              >
+                                🧭 นำทาง (Google Maps)
+                              </a>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      ))}
+                    </MapContainer>
+                  </div>
+                </div>
+
+                {/* คำอธิบายสีหมุด */}
+                <div className="px-4 flex items-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> แจ้งใหม่</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> กำลังดำเนินการ</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> ช่วยเหลือแล้ว</span>
+                </div>
+
+                {/* List รายการเคส — กดแล้วแผนที่บินไปที่จุดนั้น */}
+                <div className="px-4 space-y-2 pb-4">
+                  <p className="text-xs text-gray-400">{จุดกรอง.length} จุดในมุมมองนี้</p>
+                  {จุดกรอง.length === 0 && (
+                    <div className="text-center py-8 text-gray-400 text-sm">ไม่มีจุดในตัวกรองนี้</div>
+                  )}
+                  {จุดกรอง.map((r) => (
+                    <div key={r.id}
+                      onClick={() => setโฟกัสจุด({ lat: r.latitude, lng: r.longitude, id: r.id, t: Date.now() })}
+                      className={`bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-all border-l-4 ${แถบสีสถานะ[r.status] || 'border-l-gray-300'}`}
+                    >
+                      <div className="p-3 flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ background: สีหมุดตามสถานะ(r.status) }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-800 text-sm truncate">{r.animal_type || 'ไม่ระบุ'}</p>
+                          <p className="text-xs text-gray-500 truncate">📍 {r.location_text || '-'} · #{String(r.id).padStart(6, '0')}</p>
                         </div>
-                      </Popup>
-                    </Marker>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`}
+                          target="_blank" rel="noreferrer"
+                          onClick={function (e) { e.stopPropagation() }}
+                          className="flex items-center gap-1 bg-teal-50 text-teal-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                        >
+                          <Navigation size={13} /> นำทาง
+                        </a>
+                      </div>
+                    </div>
                   ))}
-                </MapContainer>
-              </div>
+                </div>
+              </>
             )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ============================================================
           BOTTOM SHEET: รายละเอียดรายงาน (Reports Inbox)

@@ -656,21 +656,28 @@ function AdminPage({ หน้า, user }) {
                     <option value="admin">🛡️ ผู้ดูแลระบบ (Admin)</option>
                   </select>
 
-                  {/* ระงับ / ยกเลิกระงับ */}
-                  <button
-                    onClick={function () {
-                      const สถานะใหม่ = userที่เลือก.status === 'suspended' ? 'active' : 'suspended'
-                      สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
-                      setUserที่เลือก(function (p) { return { ...p, status: สถานะใหม่ } })
-                    }}
-                    className={`w-full py-3 rounded-xl text-sm font-bold ${
-                      userที่เลือก.status === 'suspended'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-red-500 text-white'
-                    }`}
-                  >
-                    {userที่เลือก.status === 'suspended' ? '✅ ยกเลิกการระงับบัญชี' : '🚫 ระงับบัญชีนี้'}
-                  </button>
+                  {/* ระงับ / ยกเลิกระงับ — แอดมินระงับแอดมินด้วยกันไม่ได้ */}
+                  {userที่เลือก.role === 'admin' ? (
+                    <div className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-500">🔒 ไม่สามารถระงับบัญชีผู้ดูแลระบบ (Admin) ได้</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">หากต้องการระงับ ให้เปลี่ยน Role เป็นระดับอื่นก่อน</p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={function () {
+                        const สถานะใหม่ = userที่เลือก.status === 'suspended' ? 'active' : 'suspended'
+                        สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
+                        setUserที่เลือก(function (p) { return { ...p, status: สถานะใหม่ } })
+                      }}
+                      className={`w-full py-3 rounded-xl text-sm font-bold ${
+                        userที่เลือก.status === 'suspended'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-red-500 text-white'
+                      }`}
+                    >
+                      {userที่เลือก.status === 'suspended' ? '✅ ยกเลิกการระงับบัญชี' : '🚫 ระงับบัญชีนี้'}
+                    </button>
+                  )}
                 </div>
               )}
 
