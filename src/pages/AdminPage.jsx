@@ -47,12 +47,6 @@ function AdminPage({ หน้า, user }) {
   const [userDetail,     setUserDetail]     = useState(null)
   const [โหลดDetail,    setโหลดDetail]    = useState(false)
 
-  // ---- State: Inline Edit (Admin แก้ข้อมูล user) ----
-  const [editField,   setEditField]   = useState(null)   // ชื่อ field ที่กำลัง edit
-  const [editValue,   setEditValue]   = useState('')
-  const [savingField, setSavingField] = useState(false)
-  const [errorEdit,   setErrorEdit]   = useState('')
-
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
   const [โหลดExport, setโหลดExport] = useState(true)
@@ -164,40 +158,6 @@ function AdminPage({ หน้า, user }) {
       รายงานทั้งหมด: ร1.count || 0,
     })
     setโหลดDetail(false)
-  }
-
-  // ---- Admin: บันทึก field ที่แก้ไข ----
-  async function adminSaveField(field, value) {
-    if (field === 'phone' && value && !/^0[0-9]{9}$/.test(value)) {
-      setErrorEdit('เบอร์ต้อง 10 หลัก ขึ้นต้นด้วย 0')
-      return
-    }
-    if (field === 'name' && !value.trim()) {
-      setErrorEdit('ชื่อห้ามว่าง')
-      return
-    }
-    setErrorEdit('')
-    setSavingField(true)
-    const { error } = await supabase.from('users').update({ [field]: value || null }).eq('id', userที่เลือก.id)
-    setSavingField(false)
-    if (error) { setErrorEdit('บันทึกไม่สำเร็จ: ' + error.message); return }
-    const updated = { ...userที่เลือก, [field]: value || null }
-    setUserที่เลือก(updated)
-    setรายการผู้ใช้(function (prev) {
-      return prev.map(function (u) { return u.id === userที่เลือก.id ? updated : u })
-    })
-    setEditField(null)
-  }
-
-  // ---- Admin: ล้างค่า field (set null) ----
-  async function adminClearField(field) {
-    const { error } = await supabase.from('users').update({ [field]: null }).eq('id', userที่เลือก.id)
-    if (error) { alert('ล้างข้อมูลไม่สำเร็จ: ' + error.message); return }
-    const updated = { ...userที่เลือก, [field]: null }
-    setUserที่เลือก(updated)
-    setรายการผู้ใช้(function (prev) {
-      return prev.map(function (u) { return u.id === userที่เลือก.id ? updated : u })
-    })
   }
 
   // ---- ดึงรายงานที่มีพิกัด GPS สำหรับปักหมุดบนแผนที่ ----
@@ -610,97 +570,33 @@ function AdminPage({ หน้า, user }) {
                 </div>
               </div>
 
-              {/* ข้อมูลส่วนตัว */}
+              {/* ข้อมูลส่วนตัว — อ่านอย่างเดียว แอดมินแก้ไขไม่ได้ (แก้ได้แค่ Role) */}
               <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ข้อมูลส่วนตัว</p>
-
-                {/* helper render editable row */}
-                {(function () {
-                  const canEdit = userที่เลือก.id !== user?.id
-
-                  function EditableRow({ label, field, value, inputType, maxLen }) {
-                    const isEditing = editField === field
-                    return (
-                      <div>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="text-sm text-gray-500 shrink-0">{label}</span>
-                          {isEditing ? (
-                            <div className="flex items-center gap-1.5 flex-1 justify-end">
-                              <input
-                                type={inputType || 'text'}
-                                inputMode={inputType === 'tel' ? 'numeric' : undefined}
-                                value={editValue}
-                                onChange={function (e) {
-                                  const v = inputType === 'tel'
-                                    ? e.target.value.replace(/\D/g, '').slice(0, 10)
-                                    : e.target.value
-                                  setEditValue(v)
-                                  setErrorEdit('')
-                                }}
-                                maxLength={maxLen}
-                                autoFocus
-                                className="border border-purple-300 rounded-lg px-2 py-1 text-sm w-32 text-right focus:outline-none"
-                              />
-                              <button
-                                onClick={() => adminSaveField(field, editValue)}
-                                disabled={savingField}
-                                className="text-xs bg-purple-500 text-white px-2 py-1 rounded-lg disabled:opacity-50 shrink-0"
-                              >{savingField ? '...' : 'บันทึก'}</button>
-                              <button onClick={() => { setEditField(null); setErrorEdit('') }}
-                                className="text-xs text-gray-400 shrink-0">ยกเลิก</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-sm font-medium text-right break-all ${!value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
-                                {value || '-'}
-                              </span>
-                              {canEdit && (
-                                <>
-                                  <button
-                                    onClick={() => { setEditField(field); setEditValue(value || ''); setErrorEdit('') }}
-                                    className="text-purple-400 hover:bg-purple-50 rounded p-0.5 text-xs shrink-0"
-                                    title="แก้ไข"
-                                  >✏️</button>
-                                  {value && (
-                                    <button
-                                      onClick={() => adminClearField(field)}
-                                      className="text-red-400 hover:bg-red-50 rounded p-0.5 text-xs shrink-0"
-                                      title="ลบข้อมูล"
-                                    >🗑️</button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {isEditing && errorEdit && (
-                          <p className="text-red-500 text-xs text-right mt-1">{errorEdit}</p>
-                        )}
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <>
-                      <EditableRow label="ชื่อ"       field="name"  value={userที่เลือก.name}  />
-                      {/* อีเมล — ไม่แก้ไขได้ */}
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">อีเมล</span>
-                        <span className="text-sm font-medium text-gray-800 text-right max-w-[60%] break-all">{userที่เลือก.email || '-'}</span>
-                      </div>
-                      <EditableRow label="เบอร์ติดต่อ" field="phone" value={userที่เลือก.phone} inputType="tel" maxLen={10} />
-                      {/* วันที่สมัคร + User ID — ไม่แก้ไขได้ */}
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">วันที่สมัคร</span>
-                        <span className="text-sm font-medium text-gray-800">{แปลงวันที่(userที่เลือก.created_at)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">User ID</span>
-                        <span className="text-sm font-medium text-gray-800">{String(userที่เลือก.id).slice(0, 8)}...</span>
-                      </div>
-                    </>
-                  )
-                })()}
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">ชื่อ</span>
+                  <span className={`text-sm font-medium text-right break-all ${!userที่เลือก.name ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                    {userที่เลือก.name || '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">อีเมล</span>
+                  <span className="text-sm font-medium text-gray-800 text-right max-w-[60%] break-all">{userที่เลือก.email || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">เบอร์ติดต่อ</span>
+                  <span className={`text-sm font-medium text-right ${!userที่เลือก.phone ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                    {userที่เลือก.phone || '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">วันที่สมัคร</span>
+                  <span className="text-sm font-medium text-gray-800">{แปลงวันที่(userที่เลือก.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">User ID</span>
+                  <span className="text-sm font-medium text-gray-800">{String(userที่เลือก.id).slice(0, 8)}...</span>
+                </div>
               </div>
 
               {/* สถิติ */}
@@ -718,50 +614,21 @@ function AdminPage({ หน้า, user }) {
                 </div>
               )}
 
-              {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) */}
+              {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) — อ่านอย่างเดียว */}
               {userที่เลือก.role === 'volunteer' && (
                 <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
                   <p className="text-xs font-bold text-orange-600 uppercase tracking-wide">🏠 ข้อมูลศูนย์พักพิง</p>
                   {[
-                    { label: 'ชื่อศูนย์',       field: 'shelter_name',     value: userที่เลือก.shelter_name },
-                    { label: 'ที่ตั้ง',           field: 'shelter_location', value: userที่เลือก.shelter_location },
-                    { label: 'พื้นที่รับผิดชอบ', field: 'service_area',     value: userที่เลือก.service_area },
+                    { label: 'ชื่อศูนย์',       value: userที่เลือก.shelter_name },
+                    { label: 'ที่ตั้ง',           value: userที่เลือก.shelter_location },
+                    { label: 'พื้นที่รับผิดชอบ', value: userที่เลือก.service_area },
                   ].map(function (row) {
-                    const isEditing = editField === row.field
                     return (
-                      <div key={row.field}>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="text-sm text-gray-500 shrink-0">{row.label}</span>
-                          {isEditing ? (
-                            <div className="flex items-center gap-1.5 flex-1 justify-end">
-                              <input
-                                value={editValue}
-                                onChange={function (e) { setEditValue(e.target.value); setErrorEdit('') }}
-                                autoFocus
-                                className="border border-orange-300 rounded-lg px-2 py-1 text-sm w-36 text-right focus:outline-none"
-                              />
-                              <button onClick={() => adminSaveField(row.field, editValue)} disabled={savingField}
-                                className="text-xs bg-orange-500 text-white px-2 py-1 rounded-lg disabled:opacity-50 shrink-0">
-                                {savingField ? '...' : 'บันทึก'}
-                              </button>
-                              <button onClick={() => { setEditField(null); setErrorEdit('') }} className="text-xs text-gray-400 shrink-0">ยกเลิก</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-sm font-medium text-right max-w-[55%] ${!row.value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
-                                {row.value || '-'}
-                              </span>
-                              <button
-                                onClick={() => { setEditField(row.field); setEditValue(row.value || ''); setErrorEdit('') }}
-                                className="text-orange-400 hover:bg-orange-100 rounded p-0.5 text-xs shrink-0" title="แก้ไข">✏️</button>
-                              {row.value && (
-                                <button onClick={() => adminClearField(row.field)}
-                                  className="text-red-400 hover:bg-red-50 rounded p-0.5 text-xs shrink-0" title="ลบ">🗑️</button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {isEditing && errorEdit && <p className="text-red-500 text-xs text-right mt-1">{errorEdit}</p>}
+                      <div key={row.label} className="flex justify-between items-center gap-2">
+                        <span className="text-sm text-gray-500 shrink-0">{row.label}</span>
+                        <span className={`text-sm font-medium text-right max-w-[55%] ${!row.value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                          {row.value || '-'}
+                        </span>
                       </div>
                     )
                   })}
