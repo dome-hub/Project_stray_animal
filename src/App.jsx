@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 
 import Login            from './pages/Login'
+import SuspendedPage    from './pages/SuspendedPage'
 import Home             from './pages/Home'
 import ReportAnimal     from './pages/ReportAnimal'
 import FindPet          from './pages/FindPet'
@@ -22,6 +23,7 @@ import AdminPage        from './pages/AdminPage'
 function App() {
   const [user, setUser]           = useState(null)
   const [กำลังโหลด, setกำลังโหลด] = useState(true)  // รอเช็ค session ก่อน render
+  const [ถูกระงับ, setถูกระงับ]   = useState(false)  // Global Block — บัญชีถูกระงับ
 
   // Warmup: ยิง HTTP request ไปยัง Supabase ทันทีที่ app โหลด
   // เพื่อ pre-establish DNS+TCP+TLS connection ก่อนที่ user จะกด Login
@@ -55,6 +57,9 @@ function App() {
           session?.user &&
           (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')
         ) {
+          // เข้าสู่ระบบใหม่ (หรือ session ใหม่) — ล้างสถานะ "ถูกระงับ" ค้างจากรอบก่อนทิ้ง
+          setถูกระงับ(false)
+
           // แสดงแอปทันที — ใช้ข้อมูลจาก Auth ก่อน ไม่รอ DB
           const authUser = session.user
           setUser({
@@ -97,6 +102,9 @@ function App() {
 
       if (error || !data) {
         setUser(fallback)
+      } else if (data.status === 'suspended') {
+        // บัญชีถูกระงับ — Global Block: ตัดการเชื่อมต่อทันที ไม่ปล่อยให้เข้าแอป
+        await บังคับออกเพราะถูกระงับ()
       } else {
         setUser({
           id:    authUser.id,
@@ -110,10 +118,39 @@ function App() {
     }
   }
 
+  // ตัดการเชื่อมต่อทันทีเมื่อพบว่าบัญชีถูกระงับ (ตอน login หรือ realtime ระหว่างใช้งานอยู่)
+  async function บังคับออกเพราะถูกระงับ() {
+    setถูกระงับ(true)
+    setUser(null)
+    await supabase.auth.signOut()
+  }
+
+  // ฟัง realtime: ถ้าแอดมินกดระงับบัญชีระหว่างที่ผู้ใช้กำลังใช้งานอยู่ ให้เตะออกทันที ไม่ต้องรอ refresh
+  useEffect(function () {
+    if (!user?.id) return
+    const channel = supabase
+      .channel('user-status-' + user.id)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
+        function (payload) {
+          if (payload.new?.status === 'suspended') บังคับออกเพราะถูกระงับ()
+        }
+      )
+      .subscribe()
+
+    return function () { supabase.removeChannel(channel) }
+  }, [user?.id])
+
   // Logout จริงผ่าน Supabase Auth
   async function handleLogout() {
     await supabase.auth.signOut()
     setUser(null)
+  }
+
+  // Global Block — บัญชีถูกระงับ: แสดงหน้านี้แทนแอปทั้งหมด เข้าหน้าไหนไม่ได้เลย
+  if (ถูกระงับ) {
+    return <SuspendedPage onBackToLogin={() => setถูกระงับ(false)} />
   }
 
   // Loading spinner ระหว่างรอเช็ค session ครั้งแรก
