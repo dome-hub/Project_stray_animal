@@ -55,9 +55,32 @@ const หัวข้อตามRole = {
   admin:     'แจ้งเตือนผู้ดูแลระบบ',
 }
 
+// โทนสีตาม role — สอดคล้องกับทั้งแอป: user=ส้ม, volunteer=teal, admin=ม่วง
+const ธีมตามRole = {
+  user: {
+    bg: 'bg-yellow-50', spinner: 'border-yellow-400',
+    unreadCount: 'text-orange-500', badge: 'bg-blue-100 text-blue-700',
+    unreadCard: 'bg-yellow-50 border-yellow-200', unreadTitle: 'text-orange-600', unreadDot: 'bg-orange-400',
+    link: 'text-blue-500',
+  },
+  volunteer: {
+    bg: 'bg-teal-50', spinner: 'border-teal-400',
+    unreadCount: 'text-teal-600', badge: 'bg-teal-100 text-teal-700',
+    unreadCard: 'bg-teal-50 border-teal-200', unreadTitle: 'text-teal-700', unreadDot: 'bg-teal-500',
+    link: 'text-teal-600',
+  },
+  admin: {
+    bg: 'bg-purple-50', spinner: 'border-purple-400',
+    unreadCount: 'text-purple-600', badge: 'bg-purple-100 text-purple-700',
+    unreadCard: 'bg-purple-50 border-purple-200', unreadTitle: 'text-purple-700', unreadDot: 'bg-purple-500',
+    link: 'text-purple-600',
+  },
+}
+
 function NotificationPage({ user }) {
   const navigate = useNavigate()
   const role = user?.role || 'user'
+  const ธีม = ธีมตามRole[role] || ธีมตามRole.user
 
   const [รายการ, setรายการ]   = useState([])
   const [โหลด, setโหลด]       = useState(true)
@@ -287,7 +310,7 @@ function NotificationPage({ user }) {
   }
 
   return (
-    <div className="min-h-screen bg-yellow-50 pb-8" onClick={() => setเมนูเปิด(null)}>
+    <div className={`min-h-screen ${ธีม.bg} pb-8`} onClick={() => setเมนูเปิด(null)}>
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
@@ -296,12 +319,12 @@ function NotificationPage({ user }) {
           <div>
             <h1 className="font-bold text-gray-800">{หัวข้อตามRole[role]}</h1>
             {ยังไม่อ่าน > 0 && (
-              <p className="text-xs text-orange-500">{ยังไม่อ่าน} รายการยังไม่ได้อ่าน</p>
+              <p className={`text-xs ${ธีม.unreadCount}`}>{ยังไม่อ่าน} รายการยังไม่ได้อ่าน</p>
             )}
           </div>
         </div>
         {ยังไม่อ่าน > 0 && (
-          <button onClick={อ่านทั้งหมด} className="text-xs text-blue-500 font-medium">
+          <button onClick={อ่านทั้งหมด} className={`text-xs font-medium ${ธีม.link}`}>
             อ่านทั้งหมด
           </button>
         )}
@@ -309,11 +332,7 @@ function NotificationPage({ user }) {
 
       {/* Badge role */}
       <div className="px-4 pt-3">
-        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-          role === 'admin'     ? 'bg-purple-100 text-purple-700' :
-          role === 'volunteer' ? 'bg-orange-100 text-orange-700' :
-          'bg-blue-100 text-blue-700'
-        }`}>
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${ธีม.badge}`}>
           {role === 'admin'     ? '🛡️ แสดงสำหรับ Admin' :
            role === 'volunteer' ? '🦺 แสดงสำหรับเจ้าหน้าที่' :
            '👤 แสดงสำหรับผู้ใช้ทั่วไป'}
@@ -323,7 +342,7 @@ function NotificationPage({ user }) {
       {/* Loading */}
       {โหลด && (
         <div className="text-center py-16">
-          <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <div className={`w-8 h-8 border-4 ${ธีม.spinner} border-t-transparent rounded-full animate-spin mx-auto mb-2`} />
           <p className="text-sm text-gray-400">กำลังโหลด...</p>
         </div>
       )}
@@ -353,7 +372,7 @@ function NotificationPage({ user }) {
               <div
                 key={n.id}
                 className={`relative rounded-2xl shadow-sm ${
-                  read ? 'bg-white' : 'bg-yellow-50 border-2 border-yellow-200'
+                  read ? 'bg-white' : `${ธีม.unreadCard} border-2`
                 }`}
               >
                 {/* พื้นที่กดทั้งการ์ด — อ่านแล้ว + พาไปหน้าเป้าหมายทันที */}
@@ -370,7 +389,7 @@ function NotificationPage({ user }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       {n.หัวข้อ && (
-                        <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
+                        <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : ธีม.unreadTitle}`}>
                           {n.หัวข้อ}
                         </p>
                       )}
@@ -380,7 +399,7 @@ function NotificationPage({ user }) {
                       <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
                     </div>
                     {!read && (
-                      <div className="w-2.5 h-2.5 bg-orange-400 rounded-full mt-1 shrink-0" />
+                      <div className={`w-2.5 h-2.5 ${ธีม.unreadDot} rounded-full mt-1 shrink-0`} />
                     )}
                   </div>
                 </button>
