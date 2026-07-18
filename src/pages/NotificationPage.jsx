@@ -86,6 +86,9 @@ function NotificationPage({ user }) {
         .limit(30)
         .then(function ({ data }) {
           setรายการ((data || []).map(function (n) {
+            // หา ref id ของรายงานจากข้อความ (เช่น "#000025") เพื่อ deep-link ไปหน้ารายละเอียด
+            const m = String((n.title || '') + ' ' + (n.body || '')).match(/#(\d+)/)
+            const refId = m ? parseInt(m[1], 10) : null
             return {
               id:       n.id,
               emoji:    n.type === 'report_update' ? '🦺' : '🔔',
@@ -94,6 +97,7 @@ function NotificationPage({ user }) {
               เวลา:     แปลงเวลา(n.created_at),
               อ่านแล้ว: n.is_read,
               dbId:     n.id,
+              path:     refId ? `/track?open=${refId}` : '/track',
             }
           }))
           setโหลด(false)
@@ -129,6 +133,7 @@ function NotificationPage({ user }) {
                 ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
                 เวลา:     แปลงเวลา(r.created_at),
                 isNew,
+                path:     '/volunteer/reports',
               }
             })
           // รอดำเนินการขึ้นก่อนเสมอ
@@ -172,6 +177,7 @@ function NotificationPage({ user }) {
               ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
               เวลา:    แปลงเวลา(r.created_at),
               isNew:   r.status === 'รอดำเนินการ',
+              path:    '/admin/dashboard',
             }
           })
         const userItems = (ร2.data || [])
@@ -184,6 +190,7 @@ function NotificationPage({ user }) {
               ข้อความ: u.name || 'ผู้ใช้ใหม่',
               เวลา:    แปลงเวลา(u.created_at),
               isNew:   false,
+              path:    '/admin/users',
             }
           })
         // รวมแล้วเรียงตามเวลาล่าสุด
@@ -222,6 +229,12 @@ function NotificationPage({ user }) {
         return next
       })
     }
+  }
+
+  // กดที่ตัวการ์ด — "2 Actions in 1 Click": mark read แบบ optimistic/background แล้วพาไปหน้าเป้าหมายทันที
+  function กดการ์ด(item) {
+    if (!isอ่านแล้ว(item)) กดอ่าน(item)   // ไม่ await — ให้ทำงานเบื้องหลัง ไม่หน่วงการเปลี่ยนหน้า
+    if (item.path) navigate(item.path)
   }
 
   async function อ่านทั้งหมด() {
@@ -329,9 +342,9 @@ function NotificationPage({ user }) {
                   read ? 'bg-white' : 'bg-yellow-50 border-2 border-yellow-200'
                 }`}
               >
-                {/* พื้นที่กดอ่าน */}
+                {/* พื้นที่กดทั้งการ์ด — อ่านแล้ว + พาไปหน้าเป้าหมายทันที */}
                 <button
-                  onClick={() => กดอ่าน(n)}
+                  onClick={() => กดการ์ด(n)}
                   className="w-full text-left p-4 pr-10"
                 >
                   <div className="flex items-start gap-3">
@@ -367,9 +380,17 @@ function NotificationPage({ user }) {
                 {/* Dropdown เมื่อกด ⋮ */}
                 {isOpen && (
                   <div
-                    className="absolute top-10 right-3 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden"
+                    className="absolute top-10 right-3 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden min-w-[13rem]"
                     onClick={function (e) { e.stopPropagation() }}
                   >
+                    {!read && (
+                      <button
+                        onClick={() => { กดอ่าน(n); setเมนูเปิด(null) }}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-600 font-medium hover:bg-gray-50 w-full text-left border-b border-gray-100"
+                      >
+                        ✓ ทำเครื่องหมายว่าอ่านแล้ว
+                      </button>
+                    )}
                     <button
                       onClick={() => ลบแจ้งเตือน(n)}
                       className="flex items-center gap-2 px-4 py-3 text-sm text-red-500 font-medium hover:bg-red-50 w-full text-left"

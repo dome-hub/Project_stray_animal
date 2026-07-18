@@ -2,7 +2,7 @@
 // ผู้ใช้ทั่วไปดูสถานะรายงานของตัวเอง + กดดูข้อมูลเจ้าหน้าที่/ศูนย์พักพิง
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 
 const ข้อมูลสถานะ = {
@@ -89,6 +89,7 @@ function แปลงวันที่(dateString) {
 
 function TrackReport({ user }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [รายการรายงาน, setรายการรายงาน] = useState([])
   const [กำลังโหลด,    setกำลังโหลด]    = useState(true)
@@ -126,6 +127,14 @@ function TrackReport({ user }) {
         if (data && data.length > 0) setข้อมูลศูนย์(data[0])
       })
   }, [])
+
+  // Deep-link: มากับ ?open=<id> (จากการกดการ์ดแจ้งเตือน) → เปิดรายละเอียดรายงานนั้นอัตโนมัติ
+  useEffect(function () {
+    const openId = searchParams.get('open')
+    if (!openId || รายการรายงาน.length === 0) return
+    const found = รายการรายงาน.find(function (r) { return String(r.id) === String(openId) })
+    if (found) setรายงานที่เปิด(found)
+  }, [รายการรายงาน, searchParams])
 
   function เปิดรายละเอียด(รายงาน) {
     setรายงานที่เปิด(รายงาน)
