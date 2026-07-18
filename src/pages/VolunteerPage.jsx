@@ -30,9 +30,9 @@ const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
 // ---- ประเภทการแจ้ง (อิงจาก urgency ที่ผู้ใช้เลือกตอนแจ้ง) พร้อมสีเฉพาะ ----
 // แดง = สัตว์ดุร้าย/เสี่ยงอันตราย, ส้ม = สัตว์บาดเจ็บ, เหลือง = พบสัตว์พลัดหลง/จรจัด
 const ประเภทแจ้งเรียง = [
-  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย / เสี่ยงก่ออันตราย', hex: '#ef4444', dot: 'bg-red-500',    activeChip: 'border-red-500 bg-red-500 text-white' },
-  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ',                 hex: '#f97316', dot: 'bg-orange-500', activeChip: 'border-orange-500 bg-orange-500 text-white' },
-  { key: 'ปานกลาง', label: 'พบสัตว์พลัดหลง / สัตว์จรจัด',   hex: '#eab308', dot: 'bg-yellow-500', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
+  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย/อันตราย', hex: '#ef4444', dot: 'bg-red-500',    activeChip: 'border-red-500 bg-red-500 text-white' },
+  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ/ป่วย',   hex: '#f97316', dot: 'bg-orange-500', activeChip: 'border-orange-500 bg-orange-500 text-white' },
+  { key: 'ปานกลาง', label: 'สัตว์พลัดหลง/จรจัด',  hex: '#eab308', dot: 'bg-yellow-500', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
 ]
 function ประเภทจาก(urgency) {
   if (urgency === 'ด่วนมาก') return ประเภทแจ้งเรียง[0]
@@ -715,18 +715,18 @@ function VolunteerPage({ หน้า }) {
                 <p className="text-xs text-teal-600 mt-0.5">{รายงานActive.length} รายการรอดำเนินการ</p>
               </div>
 
-              {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) แสดงเฉพาะประเภทที่มีข้อมูล */}
+              {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) แสดงเฉพาะประเภทที่มีข้อมูล — เลื่อนแนวนอน */}
               {ประเภทที่มีUpdate.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {ประเภทที่มีUpdate.map(function (p) {
                     const active = ประเภทเลือกUpdate.includes(p.key)
                     return (
                       <button key={p.key} onClick={() => สลับประเภท(p.key)}
-                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
                           active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
                         }`}
                       >
-                        {!active && <span className={`w-2 h-2 rounded-full ${p.dot}`} />}
+                        {!active && <span className={`w-2 h-2 rounded-full shrink-0 ${p.dot}`} />}
                         {p.label} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
                       </button>
                     )
@@ -996,10 +996,10 @@ function VolunteerPage({ หน้า }) {
         return (
           <div className="pt-4 space-y-3">
 
-            {/* Filter chips — แยกตามประเภทการแจ้ง */}
-            <div className="px-4 flex flex-wrap gap-2">
+            {/* Filter chips — แยกตามประเภทการแจ้ง — เลื่อนแนวนอน */}
+            <div className="px-4 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <button onClick={() => setFilterMap('all')}
-                className={`px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
                   filterMap === 'all' ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
                 }`}
               >
@@ -1009,11 +1009,11 @@ function VolunteerPage({ หน้า }) {
                 const active = filterMap === p.key
                 return (
                   <button key={p.key} onClick={() => setFilterMap(p.key)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
                       active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
                     }`}
                   >
-                    {!active && <span className={`w-2 h-2 rounded-full ${p.dot}`} />}
+                    {!active && <span className={`w-2 h-2 rounded-full shrink-0 ${p.dot}`} />}
                     {p.label} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
                   </button>
                 )
