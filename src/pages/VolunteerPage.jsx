@@ -212,7 +212,7 @@ function VolunteerPage({ หน้า }) {
   // ---- แผนที่จุดเกิดเหตุ ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
-  const [filterMap, setFilterMap]   = useState('all')  // all | urgent
+  const [filterMap, setFilterMap]   = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [ประเภทเลือกUpdate, setประเภทเลือกUpdate] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
 
@@ -985,40 +985,41 @@ function VolunteerPage({ หน้า }) {
           MAP — แผนที่จุดเกิดเหตุ
           ============================================================ */}
       {หน้า === 'map' && (function () {
-        const จุดกรอง = filterMap === 'all'
+        // [] หรือเลือกครบทุกประเภท = แสดงทั้งหมด; เลือกบางประเภท = แสดงเฉพาะที่เลือก
+        const จุดกรอง = filterMap.length === 0
           ? รายงานพิกัด
-          : รายงานพิกัด.filter((r) => ประเภทจาก(r.urgency).key === filterMap)
+          : รายงานพิกัด.filter((r) => filterMap.includes(ประเภทจาก(r.urgency).key))
         // แสดง chip เฉพาะประเภทที่มีรายงานเข้ามาจริง (count > 0)
         const ประเภทที่มี = ประเภทแจ้งเรียง
           .map((p) => ({ ...p, count: รายงานพิกัด.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
           .filter((p) => p.count > 0)
+        function สลับประเภทMap(key) {
+          setFilterMap(function (prev) {
+            return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+          })
+        }
 
         return (
           <div className="pt-4 space-y-3">
 
-            {/* Filter chips — แยกตามประเภทการแจ้ง — เลื่อนแนวนอน */}
-            <div className="px-4 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <button onClick={() => setFilterMap('all')}
-                className={`px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
-                  filterMap === 'all' ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
-                }`}
-              >
-                ดูทั้งหมด <span className={filterMap === 'all' ? 'text-white/80' : 'text-gray-400'}>({รายงานพิกัด.length})</span>
-              </button>
-              {ประเภทที่มี.map(function (p) {
-                const active = filterMap === p.key
-                return (
-                  <button key={p.key} onClick={() => setFilterMap(p.key)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
-                      active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
-                    }`}
-                  >
-                    {!active && <span className={`w-2 h-2 rounded-full shrink-0 ${p.dot}`} />}
-                    {p.label} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
-                  </button>
-                )
-              })}
-            </div>
+            {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) — เลื่อนแนวนอน */}
+            {ประเภทที่มี.length > 0 && (
+              <div className="px-4 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {ประเภทที่มี.map(function (p) {
+                  const active = filterMap.includes(p.key)
+                  return (
+                    <button key={p.key} onClick={() => สลับประเภทMap(p.key)}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
+                        active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
+                      }`}
+                    >
+                      {!active && <span className={`w-2 h-2 rounded-full shrink-0 ${p.dot}`} />}
+                      {p.label} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
             {โหลดแผนที่ ? (
               <div className="text-center py-10">
