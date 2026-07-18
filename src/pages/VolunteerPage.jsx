@@ -30,9 +30,9 @@ const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
 // ---- ประเภทการแจ้ง (อิงจาก urgency ที่ผู้ใช้เลือกตอนแจ้ง) พร้อมสีเฉพาะ ----
 // แดง = สัตว์ดุร้าย/เสี่ยงอันตราย, ส้ม = สัตว์บาดเจ็บ, เหลือง = พบสัตว์พลัดหลง/จรจัด
 const ประเภทแจ้งเรียง = [
-  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย/อันตราย', hex: '#ef4444', dot: 'bg-red-500',    activeChip: 'border-red-500 bg-red-500 text-white' },
-  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ/ป่วย',   hex: '#f97316', dot: 'bg-orange-500', activeChip: 'border-orange-500 bg-orange-500 text-white' },
-  { key: 'ปานกลาง', label: 'สัตว์พลัดหลง/จรจัด',  hex: '#eab308', dot: 'bg-yellow-500', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
+  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย/อันตราย', short: 'ดุร้าย',   emoji: '🔴', hex: '#ef4444', dot: 'bg-red-500',    badge: 'bg-red-50 text-red-700',       activeChip: 'border-red-500 bg-red-500 text-white' },
+  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ/ป่วย',   short: 'บาดเจ็บ', emoji: '🟠', hex: '#f97316', dot: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700', activeChip: 'border-orange-500 bg-orange-500 text-white' },
+  { key: 'ปานกลาง', label: 'สัตว์พลัดหลง/จรจัด',  short: 'พลัดหลง', emoji: '🟡', hex: '#eab308', dot: 'bg-yellow-500', badge: 'bg-yellow-50 text-yellow-700', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
 ]
 function ประเภทจาก(urgency) {
   if (urgency === 'ด่วนมาก') return ประเภทแจ้งเรียง[0]
@@ -631,7 +631,8 @@ function VolunteerPage({ หน้า }) {
           {/* รายการการ์ด */}
           <div className="px-4 space-y-3">
             {รายงานกรอง.map(function (ร) {
-              const เร่งด่วน = ร.urgency === 'ด่วน' || ร.urgency === 'ด่วนมาก'
+              const ประเภท = ประเภทจาก(ร.urgency)
+              const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
               return (
                 <div key={ร.id}
                   className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${แถบสีสถานะ[ร.status] || 'border-l-gray-300'}`}
@@ -640,13 +641,15 @@ function VolunteerPage({ หน้า }) {
                   <div className="p-4 flex items-center gap-3">
                     <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                     <div className="flex-1 min-w-0">
-                      {เร่งด่วน && (
-                        <p className="text-xs font-bold text-red-600 flex items-center gap-1 mb-0.5">
-                          ⚠️ {ร.urgency === 'ด่วนมาก' ? 'เร่งด่วนมาก — เสี่ยงอันตราย' : 'เร่งด่วน — สัตว์บาดเจ็บ'}
-                        </p>
-                      )}
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
+                        {ประเภท.emoji} {ประเภท.short}
+                      </span>
                       <div className="flex items-start justify-between gap-2 mb-0.5">
-                        <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
+                        {รอสายพันธุ์ ? (
+                          <p className="text-gray-400 text-sm">รอระบุสายพันธุ์</p>
+                        ) : (
+                          <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
+                        )}
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200'}`}>
                           {ร.status}
                         </span>
