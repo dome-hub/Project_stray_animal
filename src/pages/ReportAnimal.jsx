@@ -5,9 +5,14 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Footprints, HeartPulse, ShieldAlert, Circle, CircleDot,
-  MapPin, LocateFixed, Loader2, Map,
+  MapPin, LocateFixed, Loader2, Map, X,
 } from 'lucide-react'
+import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
+
+// ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
+const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
 
 const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000'
 
@@ -17,6 +22,108 @@ const เหตุผลตัวเลือก = [
   { label: 'สัตว์บาดเจ็บ',                 Icon: HeartPulse,  urgency: 'ด่วน' },
   { label: 'สัตว์ดุร้าย / เสี่ยงก่ออันตราย', Icon: ShieldAlert, urgency: 'ด่วนมาก' },
 ]
+
+// จับพิกัดกึ่งกลางแผนที่ใหม่ทุกครั้งที่ผู้ใช้เลื่อนแผนที่เสร็จ (นิยามนอก component หลักกันแผนที่ remount ทุก render)
+function จับการเลื่อนแผนที่({ onMoveEnd }) {
+  useMapEvents({
+    moveend: function (e) {
+      const c = e.target.getCenter()
+      onMoveEnd({ lat: c.lat, lng: c.lng })
+    },
+  })
+  return null
+}
+
+// ---- Modal เลือกพิกัด — หมุดลอยตายตัวตรงกลางจอ ผู้ใช้เลื่อนแผนที่เอง (แบบแอปเรียกรถ) ----
+function LocationPickerModal({ ตำแหน่งเริ่มต้น, กำลังยืนยัน, onConfirm, onClose }) {
+  const [center, setCenter] = useState(ตำแหน่งเริ่มต้น)
+  const [กำลังหาGPS, setกำลังหาGPS] = useState(!ตำแหน่งเริ่มต้น)
+
+  // โหลดโมดัลแล้วยังไม่มีพิกัดเริ่มต้น → ขอ GPS ปัจจุบันมาเป็นจุดกึ่งกลางแผนที่ทันที
+  useEffect(function () {
+    if (ตำแหน่งเริ่มต้น) return
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setกำลังหาGPS(false)
+      },
+      function () {
+        setCenter({ lat: ศูนย์กลางแผนที่เริ่มต้น[0], lng: ศูนย์กลางแผนที่เริ่มต้น[1] })
+        setกำลังหาGPS(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }, [])
+
+  function กลับตำแหน่งฉัน() {
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-500">
+          <X size={20} />
+        </button>
+        <p className="font-semibold text-gray-800 text-sm">เลื่อนแผนที่เพื่อระบุตำแหน่ง</p>
+        <div className="w-8" />
+      </div>
+
+      {/* แผนที่ + หมุดลอยตรงกลาง */}
+      <div className="flex-1 relative bg-gray-100">
+        {กำลังหาGPS ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <Loader2 size={24} className="animate-spin text-orange-500" />
+            <p className="text-sm text-gray-400">กำลังค้นหาตำแหน่งปัจจุบัน...</p>
+          </div>
+        ) : (
+          <>
+            <MapContainer center={[center.lat, center.lng]} zoom={17} style={{ height: '100%', width: '100%' }}>
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <จับการเลื่อนแผนที่ onMoveEnd={setCenter} />
+            </MapContainer>
+
+            {/* หมุดตายตัวกึ่งกลางจอ — ไม่ขยับตามแผนที่ ผู้ใช้เลื่อนแผนที่เอาเอง */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ marginTop: -20 }}>
+              <MapPin size={40} className="text-orange-500 drop-shadow-lg" fill="#fed7aa" strokeWidth={2} />
+            </div>
+
+            <button
+              onClick={กลับตำแหน่งฉัน}
+              className="absolute bottom-4 right-4 w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center text-orange-500"
+            >
+              <LocateFixed size={20} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* ยืนยัน */}
+      <div className="px-4 py-4 border-t border-gray-100 shrink-0 bg-white">
+        {center && (
+          <p className="text-center text-xs text-gray-400 mb-2">
+            {center.lat.toFixed(5)}, {center.lng.toFixed(5)}
+          </p>
+        )}
+        <button
+          onClick={() => onConfirm(center.lat, center.lng)}
+          disabled={!center || กำลังยืนยัน}
+          className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {กำลังยืนยัน
+            ? <><Loader2 size={16} className="animate-spin" /> กำลังยืนยัน...</>
+            : 'ยืนยันตำแหน่งนี้'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function ReportAnimal({ user }) {
   const navigate = useNavigate()
@@ -37,6 +144,10 @@ function ReportAnimal({ user }) {
   const [กำลังส่ง,     setกำลังส่ง]     = useState(false)
   const [ส่งสำเร็จ,    setส่งสำเร็จ]    = useState(false)
   const [รหัสรายงาน,  setรหัสรายงาน]  = useState(null)
+
+  // ---- Location picker modal state ----
+  const [แสดงModalแผนที่, setแสดงModalแผนที่] = useState(false)
+  const [กำลังยืนยันจุด, setกำลังยืนยันจุด] = useState(false)
 
   // ---- Camera state ----
   const [แสดงกล้อง,   setแสดงกล้อง]   = useState(false)
@@ -168,7 +279,31 @@ function ReportAnimal({ user }) {
     }, 'image/jpeg', 0.85)
   }
 
-  // ---- GPS + Reverse Geocoding (Nominatim — ฟรี ไม่ต้อง API key) ----
+  // ---- Reverse Geocoding (Nominatim — ฟรี ไม่ต้อง API key) ----
+  async function รีเวิร์สเจอโค้ด(lat, lng) {
+    try {
+      const res  = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { 'Accept-Language': 'th' } }
+      )
+      const data = await res.json()
+      const a    = data.address || {}
+      // ประกอบที่อยู่แบบสั้น: ถนน → แขวง/ตำบล → เขต/อำเภอ → เมือง → จังหวัด
+      const parts = [
+        a.road || a.pedestrian || a.path,
+        a.suburb || a.neighbourhood || a.quarter || a.village,
+        a.city_district || a.district,
+        a.city || a.town || a.county,
+        a.state,
+      ].filter(Boolean)
+      return parts.join(', ') || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    } catch {
+      // Nominatim ใช้ไม่ได้ → แสดงพิกัดดิบ
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    }
+  }
+
+  // ---- GPS ----
   async function ใช้GPSปัจจุบัน() {
     setกำลังหาตำแหน่ง(true)
     navigator.geolocation.getCurrentPosition(
@@ -177,26 +312,7 @@ function ReportAnimal({ user }) {
         const lng = pos.coords.longitude
         setLatitude(lat)
         setLongitude(lng)
-        try {
-          const res  = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-            { headers: { 'Accept-Language': 'th' } }
-          )
-          const data = await res.json()
-          const a    = data.address || {}
-          // ประกอบที่อยู่แบบสั้น: ถนน → แขวง/ตำบล → เขต/อำเภอ → เมือง → จังหวัด
-          const parts = [
-            a.road || a.pedestrian || a.path,
-            a.suburb || a.neighbourhood || a.quarter || a.village,
-            a.city_district || a.district,
-            a.city || a.town || a.county,
-            a.state,
-          ].filter(Boolean)
-          setตำแหน่ง(parts.join(', ') || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-        } catch {
-          // Nominatim ใช้ไม่ได้ → แสดงพิกัดดิบ
-          setตำแหน่ง(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-        }
+        setตำแหน่ง(await รีเวิร์สเจอโค้ด(lat, lng))
         setกำลังหาตำแหน่ง(false)
       },
       function () {
@@ -205,6 +321,16 @@ function ReportAnimal({ user }) {
       },
       { enableHighAccuracy: true, timeout: 15000 }
     )
+  }
+
+  // ---- ยืนยันพิกัดที่เลือกจาก Modal แผนที่ ----
+  async function ยืนยันจากแผนที่(lat, lng) {
+    setกำลังยืนยันจุด(true)
+    setLatitude(lat)
+    setLongitude(lng)
+    setตำแหน่ง(await รีเวิร์สเจอโค้ด(lat, lng))
+    setกำลังยืนยันจุด(false)
+    setแสดงModalแผนที่(false)
   }
 
   // ---- ส่งรายงานจริง (ถูกเรียกหลังผ่านเช็คเบอร์แล้ว) ----
@@ -315,6 +441,16 @@ function ReportAnimal({ user }) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
+
+      {/* Modal: เลือกพิกัดจากแผนที่ */}
+      {แสดงModalแผนที่ && (
+        <LocationPickerModal
+          ตำแหน่งเริ่มต้น={latitude && longitude ? { lat: latitude, lng: longitude } : null}
+          กำลังยืนยัน={กำลังยืนยันจุด}
+          onConfirm={ยืนยันจากแผนที่}
+          onClose={() => setแสดงModalแผนที่(false)}
+        />
+      )}
 
       {/* Camera Modal */}
       {แสดงกล้อง && (
@@ -576,6 +712,14 @@ function ReportAnimal({ user }) {
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-1.5">แตะไอคอนเป้าเล็งเพื่อดึงตำแหน่งปัจจุบัน</p>
+
+          {/* เปิดแผนที่แบบเลื่อนหมุดเอง (แบบแอปเรียกรถ) */}
+          <button
+            onClick={() => setแสดงModalแผนที่(true)}
+            className="mt-2 w-full flex items-center justify-center gap-2 border-2 border-dashed border-orange-300 rounded-xl py-2.5 text-sm font-medium text-orange-600 bg-orange-50/50"
+          >
+            <Map size={16} /> เปิดแผนที่เพื่อระบุจุดเกิดเหตุ
+          </button>
 
           {/* แสดง link Google Maps เมื่อมีพิกัด */}
           {latitude && longitude && (
