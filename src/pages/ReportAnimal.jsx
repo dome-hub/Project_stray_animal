@@ -380,7 +380,7 @@ function ReportAnimal({ user }) {
 
   // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นส่งเลย ----
   async function ส่งรายงาน() {
-    if (!ตำแหน่ง || !เหตุผลแจ้ง) return
+    if (!ตำแหน่ง || !latitude || !longitude || !เหตุผลแจ้ง) return
     // ถ้ารู้แล้วว่าต้องกรอกเบอร์ → เปิด modal โดยไม่ query DB ซ้ำ
     if (ต้องกรอกเบอร์) { setแสดงModalโทรศัพท์(true); return }
     const { data: userData } = await supabase
@@ -723,7 +723,7 @@ function ReportAnimal({ user }) {
           </button>
 
           {/* แสดง link Google Maps เมื่อมีพิกัด */}
-          {latitude && longitude && (
+          {latitude && longitude ? (
             <a
               href={`https://www.google.com/maps?q=${latitude},${longitude}`}
               target="_blank" rel="noreferrer"
@@ -733,6 +733,10 @@ function ReportAnimal({ user }) {
               <span className="flex-1">ดูตำแหน่งใน Google Maps</span>
               <span className="text-xs text-green-500">→</span>
             </a>
+          ) : (
+            <p className="mt-2 text-xs text-red-500">
+              ⚠️ กรุณากดเป้าเล็ง GPS หรือเปิดแผนที่เพื่อระบุตำแหน่งจริงก่อนส่งรายงาน — พิมพ์ข้อความอย่างเดียวยังส่งไม่ได้
+            </p>
           )}
         </div>
 
@@ -748,7 +752,7 @@ function ReportAnimal({ user }) {
         </div>
 
         {/* ส่ง */}
-        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !เหตุผลแจ้ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
+        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !latitude || !longitude || !เหตุผลแจ้ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
           className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {กำลังส่ง ? '⏳ กำลังอัปโหลดและบันทึก...' : 'ส่งรายงานให้เจ้าหน้าที่'}
         </button>
