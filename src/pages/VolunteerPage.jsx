@@ -620,7 +620,7 @@ function VolunteerPage({ หน้า }) {
 
           {/* Filter Tabs — สีตรงกับป้ายสถานะบนการ์ด */}
           <div className="px-4 mb-4">
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-1 overflow-x-auto">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {[
                 { key: 'all',        label: 'ทั้งหมด',        dot: null,      count: รายงานทั้งหมด.length },
                 { key: 'pending',    label: 'ใหม่',           dot: 'bg-red-500',    count: รายงานทั้งหมด.filter(function (r) { return r.status === 'รอดำเนินการ' }).length },
