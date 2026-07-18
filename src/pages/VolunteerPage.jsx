@@ -213,7 +213,7 @@ function VolunteerPage({ หน้า }) {
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
   const [filterMap, setFilterMap]   = useState('all')  // all | urgent
-  const [filterUpdate, setFilterUpdate] = useState('all')  // all | ด่วนมาก | ด่วน | ปานกลาง — กรองหน้าอัปเดตสถานะตามประเภทการแจ้ง
+  const [ประเภทเลือกUpdate, setประเภทเลือกUpdate] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
 
   // ================================================================
@@ -698,9 +698,15 @@ function VolunteerPage({ หน้า }) {
             const ประเภทที่มีUpdate = ประเภทแจ้งเรียง
               .map((p) => ({ ...p, count: รายงานActive.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
               .filter((p) => p.count > 0)
-            const รายงานActiveกรอง = filterUpdate === 'all'
+            // [] หรือเลือกครบทุกประเภท = แสดงทั้งหมด; เลือกบางประเภท = แสดงเฉพาะที่เลือก
+            const รายงานActiveกรอง = ประเภทเลือกUpdate.length === 0
               ? รายงานActive
-              : รายงานActive.filter((r) => ประเภทจาก(r.urgency).key === filterUpdate)
+              : รายงานActive.filter((r) => ประเภทเลือกUpdate.includes(ประเภทจาก(r.urgency).key))
+            function สลับประเภท(key) {
+              setประเภทเลือกUpdate(function (prev) {
+                return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+              })
+            }
 
             return (
             <>
@@ -709,20 +715,13 @@ function VolunteerPage({ หน้า }) {
                 <p className="text-xs text-teal-600 mt-0.5">{รายงานActive.length} รายการรอดำเนินการ</p>
               </div>
 
-              {/* Filter chips — แยกตามประเภทการแจ้ง แสดงเฉพาะประเภทที่มีข้อมูล */}
+              {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) แสดงเฉพาะประเภทที่มีข้อมูล */}
               {ประเภทที่มีUpdate.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => setFilterUpdate('all')}
-                    className={`px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
-                      filterUpdate === 'all' ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
-                    }`}
-                  >
-                    ดูทั้งหมด <span className={filterUpdate === 'all' ? 'text-white/80' : 'text-gray-400'}>({รายงานActive.length})</span>
-                  </button>
                   {ประเภทที่มีUpdate.map(function (p) {
-                    const active = filterUpdate === p.key
+                    const active = ประเภทเลือกUpdate.includes(p.key)
                     return (
-                      <button key={p.key} onClick={() => setFilterUpdate(p.key)}
+                      <button key={p.key} onClick={() => สลับประเภท(p.key)}
                         className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
                           active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
                         }`}
