@@ -213,6 +213,7 @@ function VolunteerPage({ หน้า }) {
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
   const [filterMap, setFilterMap]   = useState('all')  // all | urgent
+  const [filterUpdate, setFilterUpdate] = useState('all')  // all | ด่วนมาก | ด่วน | ปานกลาง — กรองหน้าอัปเดตสถานะตามประเภทการแจ้ง
   const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
 
   // ================================================================
@@ -693,30 +694,72 @@ function VolunteerPage({ หน้า }) {
             </div>
           )}
 
-          {!โหลดรายงาน && (
+          {!โหลดรายงาน && (function () {
+            const ประเภทที่มีUpdate = ประเภทแจ้งเรียง
+              .map((p) => ({ ...p, count: รายงานActive.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
+              .filter((p) => p.count > 0)
+            const รายงานActiveกรอง = filterUpdate === 'all'
+              ? รายงานActive
+              : รายงานActive.filter((r) => ประเภทจาก(r.urgency).key === filterUpdate)
+
+            return (
             <>
               <div className="bg-teal-50 border border-teal-200 rounded-2xl p-3">
                 <p className="text-xs text-teal-700 font-medium">⚙️ เลือกรายงานเพื่ออัปเดตสถานะ</p>
                 <p className="text-xs text-teal-600 mt-0.5">{รายงานActive.length} รายการรอดำเนินการ</p>
               </div>
 
-              {รายงานActive.length === 0 && (
-                <div className="text-center py-16">
-                  <p className="text-5xl mb-3">🎉</p>
-                  <p className="font-medium text-gray-600">ไม่มีรายงานค้างอยู่</p>
-                  <p className="text-xs text-gray-400 mt-1">ทุกรายงานได้รับการดูแลเรียบร้อย</p>
+              {/* Filter chips — แยกตามประเภทการแจ้ง แสดงเฉพาะประเภทที่มีข้อมูล */}
+              {ประเภทที่มีUpdate.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setFilterUpdate('all')}
+                    className={`px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                      filterUpdate === 'all' ? 'border-teal-500 bg-teal-500 text-white' : 'border-gray-200 bg-white text-gray-600'
+                    }`}
+                  >
+                    ดูทั้งหมด <span className={filterUpdate === 'all' ? 'text-white/80' : 'text-gray-400'}>({รายงานActive.length})</span>
+                  </button>
+                  {ประเภทที่มีUpdate.map(function (p) {
+                    const active = filterUpdate === p.key
+                    return (
+                      <button key={p.key} onClick={() => setFilterUpdate(p.key)}
+                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                          active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
+                        }`}
+                      >
+                        {!active && <span className={`w-2 h-2 rounded-full ${p.dot}`} />}
+                        {p.label} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
 
-              {รายงานActive.map(function (ร) {
+              {รายงานActiveกรอง.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-5xl mb-3">{รายงานActive.length === 0 ? '🎉' : '🔍'}</p>
+                  <p className="font-medium text-gray-600">
+                    {รายงานActive.length === 0 ? 'ไม่มีรายงานค้างอยู่' : 'ไม่มีรายงานในตัวกรองนี้'}
+                  </p>
+                  {รายงานActive.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1">ทุกรายงานได้รับการดูแลเรียบร้อย</p>
+                  )}
+                </div>
+              )}
+
+              {รายงานActiveกรอง.map(function (ร) {
                 return (
                   <div key={ร.id}
-                    className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer border-l-4 ${แถบสีสถานะ[ร.status] || 'border-l-gray-300'}`}
+                    style={{ borderLeftColor: ประเภทจาก(ร.urgency).hex }}
+                    className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer border-l-4"
                     onClick={() => เปิดรายละเอียด(ร)}
                   >
                     <div className="p-4 flex items-center gap-3">
                       <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                       <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold mb-0.5" style={{ color: ประเภทจาก(ร.urgency).hex }}>
+                          ● {ประเภทจาก(ร.urgency).label}
+                        </p>
                         <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุ'}</p>
 
                         {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
@@ -746,7 +789,8 @@ function VolunteerPage({ หน้า }) {
                 )
               })}
             </>
-          )}
+            )
+          })()}
         </div>
       )}
 
