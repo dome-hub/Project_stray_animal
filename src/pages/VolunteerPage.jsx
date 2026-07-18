@@ -87,15 +87,6 @@ const สีสถานะ = {
   'มีผู้รับเลี้ยง':   'text-green-700 bg-green-50 border-green-200',
 }
 
-// แถบสีขอบซ้ายของการ์ด — ใช้โทนเดียวกับ สีสถานะ ด้านบน
-const แถบสีสถานะ = {
-  'รอดำเนินการ':    'border-l-red-400',
-  'รับเรื่องแล้ว':   'border-l-yellow-400',
-  'ลงพื้นที่แล้ว':   'border-l-yellow-400',
-  'อยู่ศูนย์พักพิง': 'border-l-blue-400',
-  'มีผู้รับเลี้ยง':   'border-l-green-400',
-}
-
 const สีสถานะสัตว์ = {
   'อยู่ศูนย์พักพิง':  'text-blue-600 bg-blue-50',
   'รอการรับเลี้ยง':   'text-green-600 bg-green-50',
@@ -113,6 +104,34 @@ function แปลงวันที่เวลา(str) {
     d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) +
     ' น.'
   )
+}
+
+// ---- Helper: ป้ายกลุ่มวันที่ — วันนี้ / เมื่อวาน / วันที่จริง ----
+function เท่ากันวัน(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+function ป้ายวันที่กลุ่ม(str) {
+  const d        = new Date(str)
+  const วันนี้   = new Date()
+  const เมื่อวาน = new Date(วันนี้)
+  เมื่อวาน.setDate(วันนี้.getDate() - 1)
+  const วันที่ตัวเลข = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+  if (เท่ากันวัน(d, วันนี้))   return `วันนี้ (${วันที่ตัวเลข})`
+  if (เท่ากันวัน(d, เมื่อวาน)) return `เมื่อวาน (${วันที่ตัวเลข})`
+  return วันที่ตัวเลข
+}
+// จัดกลุ่มรายการที่เรียงจากใหม่ไปเก่าอยู่แล้ว (created_at desc) ให้เป็น section ตามวันที่ต่อเนื่อง
+function จัดกลุ่มตามวันที่(รายการ) {
+  return รายการ.reduce(function (กลุ่ม, ร) {
+    const label = ป้ายวันที่กลุ่ม(ร.created_at)
+    const กลุ่มล่าสุด = กลุ่ม[กลุ่ม.length - 1]
+    if (กลุ่มล่าสุด && กลุ่มล่าสุด.label === label) {
+      กลุ่มล่าสุด.items.push(ร)
+    } else {
+      กลุ่ม.push({ label, items: [ร] })
+    }
+    return กลุ่ม
+  }, [])
 }
 
 // ---- Helper: Progress Bar ----
@@ -188,6 +207,7 @@ function VolunteerPage({ หน้า }) {
 
   // ---- Filter (reports) ----
   const [filterTab, setFilterTab] = useState('all')
+  const [ประเภทเลือกReports, setประเภทเลือกReports] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
 
   // ---- Animals ----
   const [สัตว์จากDB,        setSัตว์จากDB]        = useState([])
@@ -536,13 +556,27 @@ function VolunteerPage({ หน้า }) {
   // ================================================================
   // กรองรายงาน
   // ================================================================
-  const รายงานกรอง = รายงานทั้งหมด.filter(function (ร) {
+  const รายงานตามสถานะ = รายงานทั้งหมด.filter(function (ร) {
     if (filterTab === 'pending')    return ร.status === 'รอดำเนินการ'
     if (filterTab === 'inprogress') return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว'].includes(ร.status)
     if (filterTab === 'sheltered')  return ร.status === 'อยู่ศูนย์พักพิง'
     if (filterTab === 'done')       return ร.status === 'มีผู้รับเลี้ยง'
     return true
   })
+  // แสดง chip เฉพาะประเภทที่มีรายงานเข้ามาจริง (นับภายใน tab สถานะที่เลือกอยู่)
+  const ประเภทที่มีReports = ประเภทแจ้งเรียง
+    .map((p) => ({ ...p, count: รายงานตามสถานะ.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
+    .filter((p) => p.count > 0)
+  function สลับประเภทReports(key) {
+    setประเภทเลือกReports(function (prev) {
+      return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    })
+  }
+  // [] หรือเลือกครบทุกประเภท = แสดงทั้งหมด; เลือกบางประเภท = แสดงเฉพาะที่เลือก
+  const รายงานกรอง = ประเภทเลือกReports.length === 0
+    ? รายงานตามสถานะ
+    : รายงานตามสถานะ.filter((ร) => ประเภทเลือกReports.includes(ประเภทจาก(ร.urgency).key))
+  const รายงานกรองตามวันที่ = จัดกลุ่มตามวันที่(รายงานกรอง)
 
   const รายงานActive = รายงานทั้งหมด.filter(function (ร) {
     return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'อยู่ศูนย์พักพิง'].includes(ร.status)
@@ -613,6 +647,24 @@ function VolunteerPage({ หน้า }) {
             </div>
           </div>
 
+          {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) — เลื่อนแนวนอน */}
+          {ประเภทที่มีReports.length > 0 && (
+            <div className="px-4 mb-4 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {ประเภทที่มีReports.map(function (p) {
+                const active = ประเภทเลือกReports.includes(p.key)
+                return (
+                  <button key={p.key} onClick={() => สลับประเภทReports(p.key)}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border-2 whitespace-nowrap shrink-0 transition-all ${
+                      active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
+                    }`}
+                  >
+                    {p.emoji} {p.short} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           {/* Loading */}
           {โหลดรายงาน && (
             <div className="text-center py-12">
@@ -628,55 +680,64 @@ function VolunteerPage({ หน้า }) {
             </div>
           )}
 
-          {/* รายการการ์ด */}
-          <div className="px-4 space-y-3">
-            {รายงานกรอง.map(function (ร) {
-              const ประเภท = ประเภทจาก(ร.urgency)
-              const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
+          {/* รายการการ์ด — จัดกลุ่มตามวันที่ */}
+          <div className="px-4 space-y-4">
+            {รายงานกรองตามวันที่.map(function (กลุ่ม) {
               return (
-                <div key={ร.id}
-                  className={`w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${แถบสีสถานะ[ร.status] || 'border-l-gray-300'}`}
-                  onClick={() => เปิดรายละเอียด(ร)}
-                >
-                  <div className="p-4 flex items-center gap-3">
-                    <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
-                    <div className="flex-1 min-w-0">
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
-                        {ประเภท.emoji} {ประเภท.short}
-                      </span>
-                      <div className="flex items-start justify-between gap-2 mb-0.5">
-                        {รอสายพันธุ์ ? (
-                          <p className="text-gray-400 text-sm">รอระบุสายพันธุ์</p>
-                        ) : (
-                          <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200'}`}>
-                          {ร.status}
-                        </span>
-                      </div>
-
-                      {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
-                      {ร.latitude && ร.longitude ? (
-                        <a
-                          href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
-                          target="_blank" rel="noreferrer"
-                          onClick={function (e) { e.stopPropagation() }}
-                          className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                <div key={กลุ่ม.label}>
+                  <p className="text-xs font-semibold text-gray-400 mb-2 px-1">📅 {กลุ่ม.label}</p>
+                  <div className="space-y-3">
+                    {กลุ่ม.items.map(function (ร) {
+                      const ประเภท = ประเภทจาก(ร.urgency)
+                      const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
+                      return (
+                        <div key={ร.id}
+                          className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer"
+                          onClick={() => เปิดรายละเอียด(ร)}
                         >
-                          <span className="text-sm">📍</span>
-                          <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
-                          <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">Maps ↗</span>
-                        </a>
-                      ) : (
-                        <p className="text-xs text-gray-500 truncate">📍 {ร.location_text || '-'}</p>
-                      )}
+                          <div className="p-4 flex items-center gap-3">
+                            <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
+                            <div className="flex-1 min-w-0">
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
+                                {ประเภท.emoji} {ประเภท.short}
+                              </span>
+                              <div className="flex items-start justify-between gap-2 mb-0.5">
+                                {รอสายพันธุ์ ? (
+                                  <p className="text-gray-400 text-sm">รอระบุสายพันธุ์</p>
+                                ) : (
+                                  <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
+                                )}
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200'}`}>
+                                  {ร.status}
+                                </span>
+                              </div>
 
-                      <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
-                      {ร.detail && (
-                        <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
-                      )}
-                    </div>
-                    <span className="text-gray-300 text-xl shrink-0">›</span>
+                              {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
+                              {ร.latitude && ร.longitude ? (
+                                <a
+                                  href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
+                                  target="_blank" rel="noreferrer"
+                                  onClick={function (e) { e.stopPropagation() }}
+                                  className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                                >
+                                  <span className="text-sm">📍</span>
+                                  <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
+                                  <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">Maps ↗</span>
+                                </a>
+                              ) : (
+                                <p className="text-xs text-gray-500 truncate">📍 {ร.location_text || '-'}</p>
+                              )}
+
+                              <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
+                              {ร.detail && (
+                                <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
+                              )}
+                            </div>
+                            <span className="text-gray-300 text-xl shrink-0">›</span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
