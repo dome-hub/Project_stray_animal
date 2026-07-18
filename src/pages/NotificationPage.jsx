@@ -20,23 +20,45 @@ function toBKK(d) {
 
 const เดือนสั้น = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
 
-function แปลงเวลา(str) {
+// ป้ายหัวข้อกลุ่มวันที่ (Section Header): วันนี้ / เมื่อวาน / วันที่จริง
+function ป้ายวันที่(str) {
   if (!str) return ''
-
-  const bkk  = toBKK(parseUTC(str))   // UTC → Bangkok UTC+7
-  const now  = toBKK(new Date())       // ตอนนี้ใน Bangkok
-
-  const hh   = String(bkk.getUTCHours()).padStart(2, '0')
-  const mm   = String(bkk.getUTCMinutes()).padStart(2, '0')
-  const time = `${hh}:${mm} น.`
-
+  const bkk  = toBKK(parseUTC(str))
+  const now  = toBKK(new Date())
   const key  = (d) => `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
   const yest = new Date(now.getTime() - 86400000)
+  if (key(bkk) === key(now))  return 'วันนี้'
+  if (key(bkk) === key(yest)) return 'เมื่อวาน'
+  const ปี = bkk.getUTCFullYear() === now.getUTCFullYear() ? '' : ` ${bkk.getUTCFullYear() + 543}`
+  return `${bkk.getUTCDate()} ${เดือนสั้น[bkk.getUTCMonth()]}${ปี}`
+}
 
-  if (key(bkk) === key(now))  return `วันนี้ ${time}`
-  if (key(bkk) === key(yest)) return `เมื่อวาน ${time}`
+// เวลาบนการ์ด: ภายใน 24 ชม. = relative time (เพิ่งเกิดขึ้น / X นาที / X ชั่วโมงที่แล้ว)
+// ข้ามวัน (เกิน 24 ชม.) = แสดงแค่เวลานาฬิกา เช่น 14:30 น.
+function เวลาการ์ด(str) {
+  if (!str) return ''
+  const created = parseUTC(str)                 // UTC instant
+  const diffMs  = Date.now() - created.getTime()
+  const นาที    = Math.floor(diffMs / 60000)
+  if (นาที < 1)  return 'เพิ่งเกิดขึ้น'
+  if (นาที < 60) return `${นาที} นาทีที่แล้ว`
+  const ชม = Math.floor(นาที / 60)
+  if (ชม < 24)   return `${ชม} ชั่วโมงที่แล้ว`
+  const bkk = toBKK(created)
+  const hh  = String(bkk.getUTCHours()).padStart(2, '0')
+  const mm  = String(bkk.getUTCMinutes()).padStart(2, '0')
+  return `${hh}:${mm} น.`
+}
 
-  return `${bkk.getUTCDate()} ${เดือนสั้น[bkk.getUTCMonth()]} ${time}`
+// จัดกลุ่มรายการที่เรียงใหม่→เก่าแล้ว เป็น section ตามวันที่
+function จัดกลุ่มแจ้งเตือน(รายการ) {
+  return รายการ.reduce(function (กลุ่ม, it) {
+    const label = ป้ายวันที่(it.created)
+    const ล่าสุด = กลุ่ม[กลุ่ม.length - 1]
+    if (ล่าสุด && ล่าสุด.label === label) ล่าสุด.items.push(it)
+    else กลุ่ม.push({ label, items: [it] })
+    return กลุ่ม
+  }, [])
 }
 
 // emoji ตามสถานะรายงาน
@@ -117,7 +139,8 @@ function NotificationPage({ user }) {
               emoji:    n.type === 'report_update' ? '🦺' : '🔔',
               หัวข้อ:   n.title || '',
               ข้อความ:  n.body || n.title || '',
-              เวลา:     แปลงเวลา(n.created_at),
+              เวลา:     เวลาการ์ด(n.created_at),
+              created:  n.created_at,
               อ่านแล้ว: n.is_read,
               dbId:     n.id,
               refId:    refId,
@@ -165,14 +188,13 @@ function NotificationPage({ user }) {
                 emoji:    emojiสถานะ(r.status),
                 หัวข้อ:   isNew ? '🚨 รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
                 ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-                เวลา:     แปลงเวลา(r.created_at),
+                เวลา:     เวลาการ์ด(r.created_at),
+                created:  r.created_at,
                 isNew,
                 image_url: r.image_url || null,
                 path:     '/volunteer/reports',
               }
             })
-          // รอดำเนินการขึ้นก่อนเสมอ
-          items.sort(function (a, b) { return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) })
           setรายการ(items)
           setโหลด(false)
         })
@@ -210,7 +232,8 @@ function NotificationPage({ user }) {
               emoji:   emojiสถานะ(r.status),
               หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
               ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-              เวลา:    แปลงเวลา(r.created_at),
+              เวลา:    เวลาการ์ด(r.created_at),
+              created: r.created_at,
               isNew:   r.status === 'รอดำเนินการ',
               image_url: r.image_url || null,
               path:    '/admin/dashboard',
@@ -224,7 +247,8 @@ function NotificationPage({ user }) {
               emoji:   '👤',
               หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
               ข้อความ: u.name || 'ผู้ใช้ใหม่',
-              เวลา:    แปลงเวลา(u.created_at),
+              เวลา:    เวลาการ์ด(u.created_at),
+              created: u.created_at,
               isNew:   false,
               image_url: u.avatar_url || null,
               path:    '/admin/users',
@@ -250,6 +274,11 @@ function NotificationPage({ user }) {
   }
 
   const ยังไม่อ่าน = รายการ.filter(function (n) { return !isอ่านแล้ว(n) }).length
+
+  // เรียงใหม่→เก่าก่อนจัดกลุ่ม (ทุก role) เพื่อให้ section วันที่ต่อเนื่องถูกต้อง
+  const กลุ่มวันที่ = จัดกลุ่มแจ้งเตือน(
+    [...รายการ].sort(function (a, b) { return parseUTC(b.created).getTime() - parseUTC(a.created).getTime() })
+  )
 
   async function กดอ่าน(item) {
     if (role === 'user') {
@@ -362,10 +391,15 @@ function NotificationPage({ user }) {
         </div>
       )}
 
-      {/* รายการ */}
+      {/* รายการ — จัดกลุ่มตามวันที่ */}
       {!โหลด && (
-        <div className="px-4 pt-3 space-y-3">
-          {รายการ.map(function (n) {
+        <div className="px-4 pt-3 space-y-5">
+          {กลุ่มวันที่.map(function (กลุ่ม) {
+          return (
+          <div key={กลุ่ม.label}>
+            <p className="text-xs font-semibold text-gray-400 mb-2 px-1">📅 {กลุ่ม.label}</p>
+            <div className="space-y-3">
+          {กลุ่ม.items.map(function (n) {
             const read    = isอ่านแล้ว(n)
             const isOpen  = เมนูเปิด === n.id
             return (
@@ -396,7 +430,7 @@ function NotificationPage({ user }) {
                       <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
                         {n.ข้อความ}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">{n.เวลา}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">⏱️ {n.เวลา}</p>
                     </div>
                     {!read && (
                       <div className={`w-2.5 h-2.5 ${ธีม.unreadDot} rounded-full mt-1 shrink-0`} />
@@ -439,6 +473,10 @@ function NotificationPage({ user }) {
                 )}
               </div>
             )
+          })}
+            </div>
+          </div>
+          )
           })}
         </div>
       )}
