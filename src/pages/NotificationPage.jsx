@@ -84,9 +84,9 @@ function NotificationPage({ user }) {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(30)
-        .then(function ({ data }) {
-          setรายการ((data || []).map(function (n) {
-            // หา ref id ของรายงานจากข้อความ (เช่น "#000025") เพื่อ deep-link ไปหน้ารายละเอียด
+        .then(async function ({ data }) {
+          const items = (data || []).map(function (n) {
+            // หา ref id ของรายงานจากข้อความ (เช่น "#000025") เพื่อ deep-link + ดึงรูปสัตว์
             const m = String((n.title || '') + ' ' + (n.body || '')).match(/#(\d+)/)
             const refId = m ? parseInt(m[1], 10) : null
             return {
@@ -97,9 +97,20 @@ function NotificationPage({ user }) {
               เวลา:     แปลงเวลา(n.created_at),
               อ่านแล้ว: n.is_read,
               dbId:     n.id,
+              refId:    refId,
+              image_url: null,
               path:     refId ? `/track?open=${refId}` : '/track',
             }
-          }))
+          })
+          // ดึงรูปสัตว์ของแต่ละเคสมาแสดงเป็นไอคอน
+          const ids = [...new Set(items.map(function (i) { return i.refId }).filter(Boolean))]
+          if (ids.length > 0) {
+            const { data: reps } = await supabase.from('reports').select('id, image_url').in('id', ids)
+            const รูปตามId = {}
+            ;(reps || []).forEach(function (r) { รูปตามId[r.id] = r.image_url })
+            items.forEach(function (i) { if (i.refId) i.image_url = รูปตามId[i.refId] || null })
+          }
+          setรายการ(items)
           setโหลด(false)
         })
         .catch(function () { setโหลด(false) })
@@ -110,7 +121,7 @@ function NotificationPage({ user }) {
     if (role === 'volunteer') {
       supabase
         .from('reports')
-        .select('id, animal_type, location_text, status, created_at')
+        .select('id, animal_type, location_text, status, created_at, image_url')
         .order('created_at', { ascending: false })
         .limit(30)
         .then(function ({ data }) {
@@ -133,6 +144,7 @@ function NotificationPage({ user }) {
                 ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
                 เวลา:     แปลงเวลา(r.created_at),
                 isNew,
+                image_url: r.image_url || null,
                 path:     '/volunteer/reports',
               }
             })
@@ -150,12 +162,12 @@ function NotificationPage({ user }) {
       Promise.all([
         supabase
           .from('reports')
-          .select('id, animal_type, location_text, status, created_at')
+          .select('id, animal_type, location_text, status, created_at, image_url')
           .order('created_at', { ascending: false })
           .limit(20),
         supabase
           .from('users')
-          .select('id, name, created_at')
+          .select('id, name, created_at, avatar_url')
           .order('created_at', { ascending: false })
           .limit(10),
       ]).then(function ([ร1, ร2]) {
@@ -177,6 +189,7 @@ function NotificationPage({ user }) {
               ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
               เวลา:    แปลงเวลา(r.created_at),
               isNew:   r.status === 'รอดำเนินการ',
+              image_url: r.image_url || null,
               path:    '/admin/dashboard',
             }
           })
@@ -190,6 +203,7 @@ function NotificationPage({ user }) {
               ข้อความ: u.name || 'ผู้ใช้ใหม่',
               เวลา:    แปลงเวลา(u.created_at),
               isNew:   false,
+              image_url: u.avatar_url || null,
               path:    '/admin/users',
             }
           })
@@ -348,7 +362,12 @@ function NotificationPage({ user }) {
                   className="w-full text-left p-4 pr-10"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl shrink-0">{n.emoji}</span>
+                    {/* รูปภาพสัตว์ของเคส (สี่เหลี่ยมขอบมน) — ไม่มีรูปค่อย fallback เป็น emoji */}
+                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
+                      {n.image_url
+                        ? <img src={n.image_url} alt="" className="w-full h-full object-cover" />
+                        : <span className="text-2xl">{n.emoji}</span>}
+                    </div>
                     <div className="flex-1 min-w-0">
                       {n.หัวข้อ && (
                         <p className={`text-xs font-bold mb-0.5 ${read ? 'text-gray-400' : 'text-orange-600'}`}>
