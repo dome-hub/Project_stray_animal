@@ -69,22 +69,78 @@ function MapController({ โฟกัส }) {
 }
 
 // ---- ค่าคงที่ ----
+// step index สำหรับ Progress Stepper — ยุบเหลือ 4 ขั้น: แจ้งเข้า → รับเรื่อง → ลงพื้นที่ → ล่าสุด/ปิดเคส
+// ทุกสถานะทางแยก (dynamic) และสถานะปิดเคส (terminal) นับเป็นขั้นสุดท้าย (3)
 const ขั้นตอนตามสถานะ = {
-  'รอดำเนินการ':    0,
-  'รับเรื่องแล้ว':   1,
-  'ลงพื้นที่แล้ว':   2,
-  'อยู่ศูนย์พักพิง': 3,
-  'มีผู้รับเลี้ยง':   4,
+  'รอดำเนินการ':        0,
+  'รับเรื่องแล้ว':       1,
+  'ลงพื้นที่แล้ว':       2,
+  'เข้าควบคุมแล้ว':      3,
+  'ส่งรักษาสถานพยาบาล':  3,
+  'ประกาศตามหาเจ้าของ':  3,
+  'อยู่ศูนย์พักพิง':      3,
+  'ส่งคืนเจ้าของสำเร็จ':  3,
+  'มีผู้รับเลี้ยง':       3,
+  'ยุติการค้นหา':        3,
 }
-const ขั้นตอนทั้งหมด = ['แจ้งเข้า', 'รับเรื่อง', 'ลงพื้นที่', 'ศูนย์พักพิง', 'มีผู้รับเลี้ยง']
+const ขั้นตอนทั้งหมด = ['แจ้งเข้า', 'รับเรื่อง', 'ลงพื้นที่', 'ปิดเคส']
 
-// สีสถานะ — สอดคล้องกับตัวกรองด้านบน: แดง=ใหม่, เหลือง=กำลังดำเนินการ, น้ำเงิน=ศูนย์พักพิง, เขียว=สำเร็จ
+// สีสถานะ — แดง=ใหม่, เหลือง/ส้ม=กำลังดำเนินการ, น้ำเงิน=ศูนย์พักพิง, เขียว=ปิดเคสสำเร็จ, เทา=ยุติ
 const สีสถานะ = {
-  'รอดำเนินการ':    'text-red-700 bg-red-50 border-red-200',
-  'รับเรื่องแล้ว':   'text-yellow-700 bg-yellow-50 border-yellow-200',
-  'ลงพื้นที่แล้ว':   'text-yellow-700 bg-yellow-50 border-yellow-200',
-  'อยู่ศูนย์พักพิง': 'text-blue-700 bg-blue-50 border-blue-200',
-  'มีผู้รับเลี้ยง':   'text-green-700 bg-green-50 border-green-200',
+  'รอดำเนินการ':        'text-red-700 bg-red-50 border-red-200',
+  'รับเรื่องแล้ว':       'text-yellow-700 bg-yellow-50 border-yellow-200',
+  'ลงพื้นที่แล้ว':       'text-yellow-700 bg-yellow-50 border-yellow-200',
+  'เข้าควบคุมแล้ว':      'text-yellow-700 bg-yellow-50 border-yellow-200',
+  'ส่งรักษาสถานพยาบาล':  'text-orange-700 bg-orange-50 border-orange-200',
+  'ประกาศตามหาเจ้าของ':  'text-yellow-700 bg-yellow-50 border-yellow-200',
+  'อยู่ศูนย์พักพิง':      'text-blue-700 bg-blue-50 border-blue-200',
+  'ส่งคืนเจ้าของสำเร็จ':  'text-green-700 bg-green-50 border-green-200',
+  'มีผู้รับเลี้ยง':       'text-green-700 bg-green-50 border-green-200',
+  'ยุติการค้นหา':        'text-gray-600 bg-gray-100 border-gray-200',
+}
+
+// ---- Workflow สถานะที่แปรผันตามประเภทการแจ้ง (report type = urgency) ----
+// core (1→2→3) ใช้ร่วมทุกประเภท; dynamic = ทางแยกหลังลงพื้นที่ (เลือกได้เมื่อถึง ON_SITE ขึ้นไป)
+const เวิร์กโฟลว์ตามประเภท = {
+  'ด่วนมาก': {  // DANGEROUS — สัตว์ดุร้าย/เสี่ยงอันตราย
+    dynamic: [
+      { value: 'เข้าควบคุมแล้ว', label: 'เข้าควบคุมแล้ว' },
+      { value: 'อยู่ศูนย์พักพิง', label: 'อยู่ศูนย์พักพิง' },
+    ],
+  },
+  'ด่วน': {  // INJURED — สัตว์บาดเจ็บ
+    dynamic: [
+      { value: 'ส่งรักษาสถานพยาบาล', label: 'ส่งรักษาสถานพยาบาล' },
+      { value: 'อยู่ศูนย์พักพิง',     label: 'พักฟื้นที่ศูนย์พักพิง' },
+    ],
+  },
+  'ปานกลาง': {  // STRAY — พบสัตว์พลัดหลง/สัตว์จรจัด
+    dynamic: [
+      { value: 'ประกาศตามหาเจ้าของ', label: 'ประกาศตามหาเจ้าของ' },
+      { value: 'อยู่ศูนย์พักพิง',     label: 'อยู่ศูนย์พักพิง' },
+    ],
+  },
+}
+// สถานะปิดเคส (terminal) — ใช้ร่วมทุกประเภท แยกไว้กลุ่มล่างสุด
+const สถานะปิดเคส = [
+  { value: 'ส่งคืนเจ้าของสำเร็จ', label: 'ส่งคืนเจ้าของสำเร็จ' },
+  { value: 'มีผู้รับเลี้ยง',       label: 'มีผู้รับเลี้ยงแล้ว' },
+  { value: 'ยุติการค้นหา',        label: 'ยุติการค้นหา / หาตัวไม่พบ' },
+]
+
+// สร้างตัวเลือกสถานะสำหรับ report หนึ่งๆ — แยกเป็นกลุ่ม "อัปเดตความคืบหน้า" และ "ปิดเคส"
+// dynamic + terminal จะโผล่ก็ต่อเมื่อสถานะปัจจุบันถึง "ลงพื้นที่แล้ว" (ON_SITE) ขึ้นไป
+function ตัวเลือกอัปเดตสถานะ(report) {
+  const stepIdx    = ขั้นตอนตามสถานะ[report.status] ?? 0
+  const ถึงลงพื้นที่ = stepIdx >= 2
+  const progress = []
+  if (stepIdx < 1) progress.push({ value: 'รับเรื่องแล้ว', label: 'รับเรื่องแล้ว' })
+  if (stepIdx < 2) progress.push({ value: 'ลงพื้นที่แล้ว', label: 'ลงพื้นที่แล้ว' })
+  if (ถึงลงพื้นที่) {
+    const wf = เวิร์กโฟลว์ตามประเภท[report.urgency] || เวิร์กโฟลว์ตามประเภท['ปานกลาง']
+    progress.push(...wf.dynamic)
+  }
+  return { progress, close: ถึงลงพื้นที่ ? สถานะปิดเคส : [] }
 }
 
 const สีสถานะสัตว์ = {
@@ -137,9 +193,13 @@ function จัดกลุ่มตามวันที่(รายการ)
 // ---- Helper: Progress Bar ----
 function ProgressBar({ status }) {
   const stepIdx = ขั้นตอนตามสถานะ[status] ?? 0
+  // ขั้นสุดท้ายแสดงชื่อสถานะจริงเมื่อไปถึงแล้ว (เช่น "อยู่ศูนย์พักพิง") แทนคำว่า "ปิดเคส"
+  const labels = ขั้นตอนทั้งหมด.map(function (ข, i) {
+    return i === ขั้นตอนทั้งหมด.length - 1 && stepIdx >= i ? status : ข
+  })
   return (
     <div className="flex items-center">
-      {ขั้นตอนทั้งหมด.map(function (ขั้น, idx) {
+      {labels.map(function (ขั้น, idx) {
         const done    = idx <= stepIdx
         const current = idx === stepIdx
         return (
@@ -444,11 +504,17 @@ function VolunteerPage({ หน้า }) {
     }
 
     // ส่ง notification ให้ผู้แจ้ง — ทุกสถานะที่เปลี่ยน
+    const รหัส = String(report.id).padStart(6, '0')
     const msgMap = {
-      'รับเรื่องแล้ว':   `เจ้าหน้าที่รับเรื่องรายงาน #${String(report.id).padStart(6, '0')} ของคุณแล้ว กำลังเตรียมลงพื้นที่`,
-      'ลงพื้นที่แล้ว':   `เจ้าหน้าที่ลงพื้นที่แล้ว (รายงาน #${String(report.id).padStart(6, '0')}) กำลังดำเนินการรับสัตว์`,
-      'อยู่ศูนย์พักพิง': `สัตว์ที่คุณแจ้ง (#${String(report.id).padStart(6, '0')}) มาถึงศูนย์พักพิงแล้ว กำลังรับการดูแล 🏠`,
-      'มีผู้รับเลี้ยง':   `สัตว์ที่คุณแจ้ง (#${String(report.id).padStart(6, '0')}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
+      'รับเรื่องแล้ว':       `เจ้าหน้าที่รับเรื่องรายงาน #${รหัส} ของคุณแล้ว กำลังเตรียมลงพื้นที่`,
+      'ลงพื้นที่แล้ว':       `เจ้าหน้าที่ลงพื้นที่แล้ว (รายงาน #${รหัส}) กำลังดำเนินการรับสัตว์`,
+      'เข้าควบคุมแล้ว':      `เจ้าหน้าที่เข้าควบคุมสัตว์ในรายงาน #${รหัส} เรียบร้อยแล้ว`,
+      'ส่งรักษาสถานพยาบาล':  `สัตว์ที่คุณแจ้ง (#${รหัส}) ถูกนำส่งสถานพยาบาลเพื่อรักษาแล้ว 🏥`,
+      'ประกาศตามหาเจ้าของ':  `เจ้าหน้าที่กำลังประกาศตามหาเจ้าของสัตว์ในรายงาน #${รหัส} 📢`,
+      'อยู่ศูนย์พักพิง':      `สัตว์ที่คุณแจ้ง (#${รหัส}) มาถึงศูนย์พักพิงแล้ว กำลังรับการดูแล 🏠`,
+      'ส่งคืนเจ้าของสำเร็จ':  `สัตว์ที่คุณแจ้ง (#${รหัส}) ถูกส่งคืนเจ้าของเรียบร้อยแล้ว 🎉`,
+      'มีผู้รับเลี้ยง':       `สัตว์ที่คุณแจ้ง (#${รหัส}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
+      'ยุติการค้นหา':        `รายงาน #${รหัส} ได้ยุติการดำเนินการแล้ว ขอบคุณที่ช่วยแจ้งเหตุ`,
     }
     if (report.reporter_id && msgMap[สถานะใหม่]) {
       const { error: notiErr } = await supabase.from('notifications').insert({
@@ -558,9 +624,9 @@ function VolunteerPage({ หน้า }) {
   // ================================================================
   const รายงานตามสถานะ = รายงานทั้งหมด.filter(function (ร) {
     if (filterTab === 'pending')    return ร.status === 'รอดำเนินการ'
-    if (filterTab === 'inprogress') return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว'].includes(ร.status)
+    if (filterTab === 'inprogress') return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'เข้าควบคุมแล้ว', 'ส่งรักษาสถานพยาบาล', 'ประกาศตามหาเจ้าของ'].includes(ร.status)
     if (filterTab === 'sheltered')  return ร.status === 'อยู่ศูนย์พักพิง'
-    if (filterTab === 'done')       return ร.status === 'มีผู้รับเลี้ยง'
+    if (filterTab === 'done')       return ['มีผู้รับเลี้ยง', 'ส่งคืนเจ้าของสำเร็จ', 'ยุติการค้นหา'].includes(ร.status)
     return true
   })
   // แสดง chip เฉพาะประเภทที่มีรายงานเข้ามาจริง (นับภายใน tab สถานะที่เลือกอยู่)
@@ -578,8 +644,9 @@ function VolunteerPage({ หน้า }) {
     : รายงานตามสถานะ.filter((ร) => ประเภทเลือกReports.includes(ประเภทจาก(ร.urgency).key))
   const รายงานกรองตามวันที่ = จัดกลุ่มตามวันที่(รายงานกรอง)
 
+  // เคสที่ยังทำงานอยู่ (แสดงในหน้าอัปเดต) — ทุกสถานะระหว่างดำเนินการ ยกเว้นที่ปิดเคสไปแล้ว
   const รายงานActive = รายงานทั้งหมด.filter(function (ร) {
-    return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'อยู่ศูนย์พักพิง'].includes(ร.status)
+    return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'เข้าควบคุมแล้ว', 'ส่งรักษาสถานพยาบาล', 'ประกาศตามหาเจ้าของ', 'อยู่ศูนย์พักพิง'].includes(ร.status)
   })
 
   const titleMap = {
@@ -624,9 +691,9 @@ function VolunteerPage({ หน้า }) {
               {[
                 { key: 'all',        label: 'ทั้งหมด',        dot: null,      count: รายงานทั้งหมด.length },
                 { key: 'pending',    label: 'ใหม่',           dot: 'bg-red-500',    count: รายงานทั้งหมด.filter(function (r) { return r.status === 'รอดำเนินการ' }).length },
-                { key: 'inprogress', label: 'ดำเนินการ',      dot: 'bg-yellow-500', count: รายงานทั้งหมด.filter(function (r) { return ['รับเรื่องแล้ว','ลงพื้นที่แล้ว'].includes(r.status) }).length },
+                { key: 'inprogress', label: 'ดำเนินการ',      dot: 'bg-yellow-500', count: รายงานทั้งหมด.filter(function (r) { return ['รับเรื่องแล้ว','ลงพื้นที่แล้ว','เข้าควบคุมแล้ว','ส่งรักษาสถานพยาบาล','ประกาศตามหาเจ้าของ'].includes(r.status) }).length },
                 { key: 'sheltered',  label: 'ศูนย์พักพิง',    dot: 'bg-blue-500',   count: รายงานทั้งหมด.filter(function (r) { return r.status === 'อยู่ศูนย์พักพิง' }).length },
-                { key: 'done',       label: 'เสร็จ',          dot: 'bg-green-500',  count: รายงานทั้งหมด.filter(function (r) { return r.status === 'มีผู้รับเลี้ยง' }).length },
+                { key: 'done',       label: 'เสร็จ',          dot: 'bg-green-500',  count: รายงานทั้งหมด.filter(function (r) { return ['มีผู้รับเลี้ยง','ส่งคืนเจ้าของสำเร็จ','ยุติการค้นหา'].includes(r.status) }).length },
               ].map(function (tab) {
                 return (
                   <button key={tab.key} onClick={() => setFilterTab(tab.key)}
@@ -1381,41 +1448,59 @@ function VolunteerPage({ หน้า }) {
                 </div>
               )}
 
-              {/* เลือกสถานะใหม่ */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">
-                  เปลี่ยนสถานะ
-                  <span className="text-xs font-normal text-gray-400 ml-2">ปัจจุบัน: {รายงานที่เปิด.status}</span>
-                </p>
-                <div className="space-y-2">
-                  {['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'อยู่ศูนย์พักพิง', 'มีผู้รับเลี้ยง'].map(function (ส) {
-                    const isCurrent = รายงานที่เปิด.status === ส
-                    const isSelected = สถานะใหม่ === ส
-                    return (
-                      <button key={ส} onClick={() => setSถานะใหม่(ส)} disabled={isCurrent}
-                        className={`w-full py-3 px-4 rounded-xl text-sm font-medium border-2 text-left flex items-center gap-2.5 transition-all ${
-                          isCurrent
-                            ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                            : isSelected
-                            ? 'border-teal-500 bg-teal-50 text-teal-700'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-teal-200'
-                        }`}
-                      >
-                        {isCurrent
-                          ? <Circle size={16} className="shrink-0 text-gray-300" />
+              {/* เลือกสถานะใหม่ — ตัวเลือกแปรผันตามประเภทการแจ้ง แบ่งกลุ่ม "อัปเดตความคืบหน้า" / "ปิดเคส" */}
+              {(function () {
+                const { progress, close } = ตัวเลือกอัปเดตสถานะ(รายงานที่เปิด)
+                function ปุ่มสถานะ(opt) {
+                  const isCurrent  = รายงานที่เปิด.status === opt.value
+                  const isSelected = สถานะใหม่ === opt.value
+                  return (
+                    <button key={opt.value} onClick={() => setSถานะใหม่(opt.value)} disabled={isCurrent}
+                      className={`w-full py-3 px-4 rounded-xl text-sm font-medium border-2 text-left flex items-center gap-2.5 transition-all ${
+                        isCurrent
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
                           : isSelected
-                          ? <CircleDot size={16} className="shrink-0 text-teal-500" />
-                          : <Circle size={16} className="shrink-0 text-gray-300" />}
-                        <span className="flex-1">{ส}</span>
-                        {isCurrent && <span className="text-xs">← ปัจจุบัน</span>}
-                        {ส === 'อยู่ศูนย์พักพิง' && !isCurrent && !isSelected && (
-                          <span className="text-xs text-teal-500">→ เพิ่มเข้าจัดการสัตว์อัตโนมัติ</span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-teal-200'
+                      }`}
+                    >
+                      {isSelected && !isCurrent
+                        ? <CircleDot size={16} className="shrink-0 text-teal-500" />
+                        : <Circle size={16} className="shrink-0 text-gray-300" />}
+                      <span className="flex-1">{opt.label}</span>
+                      {isCurrent && <span className="text-xs">← ปัจจุบัน</span>}
+                      {opt.value === 'อยู่ศูนย์พักพิง' && !isCurrent && !isSelected && (
+                        <span className="text-xs text-teal-500">→ เพิ่มเข้าจัดการสัตว์</span>
+                      )}
+                    </button>
+                  )
+                }
+                return (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">
+                      เปลี่ยนสถานะ
+                      <span className="text-xs font-normal text-gray-400 ml-2">ปัจจุบัน: {รายงานที่เปิด.status}</span>
+                    </p>
+
+                    {/* กลุ่ม 1: อัปเดตความคืบหน้า */}
+                    <p className="text-xs font-semibold text-gray-400 mb-1.5">อัปเดตความคืบหน้า</p>
+                    <div className="space-y-2">
+                      {progress.map(ปุ่มสถานะ)}
+                    </div>
+
+                    {/* กลุ่ม 2: ปิดเคส — แสดงเมื่อถึงลงพื้นที่แล้ว */}
+                    {close.length > 0 && (
+                      <>
+                        <hr className="my-3 border-gray-100" />
+                        <p className="text-xs font-semibold text-gray-400 mb-1.5">ปิดเคส (Close Case)</p>
+                        <div className="space-y-2">
+                          {close.map(ปุ่มสถานะ)}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* หมายเหตุ */}
               <div>
