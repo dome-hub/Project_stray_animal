@@ -333,15 +333,15 @@ function TrackReport({ user }) {
                       onClick={() => เปิดรายละเอียด(รายงาน)}
                     >
                       {/* แถวบน */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-start justify-between gap-2 mb-4">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div className="w-12 h-12 bg-indigo-50 rounded-xl overflow-hidden flex items-center justify-center text-2xl shrink-0">
                             {รายงาน.image_url
                               ? <img src={รายงาน.image_url} alt="สัตว์" className="w-full h-full object-cover" />
                               : emoji
                             }
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
                               {ประเภท.emoji} {ประเภท.label}
                             </span>
@@ -350,16 +350,16 @@ function TrackReport({ user }) {
                             ) : (
                               <p className="font-bold text-gray-800 text-sm">{รายงาน.animal_type || 'ไม่ระบุประเภท'}</p>
                             )}
-                            <p className="text-xs text-gray-500">📍 {รายงาน.location_text}</p>
+                            <p className="text-xs text-gray-500 truncate">📍 {รายงาน.location_text}</p>
                             <p className="text-xs text-gray-400 mt-0.5">⏱️ {เวลาTR(รายงาน.created_at)}</p>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${สีจากสถานะTR(รายงาน.status)}`}>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${สีจากสถานะTR(รายงาน.status)}`}>
                             {รายงาน.status}
                           </span>
                           {รับเรื่องแล้ว && (
-                            <span className="text-[10px] text-purple-500 font-medium">กดดูข้อมูลเจ้าหน้าที่ ›</span>
+                            <span className="text-[10px] text-purple-500 font-medium whitespace-nowrap">กดดูข้อมูลเจ้าหน้าที่ ›</span>
                           )}
                         </div>
                       </div>
@@ -413,9 +413,9 @@ function TrackReport({ user }) {
               </div>
 
               {/* ชื่อ + สถานะ */}
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-gray-800 text-lg">{รายงานที่เปิด.animal_type || 'ไม่ระบุ'}</p>
-                <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${สีจากสถานะTR(รายงานที่เปิด.status)}`}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-gray-800 text-lg truncate min-w-0">{รายงานที่เปิด.animal_type || 'ไม่ระบุ'}</p>
+                <span className={`text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap shrink-0 ${สีจากสถานะTR(รายงานที่เปิด.status)}`}>
                   {รายงานที่เปิด.status}
                 </span>
               </div>
