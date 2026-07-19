@@ -1863,7 +1863,7 @@ function VolunteerPage({ หน้า }) {
                   <span className="text-gray-400 font-normal ml-1.5">— "รอการรับเลี้ยง" คือสถานะที่พร้อมให้เจ้าหน้าที่กดเผยแพร่หาบ้าน</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  {['อยู่ศูนย์พักพิง', 'รอการรับเลี้ยง', 'อยู่ระหว่างรักษา', 'มีผู้รับเลี้ยง'].map(function (ส) {
+                  {['อยู่ศูนย์พักพิง', 'อยู่ระหว่างรักษา', 'รอการรับเลี้ยง', 'มีผู้รับเลี้ยง'].map(function (ส) {
                     const isWaiting  = ส === 'รอการรับเลี้ยง'
                     const isSelected = สัตว์ที่แก้ไข.status === ส
                     return (
@@ -1881,11 +1881,9 @@ function VolunteerPage({ หน้า }) {
                             ? isWaiting
                               ? 'border-teal-600 bg-teal-600 text-white shadow-sm'
                               : 'border-teal-500 bg-teal-50 text-teal-700'
-                            : isWaiting
-                              ? 'border-teal-300 bg-teal-50/60 text-teal-700'
-                              : 'border-gray-200 text-gray-700'
+                            : 'border-gray-200 text-gray-700'
                         }`}>
-                        {isWaiting && <Star size={12} className={isSelected ? 'fill-white' : 'fill-teal-500 text-teal-500'} />}
+                        {isWaiting && <Star size={12} className={isSelected ? 'fill-white' : 'text-gray-400'} />}
                         {ส}
                       </button>
                     )
