@@ -2018,7 +2018,15 @@ function VolunteerPage({ หน้า }) {
                     </p>
                   </div>
                   <button
-                    onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: !prev.is_adoptable } }) }}
+                    onClick={function () {
+                      setSัตว์ที่แก้ไข(function (prev) {
+                        const เปิดเผยแพร่ = !prev.is_adoptable
+                        // เปิดเผยแพร่ตอนสถานะยังเป็น "อยู่ศูนย์พักพิง" → เปลี่ยนสถานะเป็น "รอการรับเลี้ยง" ให้อัตโนมัติ
+                        // การ์ดจะได้ย้ายไป tab "รอหาบ้าน" ทันที ไม่ต้องกดสถานะแยกอีกขั้น
+                        const status = เปิดเผยแพร่ && prev.status === 'อยู่ศูนย์พักพิง' ? 'รอการรับเลี้ยง' : prev.status
+                        return { ...prev, is_adoptable: เปิดเผยแพร่, status }
+                      })
+                    }}
                     className={`w-11 h-6 rounded-full shrink-0 transition-colors relative ${
                       สัตว์ที่แก้ไข.is_adoptable ? 'bg-green-500' : 'bg-gray-300'
                     }`}
