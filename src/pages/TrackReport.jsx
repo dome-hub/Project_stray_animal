@@ -75,16 +75,46 @@ function parseUTCtr(str) {
 
 const เดือนTR = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
 
-function แปลงวันที่(dateString) {
+// เวลาอย่างเดียว (ไม่มีวันที่) — ใช้บนการ์ดหลังแยกกลุ่มตามวันที่แล้ว วันที่ไม่ต้องซ้ำ
+function เวลาTR(dateString) {
+  const bkk = new Date(parseUTCtr(dateString).getTime() + 7 * 60 * 60 * 1000)
+  const hh  = String(bkk.getUTCHours()).padStart(2, '0')
+  const mm  = String(bkk.getUTCMinutes()).padStart(2, '0')
+  return `${hh}:${mm} น.`
+}
+
+// ---- ประเภทการแจ้ง (จาก urgency) — สีของ badge บนการ์ด ----
+const ประเภทแจ้งTR = {
+  'ด่วนมาก': { emoji: '🔴', label: 'ดุร้าย/อันตราย', badge: 'bg-red-50 text-red-700' },
+  'ด่วน':    { emoji: '🟠', label: 'บาดเจ็บ',        badge: 'bg-orange-50 text-orange-700' },
+  'ปานกลาง': { emoji: '🟡', label: 'พลัดหลง/จรจัด',  badge: 'bg-yellow-50 text-yellow-700' },
+}
+function ประเภทจากTR(urgency) {
+  return ประเภทแจ้งTR[urgency] || ประเภทแจ้งTR['ปานกลาง']
+}
+
+// ---- จัดกลุ่มรายงานตามวันที่ (Section Header) ----
+function เท่ากันวันTR(a, b) {
+  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate()
+}
+function ป้ายวันที่กลุ่มTR(dateString) {
   const bkk  = new Date(parseUTCtr(dateString).getTime() + 7 * 60 * 60 * 1000)
-  const day  = bkk.getUTCDate()
-  const mon  = เดือนTR[bkk.getUTCMonth()]
-  const year = bkk.getUTCFullYear() + 543
-  const hh   = String(bkk.getUTCHours()).padStart(2, '0')
-  const mm   = String(bkk.getUTCMinutes()).padStart(2, '0')
-  return (
-    `${day} ${mon} ${year} • ${hh}:${mm} น.`
-  )
+  const now  = new Date(Date.now() + 7 * 60 * 60 * 1000)
+  const yest = new Date(now.getTime() - 86400000)
+  const dNum = `${bkk.getUTCDate()} ${เดือนTR[bkk.getUTCMonth()]}`
+  if (เท่ากันวันTR(bkk, now))  return `วันนี้ (${dNum})`
+  if (เท่ากันวันTR(bkk, yest)) return `เมื่อวาน (${dNum})`
+  return dNum
+}
+// รายงานเรียงใหม่→เก่าอยู่แล้ว (created_at desc) → group ต่อเนื่องได้เลย
+function จัดกลุ่มตามวันที่TR(รายการ) {
+  return รายการ.reduce(function (กลุ่ม, ร) {
+    const label = ป้ายวันที่กลุ่มTR(ร.created_at)
+    const ล่าสุด = กลุ่ม[กลุ่ม.length - 1]
+    if (ล่าสุด && ล่าสุด.label === label) ล่าสุด.items.push(ร)
+    else กลุ่ม.push({ label, items: [ร] })
+    return กลุ่ม
+  }, [])
 }
 
 function TrackReport({ user }) {
@@ -144,6 +174,8 @@ function TrackReport({ user }) {
     setรายงานที่เปิด(null)
   }
 
+  const รายงานตามวันที่ = จัดกลุ่มตามวันที่TR(รายการรายงาน)
+
   // ---- Loading ----
   if (กำลังโหลด) {
     return (
@@ -180,72 +212,90 @@ function TrackReport({ user }) {
           </div>
         )}
 
-        {รายการรายงาน.map(function (รายงาน) {
-          const สถานะข้อมูล = ข้อมูลสถานะ[รายงาน.status] || สถานะDefault
-          const emoji = รายงาน.animal_type?.includes('แมว') ? '🐈' : '🐕'
-          const รับเรื่องแล้ว = สถานะที่รับเรื่อง.includes(รายงาน.status)
-
+        {รายงานตามวันที่.map(function (กลุ่ม) {
           return (
-            <div key={รายงาน.id}
-              className="bg-white rounded-2xl p-4 shadow-sm cursor-pointer active:scale-95 transition-all"
-              onClick={() => เปิดรายละเอียด(รายงาน)}
-            >
-              {/* แถวบน */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-indigo-50 rounded-xl overflow-hidden flex items-center justify-center text-2xl shrink-0">
-                    {รายงาน.image_url
-                      ? <img src={รายงาน.image_url} alt="สัตว์" className="w-full h-full object-cover" />
-                      : emoji
-                    }
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-800 text-sm">{รายงาน.animal_type || 'ไม่ระบุประเภท'}</p>
-                    <p className="text-xs text-gray-500">📍 {รายงาน.location_text}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่(รายงาน.created_at)}</p>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${สถานะข้อมูล.สี}`}>
-                    {รายงาน.status}
-                  </span>
-                  {รับเรื่องแล้ว && (
-                    <span className="text-[10px] text-purple-500 font-medium">กดดูข้อมูลเจ้าหน้าที่ ›</span>
-                  )}
-                </div>
-              </div>
+            <div key={กลุ่ม.label}>
+              <p className="text-xs font-semibold text-gray-500 mb-2 px-1">📅 {กลุ่ม.label}</p>
+              <div className="space-y-3">
+                {กลุ่ม.items.map(function (รายงาน) {
+                  const สถานะข้อมูล = ข้อมูลสถานะ[รายงาน.status] || สถานะDefault
+                  const emoji = รายงาน.animal_type?.includes('แมว') ? '🐈' : '🐕'
+                  const รับเรื่องแล้ว = สถานะที่รับเรื่อง.includes(รายงาน.status)
+                  const ประเภท = ประเภทจากTR(รายงาน.urgency)
+                  const รอสายพันธุ์ = รายงาน.animal_type === 'ไม่สามารถวิเคราะห์ได้'
 
-              {/* Progress Bar */}
-              <div className="flex items-center">
-                {สถานะข้อมูล.ขั้นตอน.map(function (ขั้น, ลำดับ) {
                   return (
-                    <div key={ลำดับ} className="flex items-center flex-1">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ขั้น.เสร็จ ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
-                        }`}>
-                          {ขั้น.เสร็จ ? '✓' : ''}
+                    <div key={รายงาน.id}
+                      className="bg-white rounded-2xl p-4 shadow-sm cursor-pointer active:scale-95 transition-all"
+                      onClick={() => เปิดรายละเอียด(รายงาน)}
+                    >
+                      {/* แถวบน */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-indigo-50 rounded-xl overflow-hidden flex items-center justify-center text-2xl shrink-0">
+                            {รายงาน.image_url
+                              ? <img src={รายงาน.image_url} alt="สัตว์" className="w-full h-full object-cover" />
+                              : emoji
+                            }
+                          </div>
+                          <div>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
+                              {ประเภท.emoji} {ประเภท.label}
+                            </span>
+                            {รอสายพันธุ์ ? (
+                              <p className="text-gray-400 text-sm">รอยืนยันสายพันธุ์</p>
+                            ) : (
+                              <p className="font-bold text-gray-800 text-sm">{รายงาน.animal_type || 'ไม่ระบุประเภท'}</p>
+                            )}
+                            <p className="text-xs text-gray-500">📍 {รายงาน.location_text}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">⏱️ {เวลาTR(รายงาน.created_at)}</p>
+                          </div>
                         </div>
-                        <p className={`text-center mt-1 leading-tight ${ขั้น.เสร็จ ? 'text-green-600' : 'text-gray-400'}`}
-                          style={{ fontSize: '9px', maxWidth: 48 }}>
-                          {ขั้น.ชื่อ}
-                        </p>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${สถานะข้อมูล.สี}`}>
+                            {รายงาน.status}
+                          </span>
+                          {รับเรื่องแล้ว && (
+                            <span className="text-[10px] text-purple-500 font-medium">กดดูข้อมูลเจ้าหน้าที่ ›</span>
+                          )}
+                        </div>
                       </div>
-                      {ลำดับ < สถานะข้อมูล.ขั้นตอน.length - 1 && (
-                        <div className={`flex-1 h-0.5 mb-4 ${
-                          ขั้น.เสร็จ && สถานะข้อมูล.ขั้นตอน[ลำดับ + 1].เสร็จ
-                            ? 'bg-green-400' : 'bg-gray-200'
-                        }`} />
-                      )}
+
+                      {/* Progress Bar */}
+                      <div className="flex items-center">
+                        {สถานะข้อมูล.ขั้นตอน.map(function (ขั้น, ลำดับ) {
+                          return (
+                            <div key={ลำดับ} className="flex items-center flex-1">
+                              <div className="flex flex-col items-center">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  ขั้น.เสร็จ ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+                                }`}>
+                                  {ขั้น.เสร็จ ? '✓' : ''}
+                                </div>
+                                <p className={`text-center mt-1 leading-tight ${ขั้น.เสร็จ ? 'text-green-600' : 'text-gray-400'}`}
+                                  style={{ fontSize: '9px', maxWidth: 48 }}>
+                                  {ขั้น.ชื่อ}
+                                </p>
+                              </div>
+                              {ลำดับ < สถานะข้อมูล.ขั้นตอน.length - 1 && (
+                                <div className={`flex-1 h-0.5 mb-4 ${
+                                  ขั้น.เสร็จ && สถานะข้อมูล.ขั้นตอน[ลำดับ + 1].เสร็จ
+                                    ? 'bg-green-400' : 'bg-gray-200'
+                                }`} />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* รหัส */}
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                        <span className="text-xs text-gray-400">รหัสรายงาน</span>
+                        <span className="text-xs font-bold text-indigo-600">#{String(รายงาน.id).padStart(6, '0')}</span>
+                      </div>
                     </div>
                   )
                 })}
-              </div>
-
-              {/* รหัส */}
-              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-                <span className="text-xs text-gray-400">รหัสรายงาน</span>
-                <span className="text-xs font-bold text-indigo-600">#{String(รายงาน.id).padStart(6, '0')}</span>
               </div>
             </div>
           )
