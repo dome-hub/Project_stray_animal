@@ -1868,7 +1868,14 @@ function VolunteerPage({ หน้า }) {
                     const isSelected = สัตว์ที่แก้ไข.status === ส
                     return (
                       <button key={ส}
-                        onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, status: ส } }) }}
+                        onClick={function () {
+                          setSัตว์ที่แก้ไข(function (prev) {
+                            // เลือกสถานะอื่นที่ไม่ใช่ "รอการรับเลี้ยง" → ปิดเผยแพร่อัตโนมัติเสมอ
+                            // กันสัตว์ที่รับเลี้ยงแล้ว/ยังไม่พร้อม ค้างโชว์ในหน้า "ค้นหาสัตว์เลี้ยง" ของ user
+                            const is_adoptable = ส === 'รอการรับเลี้ยง' ? prev.is_adoptable : false
+                            return { ...prev, status: ส, is_adoptable }
+                          })
+                        }}
                         className={`py-2.5 rounded-xl text-xs font-medium border-2 flex items-center justify-center gap-1 ${
                           isSelected
                             ? isWaiting
