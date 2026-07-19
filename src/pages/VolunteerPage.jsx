@@ -297,7 +297,7 @@ function VolunteerPage({ หน้า }) {
   const [แจ้งสำเร็จ,  setแจ้งสำเร็จ]  = useState('')   // ข้อความ toast
 
   // ---- Filter (reports) ----
-  const [filterTab, setFilterTab] = useState('all')
+  const [แท็บรายงาน, setแท็บรายงาน] = useState('active')  // active = กำลังดำเนินการ, history = ประวัติการทำงาน
   const [ประเภทเลือกReports, setประเภทเลือกReports] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
 
   // ---- Animals ----
@@ -707,12 +707,10 @@ function VolunteerPage({ หน้า }) {
   // ================================================================
   // กรองรายงาน
   // ================================================================
+  // active = สถานะยังไม่สิ้นสุด (แจ้งรายงาน/รับเรื่อง/ลงพื้นที่/ควบคุม/รักษา/ประกาศตามหา/ศูนย์พักพิงที่ยังไม่ปิดเคส)
+  // history = สถานะสิ้นสุด (terminal) — ใช้ helper เดียวกับที่หน้าอัปเดต/แผนที่ใช้ตัดสิน เพื่อไม่ให้ตรรกะขัดกันเอง
   const รายงานตามสถานะ = รายงานทั้งหมด.filter(function (ร) {
-    if (filterTab === 'pending')    return ร.status === 'รอดำเนินการ'
-    if (filterTab === 'inprogress') return ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'เข้าควบคุมแล้ว', 'ส่งรักษาสถานพยาบาล', 'ประกาศตามหาเจ้าของ'].includes(ร.status)
-    if (filterTab === 'sheltered')  return ร.status === 'อยู่ศูนย์พักพิง'
-    if (filterTab === 'done')       return ['มีผู้รับเลี้ยง', 'ส่งคืนเจ้าของสำเร็จ', 'ยุติการค้นหา'].includes(ร.status)
-    return true
+    return แท็บรายงาน === 'active' ? !เป็นเคสปิด(ร) : เป็นเคสปิด(ร)
   })
   // แสดง chip เฉพาะประเภทที่มีรายงานเข้ามาจริง (นับภายใน tab สถานะที่เลือกอยู่)
   const ประเภทที่มีReports = ประเภทแจ้งเรียง
@@ -772,29 +770,22 @@ function VolunteerPage({ หน้า }) {
       {หน้า === 'reports' && (
         <div className="pt-4">
 
-          {/* Filter Tabs — สีตรงกับป้ายสถานะบนการ์ด */}
+          {/* Tabs — กำลังดำเนินการ / ประวัติการทำงาน (ปิดเคสแล้วยังดูย้อนหลังได้เสมอ ไม่หายไปไหน) */}
           <div className="px-4 mb-4">
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
               {[
-                { key: 'all',        label: 'ทั้งหมด',        dot: null,      count: รายงานทั้งหมด.length },
-                { key: 'pending',    label: 'ใหม่',           dot: 'bg-red-500',    count: รายงานทั้งหมด.filter(function (r) { return r.status === 'รอดำเนินการ' }).length },
-                { key: 'inprogress', label: 'ดำเนินการ',      dot: 'bg-yellow-500', count: รายงานทั้งหมด.filter(function (r) { return ['รับเรื่องแล้ว','ลงพื้นที่แล้ว','เข้าควบคุมแล้ว','ส่งรักษาสถานพยาบาล','ประกาศตามหาเจ้าของ'].includes(r.status) }).length },
-                { key: 'sheltered',  label: 'ศูนย์พักพิง',    dot: 'bg-blue-500',   count: รายงานทั้งหมด.filter(function (r) { return r.status === 'อยู่ศูนย์พักพิง' }).length },
-                { key: 'done',       label: 'เสร็จ',          dot: 'bg-green-500',  count: รายงานทั้งหมด.filter(function (r) { return ['มีผู้รับเลี้ยง','ส่งคืนเจ้าของสำเร็จ','ยุติการค้นหา'].includes(r.status) }).length },
+                { key: 'active',  label: 'กำลังดำเนินการ', count: รายงานทั้งหมด.filter(function (r) { return !เป็นเคสปิด(r) }).length },
+                { key: 'history', label: 'ประวัติการทำงาน', count: รายงานทั้งหมด.filter(function (r) { return เป็นเคสปิด(r) }).length },
               ].map(function (tab) {
+                const isActive = แท็บรายงาน === tab.key
                 return (
-                  <button key={tab.key} onClick={() => setFilterTab(tab.key)}
-                    className={`flex-1 shrink-0 min-w-fit px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
-                      filterTab === tab.key ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
+                  <button key={tab.key} onClick={() => setแท็บรายงาน(tab.key)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+                      isActive ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
                     }`}
                   >
-                    {tab.dot && <span className={`w-1.5 h-1.5 rounded-full ${tab.dot}`} />}
                     {tab.label}
-                    {tab.count > 0 && (
-                      <span className={`font-bold ${filterTab === tab.key ? 'text-teal-600' : 'text-gray-400'}`}>
-                        ({tab.count})
-                      </span>
-                    )}
+                    <span className={`text-xs font-bold ${isActive ? 'text-teal-600' : 'text-gray-400'}`}>({tab.count})</span>
                   </button>
                 )
               })}
@@ -829,8 +820,10 @@ function VolunteerPage({ หน้า }) {
 
           {!โหลดรายงาน && รายงานกรอง.length === 0 && (
             <div className="text-center py-16 text-gray-400">
-              <p className="text-5xl mb-3">📋</p>
-              <p className="font-medium">ไม่มีรายงานในกลุ่มนี้</p>
+              <p className="text-5xl mb-3">{แท็บรายงาน === 'active' ? '🎉' : '📋'}</p>
+              <p className="font-medium">
+                {แท็บรายงาน === 'active' ? 'ไม่มีงานที่ต้องดำเนินการในขณะนี้' : 'ยังไม่มีประวัติการปฏิบัติงาน'}
+              </p>
             </div>
           )}
 
@@ -844,9 +837,12 @@ function VolunteerPage({ หน้า }) {
                     {กลุ่ม.items.map(function (ร) {
                       const ประเภท = ประเภทจาก(ร.urgency)
                       const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
+                      const ปิดเคสแล้ว = แท็บรายงาน === 'history'
                       return (
                         <div key={ร.id}
-                          className="w-full text-left bg-white rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer"
+                          className={`w-full text-left rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer ${
+                            ปิดเคสแล้ว ? 'bg-gray-50 opacity-75' : 'bg-white'
+                          }`}
                           onClick={() => เปิดรายละเอียด(ร)}
                         >
                           <div className="p-4 flex items-center gap-3">
@@ -861,7 +857,9 @@ function VolunteerPage({ หน้า }) {
                                 ) : (
                                   <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
                                 )}
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200'}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${
+                                  ปิดเคสแล้ว ? 'text-gray-500 bg-gray-100 border-gray-200' : (สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200')
+                                }`}>
                                   {ร.status}
                                 </span>
                               </div>
