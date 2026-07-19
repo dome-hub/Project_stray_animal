@@ -160,12 +160,44 @@ function TimelineStepper({ reportType, currentStatus, size = 'sm' }) {
   )
 }
 
+// ---- Tabs: กำลังดำเนินการ / ประวัติการแจ้ง (Pill style) ----
+function TabsNav({ active, onChange, countInProgress, countHistory }) {
+  const tabs = [
+    { key: 'in-progress', label: 'กำลังดำเนินการ', count: countInProgress },
+    { key: 'history',     label: 'ประวัติการแจ้ง',  count: countHistory },
+  ]
+  return (
+    <div className="px-4 pt-3">
+      <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+        {tabs.map(function (tab) {
+          const isActive = active === tab.key
+          return (
+            <button key={tab.key} onClick={() => onChange(tab.key)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+                isActive ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-xs font-bold ${isActive ? 'text-purple-500' : 'text-gray-400'}`}>
+                ({tab.count})
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function TrackReport({ user }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   const [รายการรายงาน, setรายการรายงาน] = useState([])
   const [กำลังโหลด,    setกำลังโหลด]    = useState(true)
+
+  // Tab: 'in-progress' = กำลังดำเนินการ, 'history' = ประวัติการแจ้ง (ปิดเคสแล้ว)
+  const [แท็บ, setแท็บ] = useState('in-progress')
 
   // Bottom sheet
   const [รายงานที่เปิด,   setรายงานที่เปิด]   = useState(null)
@@ -217,7 +249,12 @@ function TrackReport({ user }) {
     setรายงานที่เปิด(null)
   }
 
-  const รายงานตามวันที่ = จัดกลุ่มตามวันที่TR(รายการรายงาน)
+  // แยกเคสกำลังดำเนินการ vs ประวัติ (ปิดเคสแล้ว) — ใช้ helper เป็นเคสปิดTR เดิม (นับ "อยู่ศูนย์พักพิง"
+  // เป็นปิดเคสเฉพาะสัตว์ดุร้ายเท่านั้น เหมือนที่ TimelineStepper ใช้ตัดสิน activeIndex อยู่แล้ว)
+  const เคสกำลังดำเนินการ = รายการรายงาน.filter(function (ร) { return !เป็นเคสปิดTR(ร.status, ร.urgency) })
+  const เคสประวัติ        = รายการรายงาน.filter(function (ร) { return เป็นเคสปิดTR(ร.status, ร.urgency) })
+  const รายการที่แสดง     = แท็บ === 'in-progress' ? เคสกำลังดำเนินการ : เคสประวัติ
+  const รายงานตามวันที่   = จัดกลุ่มตามวันที่TR(รายการที่แสดง)
 
   // ---- Loading ----
   if (กำลังโหลด) {
@@ -241,8 +278,19 @@ function TrackReport({ user }) {
         </div>
       </div>
 
+      {/* Tabs — กำลังดำเนินการ / ประวัติการแจ้ง (แสดงเมื่อมีรายงานอย่างน้อย 1 รายการ) */}
+      {รายการรายงาน.length > 0 && (
+        <TabsNav
+          active={แท็บ}
+          onChange={setแท็บ}
+          countInProgress={เคสกำลังดำเนินการ.length}
+          countHistory={เคสประวัติ.length}
+        />
+      )}
+
       <div className="px-4 pt-4 space-y-4">
 
+        {/* ไม่มีรายงานเลยสักรายการ */}
         {!กำลังโหลด && รายการรายงาน.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 text-center">
             <div className="text-6xl mb-4">📋</div>
@@ -252,6 +300,19 @@ function TrackReport({ user }) {
               className="mt-4 bg-orange-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium">
               แจ้งสัตว์จร
             </button>
+          </div>
+        )}
+
+        {/* มีรายงาน แต่ไม่มีรายการในแท็บที่เลือกอยู่ */}
+        {!กำลังโหลด && รายการรายงาน.length > 0 && รายการที่แสดง.length === 0 && (
+          <div className="flex flex-col items-center justify-center pt-16 text-center">
+            <div className="text-5xl mb-3">{แท็บ === 'in-progress' ? '🕒' : '🗂️'}</div>
+            <p className="text-gray-600 font-semibold">
+              {แท็บ === 'in-progress' ? 'ไม่มีรายการที่กำลังดำเนินการ' : 'ยังไม่มีประวัติการแจ้ง'}
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              {แท็บ === 'in-progress' ? 'เคสที่กำลังดำเนินการจะแสดงที่นี่' : 'เคสที่ปิดแล้วจะย้ายมาแสดงที่นี่'}
+            </p>
           </div>
         )}
 
