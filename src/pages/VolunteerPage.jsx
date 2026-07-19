@@ -591,6 +591,10 @@ function VolunteerPage({ หน้า }) {
       status:       สัตว์ที่แก้ไข.status,
       traits:       สัตว์ที่แก้ไข.traits       || null,
       vaccine_info: สัตว์ที่แก้ไข.vaccine_info || null,
+      neutered:     สัตว์ที่แก้ไข.neutered     || null,
+      size:         สัตว์ที่แก้ไข.size         || null,
+      description:  สัตว์ที่แก้ไข.description  || null,
+      is_adoptable: !!สัตว์ที่แก้ไข.is_adoptable,
     }).eq('id', สัตว์ที่แก้ไข.id)
 
     if (!error) {
@@ -1048,9 +1052,16 @@ function VolunteerPage({ หน้า }) {
                           ? `${สัตว์.age || '-'} · ${สัตว์.gender || '-'}`
                           : `${สัตว์.breed || 'ไม่ระบุ'} · ${สัตว์.age || '-'} · ${สัตว์.gender || '-'}`}
                       </p>
-                      <span className={`text-xs mt-1 px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
-                        {สัตว์.status}
-                      </span>
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
+                          {สัตว์.status}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${
+                          สัตว์.is_adoptable ? 'text-green-700 bg-green-50' : 'text-gray-500 bg-gray-100'
+                        }`}>
+                          {สัตว์.is_adoptable ? '🌐 เผยแพร่แล้ว' : '🔒 ยังไม่เผยแพร่'}
+                        </span>
+                      </div>
                     </div>
                     <span className="text-gray-300 text-xl shrink-0">›</span>
                   </div>
@@ -1784,6 +1795,81 @@ function VolunteerPage({ หน้า }) {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+
+              {/* ทำหมันแล้วหรือยัง */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ทำหมันแล้วหรือยัง</p>
+                <div className="flex gap-2">
+                  {['ทำแล้ว', 'ยังไม่ทำ', 'ไม่ทราบ'].map(function (น) {
+                    const สี = น === 'ทำแล้ว' ? 'border-green-500 bg-green-500 text-white'
+                              : น === 'ยังไม่ทำ' ? 'border-red-400 bg-red-400 text-white'
+                              : 'border-gray-400 bg-gray-400 text-white'
+                    return (
+                      <button key={น}
+                        onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, neutered: น } }) }}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-medium border-2 ${
+                          สัตว์ที่แก้ไข.neutered === น ? สี : 'border-gray-200 text-gray-600'
+                        }`}>
+                        {น === 'ทำแล้ว' ? '✅ ทำแล้ว' : น === 'ยังไม่ทำ' ? '❌ ยังไม่ทำ' : '❓ ไม่ทราบ'}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ขนาดตัว */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ขนาดตัว</p>
+                <div className="flex gap-2">
+                  {['เล็ก', 'กลาง', 'ใหญ่'].map(function (ข) {
+                    return (
+                      <button key={ข}
+                        onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, size: ข } }) }}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-medium border-2 ${
+                          สัตว์ที่แก้ไข.size === ข ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600'
+                        }`}>{ข}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* เรื่องราว/นิสัย — Bio สั้นๆ แสดงในหน้ารับเลี้ยงของ user */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1">เรื่องราว/นิสัย (แสดงในหน้ารับเลี้ยง)</p>
+                <textarea
+                  value={สัตว์ที่แก้ไข.description || ''}
+                  onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, description: e.target.value } }) }}
+                  placeholder="เช่น ขี้อ้อน เข้ากับคนง่าย กินเก่ง ชอบเล่นลูกบอล"
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400 resize-none"
+                />
+              </div>
+
+              {/* เผยแพร่หาบ้าน — ตัวคัดกรองก่อนขึ้นหน้า "ค้นหาสัตว์เลี้ยง" ของ user */}
+              <div className={`rounded-2xl p-4 border-2 transition-all ${
+                สัตว์ที่แก้ไข.is_adoptable ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">
+                      {สัตว์ที่แก้ไข.is_adoptable ? '🌐 เผยแพร่หาบ้านอยู่' : '🔒 ยังไม่เผยแพร่'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      เปิดแล้วผู้ใช้ทั่วไปจะเห็นน้องในหน้า "ค้นหาสัตว์เลี้ยง"
+                    </p>
+                  </div>
+                  <button
+                    onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: !prev.is_adoptable } }) }}
+                    className={`w-12 h-7 rounded-full shrink-0 transition-colors relative ${
+                      สัตว์ที่แก้ไข.is_adoptable ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-sm transition-transform ${
+                      สัตว์ที่แก้ไข.is_adoptable ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    }`} />
+                  </button>
                 </div>
               </div>
 

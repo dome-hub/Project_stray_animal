@@ -1,49 +1,51 @@
 // FindPet.jsx — หน้าค้นหาสัตว์เลี้ยง
-// ดึงข้อมูลจาก Supabase Database จริงๆ แล้ว
+// แสดงเฉพาะสัตว์ที่เจ้าหน้าที่ศูนย์พักพิงคัดกรองแล้วกดเผยแพร่ (is_adoptable = true)
+// ตัวกรองเป็นการกรองข้อมูลจริงจากฟิลด์ที่เจ้าหน้าที่กรอกไว้ ไม่ใช่คะแนนสุ่ม
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'   // นำเข้า supabase client
 
+// ช่วงอายุที่เจ้าหน้าที่เลือกได้ตอนกรอกข้อมูลสัตว์ (VolunteerPage) — ใช้ map เป็นกลุ่ม "เด็ก/โต" ตอนกรอง
+const อายุกลุ่มเด็ก = ['น้อยกว่า 1 ปี', '1–2 ปี']
+const อายุกลุ่มโต   = ['2–5 ปี', '5–10 ปี', 'มากกว่า 10 ปี']
+
 function FindPet() {
   const navigate = useNavigate()
 
-  // แท็บที่แสดงอยู่: 'form' = ค้นหา, 'result' = ผลค้นหา, 'all' = ดูทั้งหมด
+  // แท็บที่แสดงอยู่: 'form' = ตัวกรอง, 'result' = ผลค้นหา, 'all' = ดูทั้งหมด
   const [แท็บ, setแท็บ] = useState('form')
 
   // กำลัง Loading อยู่ไหม
   const [กำลังโหลด, setกำลังโหลด] = useState(true)
 
-  // สัตว์ทั้งหมดที่ดึงมาจาก Database
+  // สัตว์ที่พร้อมให้รับเลี้ยง (is_adoptable = true) ดึงมาจาก Database
   const [สัตว์ทั้งหมด, setSัตว์ทั้งหมด] = useState([])
 
-  // เก็บค่าที่ผู้ใช้กรอก
+  // เก็บค่าตัวกรองที่ผู้ใช้เลือก
   const [ประเภทสัตว์, setประเภทสัตว์] = useState('สุนัข')
-  const [อายุ, setอายุ] = useState('')
-  const [เพศ, setเพศ] = useState('')
-  const [ขนาด, setขนาด] = useState('')
-  const [นิสัยที่เลือก, setนิสัยที่เลือก] = useState([])
+  const [ช่วงอายุ,    setช่วงอายุ]    = useState('')   // '' | 'เด็ก' | 'โต'
+  const [เพศ,         setเพศ]         = useState('')
+  const [ขนาด,        setขนาด]        = useState('')
 
   // เก็บผลการค้นหา
   const [ผลค้นหา, setผลค้นหา] = useState([])
 
-  // ---- ดึงข้อมูลสัตว์จาก Supabase ตอนโหลดหน้า ----
-  // useEffect = ทำงานครั้งเดียวตอนหน้าเปิด ([] ข้างหลัง)
+  // ---- ดึงสัตว์ที่เผยแพร่แล้วจาก Supabase ตอนโหลดหน้า ----
   useEffect(function () {
     async function ดึงข้อมูลสัตว์() {
       setกำลังโหลด(true)
 
-      // ดึงข้อมูลจากตาราง animals ใน Supabase
+      // เฉพาะสัตว์ที่เจ้าหน้าที่คัดกรองและกดเผยแพร่แล้วเท่านั้น
       const { data, error } = await supabase
-        .from('animals')       // ชื่อตาราง
-        .select('*')           // ดึงทุก column
-        .order('created_at', { ascending: false })  // ล่าสุดขึ้นก่อน
+        .from('animals')
+        .select('*')
+        .eq('is_adoptable', true)
+        .order('created_at', { ascending: false })
 
       if (error) {
-        // ถ้าเกิดข้อผิดพลาด แสดงใน console
         console.log('เกิดข้อผิดพลาดในการดึงข้อมูล:', error.message)
       } else {
-        // แปลงข้อมูลจาก Database ให้ตรงกับที่การ์ดต้องการ
         const แปลงแล้ว = data.map(function (สัตว์) {
           return {
             id: สัตว์.id,
@@ -53,13 +55,14 @@ function FindPet() {
             สายพันธุ์: สัตว์.breed || 'ไม่ระบุ',
             อายุ: สัตว์.age || 'ไม่ระบุ',
             เพศ: สัตว์.gender || 'ไม่ระบุ',
+            ขนาด: สัตว์.size || 'ไม่ระบุ',
             สถานะ: สัตว์.status,
             สุขภาพ: สัตว์.health,
             ลักษณะ: สัตว์.description || '',
             วัคซีน: สัตว์.vaccine_info || '',
+            ทำหมัน: สัตว์.neutered || '',
             นิสัย: สัตว์.traits ? สัตว์.traits.split(',').map(function (t) { return t.trim() }).filter(Boolean) : [],
             สถานที่: สัตว์.location || 'กำแพงแสน นครปฐม',
-            คะแนน: Math.floor(Math.random() * 20) + 75,
           }
         })
         setSัตว์ทั้งหมด(แปลงแล้ว)
@@ -69,30 +72,21 @@ function FindPet() {
     }
 
     ดึงข้อมูลสัตว์()
-  }, [])  // [] = ทำแค่ครั้งเดียวตอนเปิดหน้า
+  }, [])
 
-  // ฟังก์ชันเลือก/ยกเลิกนิสัย
-  function เลือกนิสัย(นิสัย) {
-    if (นิสัยที่เลือก.includes(นิสัย)) {
-      setนิสัยที่เลือก(นิสัยที่เลือก.filter((x) => x !== นิสัย))
-    } else {
-      setนิสัยที่เลือก([...นิสัยที่เลือก, นิสัย])
-    }
-  }
-
-  // ฟังก์ชันค้นหาสัตว์ (กรองจากที่ดึงมาแล้ว)
+  // ฟังก์ชันค้นหาสัตว์ — กรองจากข้อมูลจริงตามเงื่อนไขที่เลือก
   function ค้นหาสัตว์() {
-    // กรองตามประเภท (สุนัข/แมว)
     const กรอง = สัตว์ทั้งหมด.filter(function (สัตว์) {
-      if (ประเภทสัตว์ === 'สุนัข') return สัตว์.emoji === '🐕'
-      if (ประเภทสัตว์ === 'แมว') return สัตว์.emoji === '🐈'
+      if (ประเภทสัตว์ === 'สุนัข' && สัตว์.emoji !== '🐕') return false
+      if (ประเภทสัตว์ === 'แมว'   && สัตว์.emoji !== '🐈') return false
+      if (เพศ && สัตว์.เพศ !== เพศ) return false
+      if (ขนาด && สัตว์.ขนาด !== ขนาด) return false
+      if (ช่วงอายุ === 'เด็ก' && !อายุกลุ่มเด็ก.includes(สัตว์.อายุ)) return false
+      if (ช่วงอายุ === 'โต'   && !อายุกลุ่มโต.includes(สัตว์.อายุ))   return false
       return true
     })
 
-    // เรียงจากคะแนนสูงสุด
-    const เรียงแล้ว = [...กรอง].sort((a, b) => b.คะแนน - a.คะแนน)
-
-    setผลค้นหา(เรียงแล้ว)
+    setผลค้นหา(กรอง)
     setแท็บ('result')
   }
 
@@ -119,7 +113,7 @@ function FindPet() {
         </div>
       </div>
 
-      {/* แท็บสลับระหว่าง "ค้นหา" และ "ดูทั้งหมด" */}
+      {/* แท็บสลับระหว่าง "ตัวกรอง" และ "ดูทั้งหมด" */}
       <div className="flex mx-4 mt-4 bg-gray-100 rounded-xl p-1">
         <button
           onClick={() => setแท็บ('form')}
@@ -129,7 +123,7 @@ function FindPet() {
               : 'text-gray-500'
           }`}
         >
-          🔍 ค้นหาด้วย AI
+          🔍 ค้นหาแบบละเอียด
         </button>
         <button
           onClick={() => setแท็บ('all')}
@@ -147,7 +141,7 @@ function FindPet() {
       {แท็บ === 'result' && (
         <div className="px-4 pt-4 space-y-4">
           <p className="text-sm text-gray-500 font-medium">
-            พบ {ผลค้นหา.length} ตัว ที่เหมาะกับคุณ
+            พบ {ผลค้นหา.length} ตัว ที่ตรงกับเงื่อนไข
           </p>
 
           {ผลค้นหา.length === 0 && (
@@ -157,11 +151,10 @@ function FindPet() {
             </div>
           )}
 
-          {ผลค้นหา.map((สัตว์, ลำดับ) => (
+          {ผลค้นหา.map((สัตว์) => (
             <การ์ดสัตว์
               key={สัตว์.id}
               สัตว์={สัตว์}
-              แสดงBadge={ลำดับ === 0}
               onClick={() => navigate(`/pet/${สัตว์.id}`, { state: { สัตว์ } })}
             />
           ))}
@@ -179,13 +172,14 @@ function FindPet() {
       {แท็บ === 'all' && (
         <div className="px-4 pt-4 space-y-4">
           <p className="text-sm text-gray-500 font-medium">
-            สัตว์ทั้งหมดในระบบ {สัตว์ทั้งหมด.length} ตัว
+            สัตว์ที่พร้อมหาบ้าน {สัตว์ทั้งหมด.length} ตัว
           </p>
 
           {สัตว์ทั้งหมด.length === 0 && (
             <div className="text-center py-10 text-gray-400">
               <p className="text-4xl mb-2">🐾</p>
-              <p>ยังไม่มีสัตว์ในระบบ</p>
+              <p>ยังไม่มีสัตว์ที่พร้อมหาบ้านในตอนนี้</p>
+              <p className="text-xs mt-1">เจ้าหน้าที่ศูนย์พักพิงกำลังคัดกรองสัตว์อยู่</p>
             </div>
           )}
 
@@ -193,14 +187,13 @@ function FindPet() {
             <การ์ดสัตว์
               key={สัตว์.id}
               สัตว์={สัตว์}
-              แสดงBadge={false}
               onClick={() => navigate(`/pet/${สัตว์.id}`, { state: { สัตว์ } })}
             />
           ))}
         </div>
       )}
 
-      {/* ---- หน้าฟอร์มค้นหา ---- */}
+      {/* ---- หน้าฟอร์มตัวกรอง ---- */}
       {แท็บ === 'form' && (
         <div className="px-4 pt-5 space-y-6">
 
@@ -226,32 +219,32 @@ function FindPet() {
 
           {/* เลือกอายุ */}
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">
-              อายุ <span className="text-red-400">*</span>
-            </p>
-            <select
-              value={อายุ}
-              onChange={(e) => setอายุ(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none"
-            >
-              <option value="">-- เลือกช่วงอายุ --</option>
-              <option>น้อยกว่า 1 ปี</option>
-              <option>1–3 ปี</option>
-              <option>3–7 ปี</option>
-              <option>มากกว่า 7 ปี</option>
-            </select>
+            <p className="text-sm font-semibold text-gray-700 mb-2">อายุ</p>
+            <div className="flex gap-3 flex-wrap">
+              {['เด็ก', 'โต'].map((ตัวเลือก) => (
+                <button
+                  key={ตัวเลือก}
+                  onClick={() => setช่วงอายุ(ช่วงอายุ === ตัวเลือก ? '' : ตัวเลือก)}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                    ช่วงอายุ === ตัวเลือก
+                      ? 'border-green-500 bg-green-500 text-white'
+                      : 'border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  {ตัวเลือก}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* เลือกเพศ */}
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">
-              เพศ <span className="text-red-400">*</span>
-            </p>
+            <p className="text-sm font-semibold text-gray-700 mb-2">เพศ</p>
             <div className="flex gap-3 flex-wrap">
-              {['เพศผู้', 'เพศเมีย', 'ไม่ทราบ'].map((ตัวเลือก) => (
+              {['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].map((ตัวเลือก) => (
                 <button
                   key={ตัวเลือก}
-                  onClick={() => setเพศ(ตัวเลือก)}
+                  onClick={() => setเพศ(เพศ === ตัวเลือก ? '' : ตัวเลือก)}
                   className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
                     เพศ === ตัวเลือก
                       ? 'border-green-500 bg-green-500 text-white'
@@ -264,23 +257,22 @@ function FindPet() {
             </div>
           </div>
 
-          {/* เลือกนิสัย */}
+          {/* เลือกขนาดตัว */}
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">
-              นิสัยที่ต้องการ{' '}
-              <span className="text-gray-400 font-normal text-xs">(เลือกได้หลายข้อ)</span>
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {['เป็นมิตร', 'ชอบอิสระ', 'สงบเสงี่ยม', 'กระตือรือร้น', 'ขี้เล่น', 'ชอบออกกำลัง'].map((นิสัย) => (
-                <label key={นิสัย} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={นิสัยที่เลือก.includes(นิสัย)}
-                    onChange={() => เลือกนิสัย(นิสัย)}
-                    className="w-4 h-4 accent-green-500"
-                  />
-                  <span className="text-sm text-gray-700">{นิสัย}</span>
-                </label>
+            <p className="text-sm font-semibold text-gray-700 mb-2">ขนาดตัว</p>
+            <div className="flex gap-3 flex-wrap">
+              {['เล็ก', 'กลาง', 'ใหญ่'].map((ตัวเลือก) => (
+                <button
+                  key={ตัวเลือก}
+                  onClick={() => setขนาด(ขนาด === ตัวเลือก ? '' : ตัวเลือก)}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                    ขนาด === ตัวเลือก
+                      ? 'border-green-500 bg-green-500 text-white'
+                      : 'border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  {ตัวเลือก}
+                </button>
               ))}
             </div>
           </div>
@@ -288,10 +280,9 @@ function FindPet() {
           {/* ปุ่มค้นหา */}
           <button
             onClick={ค้นหาสัตว์}
-            disabled={!อายุ || !เพศ}
-            className="w-full bg-green-500 text-white rounded-xl py-3.5 font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-green-500 text-white rounded-xl py-3.5 font-semibold text-base"
           >
-            ค้นหาสัตว์เลี้ยงที่เหมาะกับฉัน
+            ค้นหาสัตว์เลี้ยง
           </button>
 
         </div>
@@ -302,7 +293,7 @@ function FindPet() {
 }
 
 // Component การ์ดสัตว์ — ใช้ซ้ำได้
-function การ์ดสัตว์({ สัตว์, แสดงBadge, onClick }) {
+function การ์ดสัตว์({ สัตว์, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -318,17 +309,7 @@ function การ์ดสัตว์({ สัตว์, แสดงBadge, on
         </div>
 
         <div className="flex-1">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-bold text-gray-800">{สัตว์.ชื่อ}</h3>
-            <div className="flex items-center gap-1">
-              {แสดงBadge && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                  แนะนำ
-                </span>
-              )}
-              <span className="text-xs font-bold text-green-600">{สัตว์.คะแนน}%</span>
-            </div>
-          </div>
+          <h3 className="font-bold text-gray-800 mb-1">{สัตว์.ชื่อ}</h3>
 
           <p className="text-gray-500 text-xs mb-2">
             {สัตว์.สายพันธุ์} • {สัตว์.อายุ} • {สัตว์.เพศ}

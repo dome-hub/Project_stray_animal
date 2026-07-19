@@ -19,7 +19,6 @@ function PetDetail() {
     ขนาด: 'กลาง',
     นิสัย: ['เป็นมิตร', 'ขี้เล่น'],
     สถานที่: 'ลาดพร้าว กรุงเทพฯ',
-    คะแนน: 95,
   }
 
   // ---- ข้อมูลศูนย์พักพิงจาก DB ----
@@ -59,11 +58,6 @@ function PetDetail() {
         </div>
         <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
         <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
-        {สัตว์.คะแนน && (
-          <div className="inline-block bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium mt-2">
-            🤖 AI แนะนำ {สัตว์.คะแนน}% เหมาะกับคุณ
-          </div>
-        )}
       </div>
 
       {/* ข้อมูลทั่วไป */}
@@ -88,19 +82,37 @@ function PetDetail() {
         </div>
       </div>
 
-      {/* วัคซีน */}
-      {สัตว์.วัคซีน && (
-        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">💉 การฉีดวัคซีน</h3>
-          <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
-            สัตว์.วัคซีน === 'ฉีดแล้ว'   ? 'bg-green-100 text-green-700' :
-            สัตว์.วัคซีน === 'ยังไม่ฉีด' ? 'bg-red-100 text-red-600'    :
-            'bg-gray-100 text-gray-600'
-          }`}>
-            {สัตว์.วัคซีน === 'ฉีดแล้ว'   ? '✅ ฉีดวัคซีนแล้ว'       :
-             สัตว์.วัคซีน === 'ยังไม่ฉีด' ? '❌ ยังไม่ได้ฉีดวัคซีน' :
-             '❓ ไม่ทราบประวัติ'}
-          </span>
+      {/* วัคซีน + ทำหมัน */}
+      {(สัตว์.วัคซีน || สัตว์.ทำหมัน) && (
+        <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm space-y-4">
+          {สัตว์.วัคซีน && (
+            <div>
+              <h3 className="font-bold text-gray-800 mb-3">💉 การฉีดวัคซีน</h3>
+              <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+                สัตว์.วัคซีน === 'ฉีดแล้ว'   ? 'bg-green-100 text-green-700' :
+                สัตว์.วัคซีน === 'ยังไม่ฉีด' ? 'bg-red-100 text-red-600'    :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {สัตว์.วัคซีน === 'ฉีดแล้ว'   ? '✅ ฉีดวัคซีนแล้ว'       :
+                 สัตว์.วัคซีน === 'ยังไม่ฉีด' ? '❌ ยังไม่ได้ฉีดวัคซีน' :
+                 '❓ ไม่ทราบประวัติ'}
+              </span>
+            </div>
+          )}
+          {สัตว์.ทำหมัน && (
+            <div>
+              <h3 className="font-bold text-gray-800 mb-3">✂️ การทำหมัน</h3>
+              <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+                สัตว์.ทำหมัน === 'ทำแล้ว'   ? 'bg-green-100 text-green-700' :
+                สัตว์.ทำหมัน === 'ยังไม่ทำ' ? 'bg-red-100 text-red-600'    :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {สัตว์.ทำหมัน === 'ทำแล้ว'   ? '✅ ทำหมันแล้ว'   :
+                 สัตว์.ทำหมัน === 'ยังไม่ทำ' ? '❌ ยังไม่ทำหมัน' :
+                 '❓ ไม่ทราบประวัติ'}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
