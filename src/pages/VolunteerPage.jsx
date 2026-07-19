@@ -2019,12 +2019,12 @@ function VolunteerPage({ หน้า }) {
                   </div>
                   <button
                     onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: !prev.is_adoptable } }) }}
-                    className={`w-12 h-7 rounded-full shrink-0 transition-colors relative ${
+                    className={`w-11 h-6 rounded-full shrink-0 transition-colors relative ${
                       สัตว์ที่แก้ไข.is_adoptable ? 'bg-green-500' : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-sm transition-transform ${
-                      สัตว์ที่แก้ไข.is_adoptable ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                      สัตว์ที่แก้ไข.is_adoptable ? 'translate-x-5' : 'translate-x-0'
                     }`} />
                   </button>
                 </div>
