@@ -5,9 +5,9 @@
 // animals  → จัดการสัตว์ในศูนย์ (รวมที่มาจากรายงาน)
 // stats    → สถิติ
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Circle, CircleDot, Plus, X, FileSpreadsheet, Navigation } from 'lucide-react'
+import { Circle, CircleDot, Plus, X, FileSpreadsheet, Navigation, Camera, Star } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -166,6 +166,21 @@ const สีสถานะสัตว์ = {
   'มีผู้รับเลี้ยง':    'text-gray-500 bg-gray-100',
 }
 
+// ตัวเลือกช่วงอายุ (ใช้ทั้งฟอร์มเพิ่ม/แก้ไข) — ต้องเป็นชุดค่าคงที่เดียวกันเสมอ
+// เพราะ FindPet.jsx (ฝั่ง user) กรอง "เด็ก/โต" โดย match ตรงกับ string ชุดนี้
+const ตัวเลือกอายุสัตว์ = ['น้อยกว่า 1 ปี', '1–2 ปี', '2–5 ปี', '5–10 ปี', 'มากกว่า 10 ปี', 'ไม่ทราบ']
+
+// ---- Helper: ชื่อ/สายพันธุ์ ที่แสดงผลได้จริง — กัน "ไม่สามารถวิเคราะห์ได้" (AI วิเคราะห์พันธุ์ไม่ได้) หลุดมาโชว์เป็นชื่อ ----
+function แสดงสายพันธุ์สัตว์(breed) {
+  if (!breed || breed === 'ไม่สามารถวิเคราะห์ได้') return 'รอระบุสายพันธุ์'
+  return breed
+}
+function แสดงชื่อสัตว์(สัตว์) {
+  if (สัตว์.name && สัตว์.name !== 'ยังไม่ตั้งชื่อ') return สัตว์.name
+  if (สัตว์.report_id) return `ยังไม่ตั้งชื่อ (รหัส #${String(สัตว์.report_id).padStart(6, '0')})`
+  return `${สัตว์.breed?.includes('แมว') ? 'แมว' : 'สุนัข'} รอระบุชื่อ`
+}
+
 // ---- Helper: แปลงวันที่ ----
 function แปลงวันที่เวลา(str) {
   if (!str) return ''
@@ -288,11 +303,16 @@ function VolunteerPage({ หน้า }) {
   // ---- Animals ----
   const [สัตว์จากDB,        setSัตว์จากDB]        = useState([])
   const [โหลดสัตว์,         setโหลดสัตว์]         = useState(true)
+  const [แท็บสัตว์,         setแท็บสัตว์]         = useState('shelter')  // shelter | waiting | adopted
   const [สัตว์ที่แก้ไข,      setSัตว์ที่แก้ไข]      = useState(null)
   const [inputนิสัย,        setinputนิสัย]        = useState('')      // ช่องพิมพ์ก่อนกลายเป็น chip
   const [ข้อมูลรายงานสัตว์,  setข้อมูลรายงานสัตว์]  = useState(null)   // { report + reporter }
   const [โหลดรายงานสัตว์,   setโหลดรายงานสัตว์]   = useState(false)
   const [แสดงฟอร์มเพิ่ม, setแสดงฟอร์มเพิ่ม] = useState(false)
+  const [ไฟล์รูปสัตว์ใหม่,  setไฟล์รูปสัตว์ใหม่]  = useState(null)     // File ที่เลือกอัปโหลดใหม่ (ยังไม่ได้ upload)
+  const [พรีวิวรูปสัตว์ใหม่, setพรีวิวรูปสัตว์ใหม่] = useState(null)     // object URL สำหรับ preview
+  const [กำลังอัปโหลดรูป,   setกำลังอัปโหลดรูป]   = useState(false)
+  const inputรูปสัตว์ = useRef(null)
   const [ชื่อสัตว์,       setชื่อสัตว์]       = useState('')
   const [เพศสัตว์,       setเพศสัตว์]       = useState('')
   const [สายพันธุ์,      setSายพันธุ์]      = useState('')
@@ -581,7 +601,24 @@ function VolunteerPage({ หน้า }) {
   }
 
   async function บันทึกแก้ไขสัตว์() {
-    if (!สัตว์ที่แก้ไข) return
+    if (!สัตว์ที่แก้ไข || กำลังอัปโหลดรูป) return
+
+    // อัปโหลดรูปโปรไฟล์ใหม่ก่อน (ถ้าเลือกไว้) — ใช้แทนรูปเดิมจากจุดเกิดเหตุ
+    let photo_url = สัตว์ที่แก้ไข.photo_url || null
+    if (ไฟล์รูปสัตว์ใหม่) {
+      setกำลังอัปโหลดรูป(true)
+      const ชื่อไฟล์ = `animal_${Date.now()}_${ไฟล์รูปสัตว์ใหม่.name.replace(/\s/g, '_')}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปสัตว์ใหม่)
+      setกำลังอัปโหลดรูป(false)
+      if (uploadError) {
+        alert('อัปโหลดรูปไม่สำเร็จ: ' + uploadError.message)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
+      photo_url = urlData.publicUrl
+    }
+
     const { error } = await supabase.from('animals').update({
       name:         สัตว์ที่แก้ไข.name,
       breed:        สัตว์ที่แก้ไข.breed,
@@ -589,6 +626,7 @@ function VolunteerPage({ หน้า }) {
       gender:       สัตว์ที่แก้ไข.gender,
       health:       สัตว์ที่แก้ไข.health,
       status:       สัตว์ที่แก้ไข.status,
+      photo_url:    photo_url,
       traits:       สัตว์ที่แก้ไข.traits       || null,
       vaccine_info: สัตว์ที่แก้ไข.vaccine_info || null,
       neutered:     สัตว์ที่แก้ไข.neutered     || null,
@@ -599,8 +637,11 @@ function VolunteerPage({ หน้า }) {
 
     if (!error) {
       setSัตว์จากDB(function (prev) {
-        return prev.map(function (s) { return s.id === สัตว์ที่แก้ไข.id ? สัตว์ที่แก้ไข : s })
+        return prev.map(function (s) { return s.id === สัตว์ที่แก้ไข.id ? { ...สัตว์ที่แก้ไข, photo_url } : s })
       })
+      if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
+      setไฟล์รูปสัตว์ใหม่(null)
+      setพรีวิวรูปสัตว์ใหม่(null)
       setSัตว์ที่แก้ไข(null)
       setข้อมูลรายงานสัตว์(null)
       toast('✅ บันทึกข้อมูลสัตว์สำเร็จ!')
@@ -611,9 +652,14 @@ function VolunteerPage({ หน้า }) {
 
   // เปิด bottom sheet แก้ไขสัตว์ + ดึงข้อมูลรายงาน/ผู้แจ้ง (ถ้ามาจากรายงาน)
   async function เปิดแก้ไขสัตว์(สัตว์) {
-    setSัตว์ที่แก้ไข({ ...สัตว์ })
+    // ถ้า breed เป็นข้อความความล้มเหลวของ AI ("ไม่สามารถวิเคราะห์ได้") ให้เคลียร์เป็นค่าว่าง
+    // กันไม่ให้ข้อความนี้โผล่ในช่องกรอกตอนแก้ไข (เจ้าหน้าที่ควรกรอกสายพันธุ์จริงเอง)
+    const breedสะอาด = สัตว์.breed === 'ไม่สามารถวิเคราะห์ได้' ? '' : สัตว์.breed
+    setSัตว์ที่แก้ไข({ ...สัตว์, breed: breedสะอาด })
     setinputนิสัย('')
     setข้อมูลรายงานสัตว์(null)
+    setไฟล์รูปสัตว์ใหม่(null)
+    setพรีวิวรูปสัตว์ใหม่(null)
 
     if (!สัตว์.report_id) return
 
@@ -637,6 +683,25 @@ function VolunteerPage({ หน้า }) {
       setข้อมูลรายงานสัตว์({ ...report, reporter })
     }
     setโหลดรายงานสัตว์(false)
+  }
+
+  // เลือกไฟล์รูปโปรไฟล์ใหม่สำหรับสัตว์ (ยังไม่อัปโหลดจนกว่าจะกดบันทึก)
+  function เลือกรูปสัตว์ใหม่(event) {
+    const ไฟล์ = event.target.files[0]
+    if (!ไฟล์) return
+    if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
+    setไฟล์รูปสัตว์ใหม่(ไฟล์)
+    setพรีวิวรูปสัตว์ใหม่(URL.createObjectURL(ไฟล์))
+    event.target.value = ''
+  }
+
+  // ปิด bottom sheet แก้ไขสัตว์ — เคลียร์ preview รูปที่เลือกไว้ (ถ้ามี) กันหลุดค้างใน memory
+  function ปิดแก้ไขสัตว์() {
+    if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
+    setไฟล์รูปสัตว์ใหม่(null)
+    setพรีวิวรูปสัตว์ใหม่(null)
+    setSัตว์ที่แก้ไข(null)
+    setข้อมูลรายงานสัตว์(null)
   }
 
   // ================================================================
@@ -996,7 +1061,7 @@ function VolunteerPage({ หน้า }) {
                 <select value={อายุสัตว์} onChange={(e) => setอายุสัตว์(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white">
                   <option value="">-- เลือก --</option>
-                  {['น้อยกว่า 1 ปี','1–2 ปี','2–5 ปี','5–10 ปี','มากกว่า 10 ปี','ไม่ทราบ'].map(function (a) {
+                  {ตัวเลือกอายุสัตว์.map(function (a) {
                     return <option key={a}>{a}</option>
                   })}
                 </select>
@@ -1013,62 +1078,107 @@ function VolunteerPage({ หน้า }) {
             <p className="text-xs text-gray-400 mt-0.5">รวมสัตว์ที่มาจากรายงาน (สถานะ อยู่ศูนย์พักพิง)</p>
           </div>
 
-          {โหลดสัตว์ && (
-            <div className="text-center py-6">
-              <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto" />
-            </div>
-          )}
+          {(function () {
+            // Tabs กรองสถานะ — อยู่ศูนย์พักพิง (รวมอยู่ระหว่างรักษา) / รอหาบ้าน / รับเลี้ยงแล้ว
+            const กลุ่มสถานะตามแท็บ = {
+              shelter: ['อยู่ศูนย์พักพิง', 'อยู่ระหว่างรักษา'],
+              waiting: ['รอการรับเลี้ยง'],
+              adopted: ['มีผู้รับเลี้ยง'],
+            }
+            const นับตามแท็บ = function (key) {
+              return สัตว์จากDB.filter(function (s) { return กลุ่มสถานะตามแท็บ[key].includes(s.status) }).length
+            }
+            const แท็บทั้งหมด = [
+              { key: 'shelter', label: 'อยู่ศูนย์พักพิง', count: นับตามแท็บ('shelter') },
+              { key: 'waiting', label: 'รอหาบ้าน',        count: นับตามแท็บ('waiting') },
+              { key: 'adopted', label: 'รับเลี้ยงแล้ว',    count: นับตามแท็บ('adopted') },
+            ]
+            const สัตว์ตามแท็บ = สัตว์จากDB.filter(function (s) {
+              return กลุ่มสถานะตามแท็บ[แท็บสัตว์].includes(s.status)
+            })
+            const ข้อความว่างตามแท็บ = {
+              shelter: 'ไม่มีสัตว์ในศูนย์ตอนนี้',
+              waiting: 'ยังไม่มีสัตว์ที่รอหาบ้าน',
+              adopted: 'ยังไม่มีสัตว์ที่มีผู้รับเลี้ยง',
+            }
 
-          {!โหลดสัตว์ && สัตว์จากDB.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-4xl mb-2">🐾</p>
-              <p className="text-sm">ยังไม่มีสัตว์ในระบบ</p>
-            </div>
-          )}
+            return (
+              <>
+                {/* Tabs */}
+                <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                  {แท็บทั้งหมด.map(function (tab) {
+                    const isActive = แท็บสัตว์ === tab.key
+                    return (
+                      <button key={tab.key} onClick={() => setแท็บสัตว์(tab.key)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
+                          isActive ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
+                        }`}
+                      >
+                        {tab.label}
+                        <span className={`font-bold ${isActive ? 'text-teal-600' : 'text-gray-400'}`}>({tab.count})</span>
+                      </button>
+                    )
+                  })}
+                </div>
 
-          <div className="space-y-3">
-            {สัตว์จากDB.map(function (สัตว์) {
-              const ยังไม่ตั้งชื่อ = สัตว์.name === 'ยังไม่ตั้งชื่อ'
-              return (
-                <button key={สัตว์.id} onClick={() => เปิดแก้ไขสัตว์(สัตว์)}
-                  className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center shrink-0">
-                      {สัตว์.photo_url
-                        ? <img src={สัตว์.photo_url} alt={สัตว์.name} className="w-full h-full object-cover" />
-                        : <span className="text-3xl">{สัตว์.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
-                      }
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold text-gray-800">{ยังไม่ตั้งชื่อ ? (สัตว์.breed || 'ไม่ระบุสายพันธุ์') : สัตว์.name}</p>
-                        {สัตว์.report_id && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">📋 จากรายงาน</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {ยังไม่ตั้งชื่อ
-                          ? `${สัตว์.age || '-'} · ${สัตว์.gender || '-'}`
-                          : `${สัตว์.breed || 'ไม่ระบุ'} · ${สัตว์.age || '-'} · ${สัตว์.gender || '-'}`}
-                      </p>
-                      <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
-                          {สัตว์.status}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${
-                          สัตว์.is_adoptable ? 'text-green-700 bg-green-50' : 'text-gray-500 bg-gray-100'
-                        }`}>
-                          {สัตว์.is_adoptable ? '🌐 เผยแพร่แล้ว' : '🔒 ยังไม่เผยแพร่'}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-gray-300 text-xl shrink-0">›</span>
+                {โหลดสัตว์ && (
+                  <div className="text-center py-6">
+                    <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto" />
                   </div>
-                </button>
-              )
-            })}
-          </div>
+                )}
+
+                {!โหลดสัตว์ && สัตว์ตามแท็บ.length === 0 && (
+                  <div className="text-center py-12 text-gray-400">
+                    <p className="text-4xl mb-2">🐾</p>
+                    <p className="text-sm">
+                      {สัตว์จากDB.length === 0 ? 'ยังไม่มีสัตว์ในระบบ' : ข้อความว่างตามแท็บ[แท็บสัตว์]}
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {สัตว์ตามแท็บ.map(function (สัตว์) {
+                    return (
+                      <button key={สัตว์.id} onClick={() => เปิดแก้ไขสัตว์(สัตว์)}
+                        className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-14 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center shrink-0">
+                            {สัตว์.photo_url
+                              ? <img src={สัตว์.photo_url} alt={แสดงชื่อสัตว์(สัตว์)} className="w-full h-full object-cover" />
+                              : <span className="text-3xl">{สัตว์.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-gray-800 truncate">{แสดงชื่อสัตว์(สัตว์)}</p>
+                              {สัตว์.report_id && (
+                                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">📋 จากรายงาน</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">
+                              {แสดงสายพันธุ์สัตว์(สัตว์.breed)} · {สัตว์.age || '-'} · {สัตว์.gender || '-'}
+                            </p>
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
+                                {สัตว์.status}
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${
+                                สัตว์.is_adoptable ? 'text-green-700 bg-green-50' : 'text-gray-500 bg-gray-100'
+                              }`}>
+                                {สัตว์.is_adoptable ? '🌐 เผยแพร่แล้ว' : '🔒 ยังไม่เผยแพร่'}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-gray-300 text-xl shrink-0">›</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )
+          })()}
         </div>
       )}
 
@@ -1565,22 +1675,42 @@ function VolunteerPage({ หน้า }) {
           ============================================================ */}
       {สัตว์ที่แก้ไข && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
-             onClick={() => { setSัตว์ที่แก้ไข(null); setข้อมูลรายงานสัตว์(null) }}>
+             onClick={ปิดแก้ไขสัตว์}>
           <div className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
             <div className="flex items-center justify-between px-5 py-3">
               <p className="font-bold text-gray-800">แก้ไขข้อมูลสัตว์</p>
-              <button onClick={() => { setSัตว์ที่แก้ไข(null); setข้อมูลรายงานสัตว์(null) }} className="text-gray-400 text-2xl leading-none">✕</button>
+              <button onClick={ปิดแก้ไขสัตว์} className="text-gray-400 text-2xl leading-none">✕</button>
             </div>
 
             <div className="px-5 pb-8 space-y-4">
-              {/* รูป */}
-              <div className="w-full h-36 rounded-2xl overflow-hidden bg-teal-50 flex items-center justify-center">
-                {สัตว์ที่แก้ไข.photo_url
-                  ? <img src={สัตว์ที่แก้ไข.photo_url} alt={สัตว์ที่แก้ไข.name} className="w-full h-full object-contain" />
-                  : <span className="text-6xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
-                }
+              {/* รูปโปรไฟล์ — อัปโหลดรูปใหม่แทนรูปจากจุดเกิดเหตุ ใช้ตอนหาบ้าน */}
+              <div>
+                <div className="relative w-full h-36 rounded-2xl overflow-hidden bg-teal-50 flex items-center justify-center">
+                  {พรีวิวรูปสัตว์ใหม่ ? (
+                    <img src={พรีวิวรูปสัตว์ใหม่} alt="รูปใหม่ (พรีวิว)" className="w-full h-full object-contain" />
+                  ) : สัตว์ที่แก้ไข.photo_url ? (
+                    <img src={สัตว์ที่แก้ไข.photo_url} alt={แสดงชื่อสัตว์(สัตว์ที่แก้ไข)} className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-6xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
+                  )}
+                  {พรีวิวรูปสัตว์ใหม่ && (
+                    <span className="absolute top-2 left-2 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      รูปใหม่ (ยังไม่บันทึก)
+                    </span>
+                  )}
+                </div>
+                <input ref={inputรูปสัตว์} type="file" accept="image/*" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
+                <button
+                  onClick={() => inputรูปสัตว์.current.click()}
+                  className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-teal-300 rounded-xl py-2.5 text-sm font-medium text-teal-600 bg-teal-50/50"
+                >
+                  <Camera size={16} /> {สัตว์ที่แก้ไข.photo_url || พรีวิวรูปสัตว์ใหม่ ? 'เปลี่ยนรูปโปรไฟล์' : 'อัปโหลดรูปโปรไฟล์'}
+                </button>
+                <p className="text-xs text-gray-400 mt-1">
+                  แนะนำให้ถ่ายรูปใหม่ที่หน้าตาน่ารักกว่ารูปตอนเกิดเหตุ ใช้แสดงในหน้าหาบ้าน
+                </p>
               </div>
 
               {สัตว์ที่แก้ไข.report_id && (
@@ -1680,7 +1810,6 @@ function VolunteerPage({ หน้า }) {
               {[
                 { label: 'ชื่อสัตว์', key: 'name',   placeholder: 'ชื่อสัตว์' },
                 { label: 'สายพันธุ์', key: 'breed',  placeholder: 'เช่น สุนัขพันธุ์ไทย' },
-                { label: 'อายุ',      key: 'age',    placeholder: 'เช่น 2–3 ปี' },
                 { label: 'สุขภาพ',   key: 'health', placeholder: 'เช่น ปกติ, บาดเจ็บ, รักษาอยู่' },
               ].map(function (f) {
                 return (
@@ -1692,6 +1821,20 @@ function VolunteerPage({ หน้า }) {
                   </div>
                 )
               })}
+
+              {/* อายุ — ใช้ select ชุดตัวเลือกเดียวกับฟอร์มเพิ่ม เพราะหน้า "ค้นหาสัตว์เลี้ยง" ฝั่ง user
+                  กรอง "เด็ก/โต" โดย match ตรงกับ string ชุดนี้ ถ้าเป็นข้อความอิสระ ตัวกรองจะหาไม่เจอ */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1">อายุ</p>
+                <select value={สัตว์ที่แก้ไข.age || ''}
+                  onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, age: e.target.value } }) }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-teal-400">
+                  <option value="">-- เลือก --</option>
+                  {ตัวเลือกอายุสัตว์.map(function (a) {
+                    return <option key={a}>{a}</option>
+                  })}
+                </select>
+              </div>
 
               <div>
                 <p className="text-xs font-semibold text-gray-600 mb-2">เพศ</p>
@@ -1715,15 +1858,29 @@ function VolunteerPage({ หน้า }) {
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-gray-600 mb-2">สถานะ</p>
+                <p className="text-xs font-semibold text-gray-600 mb-2">
+                  สถานะ
+                  <span className="text-gray-400 font-normal ml-1.5">— "รอการรับเลี้ยง" คือสถานะที่พร้อมให้เจ้าหน้าที่กดเผยแพร่หาบ้าน</span>
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {['อยู่ศูนย์พักพิง', 'รอการรับเลี้ยง', 'อยู่ระหว่างรักษา', 'มีผู้รับเลี้ยง'].map(function (ส) {
+                    const isWaiting  = ส === 'รอการรับเลี้ยง'
+                    const isSelected = สัตว์ที่แก้ไข.status === ส
                     return (
                       <button key={ส}
                         onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, status: ส } }) }}
-                        className={`py-2.5 rounded-xl text-xs font-medium border-2 ${
-                          สัตว์ที่แก้ไข.status === ส ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-700'
-                        }`}>{ส}</button>
+                        className={`py-2.5 rounded-xl text-xs font-medium border-2 flex items-center justify-center gap-1 ${
+                          isSelected
+                            ? isWaiting
+                              ? 'border-teal-600 bg-teal-600 text-white shadow-sm'
+                              : 'border-teal-500 bg-teal-50 text-teal-700'
+                            : isWaiting
+                              ? 'border-teal-300 bg-teal-50/60 text-teal-700'
+                              : 'border-gray-200 text-gray-700'
+                        }`}>
+                        {isWaiting && <Star size={12} className={isSelected ? 'fill-white' : 'fill-teal-500 text-teal-500'} />}
+                        {ส}
+                      </button>
                     )
                   })}
                 </div>
