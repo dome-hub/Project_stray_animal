@@ -10,6 +10,7 @@ import {
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
+import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 
 // ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
 const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
@@ -213,9 +214,15 @@ function ReportAnimal({ user }) {
   }
 
   // ---- เลือกรูปจากแกลเลอรี่ ----
-  function เลือกรูปภาพ(event) {
+  async function เลือกรูปภาพ(event) {
     const ไฟล์ = event.target.files[0]
     if (!ไฟล์) return
+    const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
+    if (!ผลตรวจ.ok) {
+      alert(ผลตรวจ.error)
+      event.target.value = ''
+      return
+    }
     setไฟล์รูปภาพ(ไฟล์)
     setรูปภาพPreview(URL.createObjectURL(ไฟล์))
     setผลAI(null)
@@ -645,7 +652,7 @@ function ReportAnimal({ user }) {
             </div>
           )}
 
-          <input ref={inputGallery} type="file" accept="image/*" className="hidden" onChange={เลือกรูปภาพ} />
+          <input ref={inputGallery} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปภาพ} />
         </div>
 
         {กำลังวิเคราะห์ && (

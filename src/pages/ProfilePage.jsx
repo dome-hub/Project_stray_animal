@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2, ShieldAlert, X } from 'lucide-react'
 import { supabase } from '../supabase'
+import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 
 // Role display config
 const roleMap = {
@@ -229,6 +230,12 @@ function ProfilePage({ user }) {
   async function เลือกรูปโปรไฟล์(event) {
     const ไฟล์ = event.target.files[0]
     if (!ไฟล์) return
+    const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
+    if (!ผลตรวจ.ok) {
+      alert(ผลตรวจ.error)
+      event.target.value = ''
+      return
+    }
     setกำลังอัปโหลดรูป(true)
     try {
       const นามสกุล = ไฟล์.name.split('.').pop()
@@ -312,7 +319,7 @@ function ProfilePage({ user }) {
             <span className="text-sm">📷</span>
           </button>
         </div>
-        <input ref={inputรูป} type="file" accept="image/*" className="hidden" onChange={เลือกรูปโปรไฟล์} />
+        <input ref={inputรูป} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปโปรไฟล์} />
 
         <h2 className="text-xl font-bold text-gray-800">{displayName}</h2>
         <p className="text-gray-500 text-sm mt-1">{user?.email || ''}</p>

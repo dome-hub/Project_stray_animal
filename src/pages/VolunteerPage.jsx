@@ -15,6 +15,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
+import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -699,9 +700,15 @@ function VolunteerPage({ หน้า }) {
   }
 
   // เลือกไฟล์รูปโปรไฟล์ใหม่สำหรับสัตว์ (ยังไม่อัปโหลดจนกว่าจะกดบันทึก)
-  function เลือกรูปสัตว์ใหม่(event) {
+  async function เลือกรูปสัตว์ใหม่(event) {
     const ไฟล์ = event.target.files[0]
     if (!ไฟล์) return
+    const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
+    if (!ผลตรวจ.ok) {
+      alert(ผลตรวจ.error)
+      event.target.value = ''
+      return
+    }
     if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
     setไฟล์รูปสัตว์ใหม่(ไฟล์)
     setพรีวิวรูปสัตว์ใหม่(URL.createObjectURL(ไฟล์))
@@ -1712,7 +1719,7 @@ function VolunteerPage({ หน้า }) {
                     </span>
                   )}
                 </div>
-                <input ref={inputรูปสัตว์} type="file" accept="image/*" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
+                <input ref={inputรูปสัตว์} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
                 <button
                   onClick={() => inputรูปสัตว์.current.click()}
                   className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-teal-300 rounded-xl py-2.5 text-sm font-medium text-teal-600 bg-teal-50/50"
