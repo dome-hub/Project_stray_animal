@@ -4,7 +4,7 @@
 
 import { Dog, Cat } from 'lucide-react'
 
-export function เป็นแมว(ชนิด) {
+function เป็นแมว(ชนิด) {
   return typeof ชนิด === 'string' && ชนิด.includes('แมว')
 }
 
