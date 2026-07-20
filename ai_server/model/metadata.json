@@ -1,48 +1,57 @@
 {
-  "version": "2.0",
+  "version": "3.0",
   "img_size": 224,
-  "num_classes": 37,
+  "num_classes": 46,
   "classes": [
-    "scottish_terrier",
-    "bombay",
-    "beagle",
-    "british_shorthair",
-    "persian",
     "staffordshire_bull_terrier",
-    "german_shorthaired",
-    "pug",
-    "birman",
-    "english_setter",
-    "samoyed",
+    "thai_ridgeback",
     "english_cocker_spaniel",
+    "boxer",
+    "birman",
+    "scottish_terrier",
     "sphynx",
     "ragdoll",
-    "siamese",
-    "american_bulldog",
-    "egyptian_mau",
-    "newfoundland",
-    "maine_coon",
-    "american_pit_bull_terrier",
-    "keeshond",
-    "russian_blue",
-    "pomeranian",
-    "havanese",
-    "miniature_pinscher",
-    "boxer",
-    "japanese_chin",
-    "basset_hound",
-    "abyssinian",
-    "wheaten_terrier",
-    "great_pyrenees",
-    "chihuahua",
-    "bengal",
-    "shiba_inu",
     "yorkshire_terrier",
+    "american_bulldog",
+    "british_shorthair",
+    "labrador_retriever",
+    "havanese",
+    "basset_hound",
     "leonberger",
-    "saint_bernard"
+    "egyptian_mau",
+    "bengal",
+    "great_pyrenees",
+    "pomeranian",
+    "american_pit_bull_terrier",
+    "siamese",
+    "german_shorthaired",
+    "wheaten_terrier",
+    "persian",
+    "beagle",
+    "siberian_husky",
+    "bombay",
+    "golden_retriever",
+    "russian_blue",
+    "samoyed",
+    "korat",
+    "khao_manee",
+    "thai_bangkaew",
+    "konja",
+    "saint_bernard",
+    "chihuahua",
+    "english_setter",
+    "suphalak",
+    "pug",
+    "shiba_inu",
+    "miniature_pinscher",
+    "newfoundland",
+    "keeshond",
+    "maine_coon",
+    "japanese_chin",
+    "abyssinian"
   ],
-  "test_accuracy": 0.9315931797027588,
-  "top3_accuracy": 0.9900990128517151,
+  "test_accuracy": 0.9156956672668457,
+  "top3_accuracy": 0.9876627922058105,
   "breed_info": {
     "scottish_terrier": {
       "ชื่อไทย": "สก็อตทิช เทอร์เรีย",
@@ -265,6 +274,60 @@
       "ประเภท": "สุนัข",
       "ขนาด": "ใหญ่มาก",
       "นิสัย": "ใจดี / อ่อนโยน / นิ่งสงบ / เป็นมิตรกับเด็ก"
+    },
+    "thai_ridgeback": {
+      "ชื่อไทย": "ไทยหลังอาน",
+      "ประเภท": "สุนัข",
+      "ขนาด": "ใหญ่",
+      "นิสัย": "ฉลาด / ปราดเปรียว / ระแวงคนแปลกหน้า / ซื่อสัตย์ต่อเจ้าของ"
+    },
+    "siberian_husky": {
+      "ชื่อไทย": "ไซบีเรียน ฮัสกี้",
+      "ประเภท": "สุนัข",
+      "ขนาด": "ใหญ่",
+      "นิสัย": "ร่าเริง / พลังงานสูงมาก / เป็นมิตร / ชอบวิ่ง"
+    },
+    "thai_bangkaew": {
+      "ชื่อไทย": "ไทยบางแก้ว",
+      "ประเภท": "สุนัข",
+      "ขนาด": "กลาง",
+      "นิสัย": "ฉลาด / ซื่อสัตย์ / ปกป้องเจ้าของ / ระแวงคนแปลกหน้า"
+    },
+    "labrador_retriever": {
+      "ชื่อไทย": "ลาบราดอร์ รีทรีฟเวอร์",
+      "ประเภท": "สุนัข",
+      "ขนาด": "ใหญ่",
+      "นิสัย": "เป็นมิตร / ร่าเริง / ฉลาด / รักการเล่นน้ำ"
+    },
+    "golden_retriever": {
+      "ชื่อไทย": "โกลเด้น รีทรีฟเวอร์",
+      "ประเภท": "สุนัข",
+      "ขนาด": "ใหญ่",
+      "นิสัย": "เป็นมิตร / อ่อนโยน / ฉลาด / ซื่อสัตย์"
+    },
+    "khao_manee": {
+      "ชื่อไทย": "ขาวมณี",
+      "ประเภท": "แมว",
+      "ขนาด": "กลาง",
+      "นิสัย": "ฉลาด / ขี้เล่น / เป็นมิตร / แมวมงคลไทย"
+    },
+    "korat": {
+      "ชื่อไทย": "โคราช (สีสวาด)",
+      "ประเภท": "แมว",
+      "ขนาด": "กลาง",
+      "นิสัย": "ขี้อ้อน / ผูกพันเจ้าของ / ฉลาด / แมวมงคลนำโชค"
+    },
+    "suphalak": {
+      "ชื่อไทย": "ศุภลักษณ์",
+      "ประเภท": "แมว",
+      "ขนาด": "กลาง",
+      "นิสัย": "สงบ / ผูกพันเจ้าของ / แมวมงคลไทยหายาก"
+    },
+    "konja": {
+      "ชื่อไทย": "โกญจา",
+      "ประเภท": "แมว",
+      "ขนาด": "กลาง",
+      "นิสัย": "ฉลาด / ขี้อ้อน / แมวมงคลไทยหายาก"
     }
   }
 }
