@@ -31,9 +31,9 @@ const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
 // ---- ประเภทการแจ้ง (อิงจาก urgency ที่ผู้ใช้เลือกตอนแจ้ง) พร้อมสีเฉพาะ ----
 // แดง = สัตว์ดุร้าย/เสี่ยงอันตราย, ส้ม = สัตว์บาดเจ็บ, เหลือง = พบสัตว์พลัดหลง/จรจัด
 const ประเภทแจ้งเรียง = [
-  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย/อันตราย', short: 'ดุร้าย',   emoji: '🔴', hex: '#ef4444', dot: 'bg-red-500',    badge: 'bg-red-50 text-red-700',       activeChip: 'border-red-500 bg-red-500 text-white' },
-  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ/ป่วย',   short: 'บาดเจ็บ', emoji: '🟠', hex: '#f97316', dot: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700', activeChip: 'border-orange-500 bg-orange-500 text-white' },
-  { key: 'ปานกลาง', label: 'สัตว์พลัดหลง/จรจัด',  short: 'พลัดหลง', emoji: '🟡', hex: '#eab308', dot: 'bg-yellow-500', badge: 'bg-yellow-50 text-yellow-700', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
+  { key: 'ด่วนมาก', label: 'สัตว์ดุร้าย/อันตราย', short: 'ดุร้าย',   emoji: '🔴', hex: '#ef4444', dot: 'bg-red-500',    badge: 'bg-red-100 text-red-700 border border-red-500',       activeChip: 'border-red-500 bg-red-500 text-white' },
+  { key: 'ด่วน',    label: 'สัตว์บาดเจ็บ/ป่วย',   short: 'บาดเจ็บ', emoji: '🟠', hex: '#f97316', dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700 border border-orange-500', activeChip: 'border-orange-500 bg-orange-500 text-white' },
+  { key: 'ปานกลาง', label: 'สัตว์พลัดหลง/จรจัด',  short: 'พลัดหลง', emoji: '🟡', hex: '#eab308', dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-700 border border-yellow-500', activeChip: 'border-yellow-500 bg-yellow-500 text-white' },
 ]
 function ประเภทจาก(urgency) {
   if (urgency === 'ด่วนมาก') return ประเภทแจ้งเรียง[0]
@@ -860,7 +860,8 @@ function VolunteerPage({ หน้า }) {
                       const ปิดเคสแล้ว = แท็บรายงาน === 'history'
                       return (
                         <div key={ร.id}
-                          className={`w-full text-left rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer ${
+                          style={{ borderLeftColor: ปิดเคสแล้ว ? '#d1d5db' : ประเภท.hex }}
+                          className={`w-full text-left rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${
                             ปิดเคสแล้ว ? 'bg-gray-50 opacity-75' : 'bg-white'
                           }`}
                           onClick={() => เปิดรายละเอียด(ร)}
