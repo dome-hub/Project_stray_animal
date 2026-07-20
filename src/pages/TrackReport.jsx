@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Pencil, Trash2, X, ClipboardList, Clock, FolderClosed, Calendar, MapPin,
+  Pencil, Trash2, X, ClipboardList, Clock, FolderClosed, MapPin,
   MessageSquare, FileText, Camera, Save, Ban, HardHat, User, Home,
   Map, Phone, CheckCircle2, Hourglass,
 } from 'lucide-react'
@@ -442,7 +442,7 @@ function TrackReport({ user }) {
         {รายงานตามวันที่.map(function (กลุ่ม) {
           return (
             <div key={กลุ่ม.label}>
-              <p className="text-xs font-semibold text-gray-500 mb-2 px-1 flex items-center gap-1.5"><Calendar size={13} className="shrink-0" /> {กลุ่ม.label}</p>
+              <p className="text-xs font-semibold text-gray-500 mb-2 px-1">📅 {กลุ่ม.label}</p>
               <div className="space-y-3">
                 {กลุ่ม.items.map(function (รายงาน) {
                   const รับเรื่องแล้ว = สถานะที่รับเรื่อง.includes(รายงาน.status)

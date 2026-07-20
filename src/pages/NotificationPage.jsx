@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Siren, HardHat, Car, Home, CheckCircle2, ClipboardList, Bell, User, Shield,
-  Calendar, Clock, Trash2,
+  Clock, Trash2,
 } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -401,9 +401,7 @@ function NotificationPage({ user }) {
           {กลุ่มวันที่.map(function (กลุ่ม) {
           return (
           <div key={กลุ่ม.label}>
-            <p className="text-xs font-semibold text-gray-400 mb-2 px-1 flex items-center gap-1.5">
-              <Calendar size={13} className="shrink-0" /> {กลุ่ม.label}
-            </p>
+            <p className="text-xs font-semibold text-gray-400 mb-2 px-1">📅 {กลุ่ม.label}</p>
             <div className="space-y-3">
           {กลุ่ม.items.map(function (n) {
             const read    = isอ่านแล้ว(n)

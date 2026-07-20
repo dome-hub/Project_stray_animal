@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Circle, CircleDot, Plus, X, FileSpreadsheet, Navigation, Camera, Star,
-  PawPrint, HelpCircle, HardHat, PartyPopper, ClipboardList, Calendar, MapPin,
+  PawPrint, HelpCircle, HardHat, PartyPopper, ClipboardList, MapPin,
   AlertTriangle, Settings, Search, FileText, Map, MessageSquare, User, Trash2,
   Phone, Loader2, CheckCircle2, XCircle, Save, Zap, Link2, Globe, Lock,
   Hourglass, Heart, ExternalLink,
@@ -1042,7 +1042,7 @@ function VolunteerPage({ หน้า }) {
             {รายงานกรองตามวันที่.map(function (กลุ่ม) {
               return (
                 <div key={กลุ่ม.label}>
-                  <p className="text-xs font-semibold text-gray-400 mb-2 px-1 flex items-center gap-1.5"><Calendar size={13} className="shrink-0" /> {กลุ่ม.label}</p>
+                  <p className="text-xs font-semibold text-gray-400 mb-2 px-1">📅 {กลุ่ม.label}</p>
                   <div className="space-y-3">
                     {กลุ่ม.items.map(function (ร) {
                       const ประเภท = ประเภทจาก(ร.urgency)
@@ -1403,7 +1403,7 @@ function VolunteerPage({ หน้า }) {
                             <p className="text-xs text-gray-500 mt-1 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {สัตว์.location || 'รอระบุ'}</p>
 
                             {/* Row 4: วันที่รับเข้า */}
-                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar size={12} className="shrink-0" /> รับเข้า {วันที่รับเข้า(สัตว์.created_at)}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">📅 รับเข้า {วันที่รับเข้า(สัตว์.created_at)}</p>
 
                             {/* Row 5: ป้ายสถานะ + สถานะเผยแพร่ */}
                             <div className="flex items-center gap-1 mt-1.5 flex-wrap">
