@@ -3,15 +3,19 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, ShieldAlert, X } from 'lucide-react'
+import {
+  Trash2, ShieldAlert, X, Shield, HardHat, User, Camera, Home, Save, Loader2,
+  ClipboardList, PawPrint, CheckCircle2, MapPin, Users, FileText, Heart,
+} from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import AnimalIcon from '../components/AnimalIcon'
 
 // Role display config
 const roleMap = {
-  admin:     { ชื่อ: 'ผู้ดูแลระบบ',            emoji: '🛡️', สี: 'text-purple-700 bg-purple-50' },
-  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', emoji: '🦺', สี: 'text-orange-700 bg-orange-50' },
-  user:      { ชื่อ: 'ผู้ใช้งานทั่วไป',          emoji: '👤', สี: 'text-blue-700 bg-blue-50' },
+  admin:     { ชื่อ: 'ผู้ดูแลระบบ',            Icon: Shield,  สี: 'text-purple-700 bg-purple-50' },
+  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', Icon: HardHat, สี: 'text-orange-700 bg-orange-50' },
+  user:      { ชื่อ: 'ผู้ใช้งานทั่วไป',          Icon: User,    สี: 'text-blue-700 bg-blue-50' },
 }
 
 // Tab config แยกตาม role
@@ -309,22 +313,22 @@ function ProfilePage({ user }) {
             ) : รูปโปรไฟล์ ? (
               <img src={รูปโปรไฟล์} alt="โปรไฟล์" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-5xl">👤</span>
+              <User size={48} strokeWidth={1.5} className="text-blue-400" />
             )}
           </div>
           <button
             onClick={() => inputรูป.current.click()}
             className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-md border-2 border-white"
           >
-            <span className="text-sm">📷</span>
+            <Camera size={15} className="text-white" />
           </button>
         </div>
         <input ref={inputรูป} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปโปรไฟล์} />
 
         <h2 className="text-xl font-bold text-gray-800">{displayName}</h2>
         <p className="text-gray-500 text-sm mt-1">{user?.email || ''}</p>
-        <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-2 ${roleInfo.สี}`}>
-          {roleInfo.emoji} {roleInfo.ชื่อ}
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mt-2 ${roleInfo.สี}`}>
+          <roleInfo.Icon size={13} className="shrink-0" /> {roleInfo.ชื่อ}
         </div>
       </div>
 
@@ -387,8 +391,8 @@ function ProfilePage({ user }) {
             {/* สิทธิ์ */}
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">สิทธิ์</span>
-              <span className={`text-sm font-medium ${roleInfo.สี.split(' ')[0]}`}>
-                {roleInfo.emoji} {roleInfo.ชื่อ}
+              <span className={`text-sm font-medium inline-flex items-center gap-1.5 ${roleInfo.สี.split(' ')[0]}`}>
+                <roleInfo.Icon size={14} className="shrink-0" /> {roleInfo.ชื่อ}
               </span>
             </div>
 
@@ -450,7 +454,9 @@ function ProfilePage({ user }) {
       {แท็บ === 'info' && currentRole === 'volunteer' && (
         <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-gray-800">🏠 ข้อมูลศูนย์พักพิง</h3>
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              <Home size={18} className="text-gray-500 shrink-0" /> ข้อมูลศูนย์พักพิง
+            </h3>
             {!กำลังแก้ไขShelter && (
               <button
                 onClick={() => {
@@ -497,9 +503,11 @@ function ProfilePage({ user }) {
                 <button
                   onClick={บันทึกShelter}
                   disabled={กำลังบันทึกShelter}
-                  className="flex-1 bg-orange-500 text-white rounded-xl py-2 text-sm font-medium disabled:opacity-60"
+                  className="flex-1 bg-orange-500 text-white rounded-xl py-2 text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  {กำลังบันทึกShelter ? '⏳ กำลังบันทึก...' : '💾 บันทึก'}
+                  {กำลังบันทึกShelter
+                    ? <><Loader2 size={14} className="animate-spin shrink-0" /> กำลังบันทึก...</>
+                    : <><Save size={14} className="shrink-0" /> บันทึก</>}
                 </button>
                 <button
                   onClick={() => setกำลังแก้ไขShelter(false)}
@@ -617,7 +625,7 @@ function ProfilePage({ user }) {
             </div>
           ) : ประวัติแจ้ง.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-5xl mb-3">📋</p>
+              <ClipboardList size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
               <p className="font-medium text-gray-600">ยังไม่มีประวัติการแจ้ง</p>
               <p className="text-xs text-gray-400 mt-1">เมื่อคุณแจ้งสัตว์จร จะปรากฏที่นี่</p>
               <button onClick={() => navigate('/report')}
@@ -632,15 +640,15 @@ function ProfilePage({ user }) {
                 <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center text-2xl shrink-0">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center shrink-0">
                         {r.image_url
                           ? <img src={r.image_url} alt="สัตว์" className="w-full h-full object-cover" />
-                          : (r.animal_type?.includes('แมว') ? '🐈' : '🐕')
+                          : <AnimalIcon ชนิด={r.animal_type} size={24} className="text-orange-400" />
                         }
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800 text-sm">{r.animal_type || 'ไม่ระบุ'}</p>
-                        <p className="text-xs text-gray-500">📍 {r.location_text}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {r.location_text}</p>
                         <p className="text-xs text-gray-400">{แปลงวันที่(r.created_at)} • #{String(r.id).padStart(6, '0')}</p>
                       </div>
                     </div>
@@ -658,7 +666,7 @@ function ProfilePage({ user }) {
       {/* ======== Tab: ประวัติรับเลี้ยง (user) ======== */}
       {แท็บ === 'adoptions' && (
         <div className="text-center py-16 px-4">
-          <p className="text-5xl mb-3">🐾</p>
+          <PawPrint size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
           <p className="font-medium text-gray-600">ยังไม่มีประวัติการรับเลี้ยง</p>
           <p className="text-xs text-gray-400 mt-1">เมื่อคุณยื่นขอรับเลี้ยงสัตว์ จะปรากฏที่นี่</p>
           <button onClick={() => navigate('/find-pet')}
@@ -729,7 +737,7 @@ function ProfilePage({ user }) {
             </div>
           ) : คิวงาน.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-5xl mb-3">✅</p>
+              <CheckCircle2 size={48} strokeWidth={1.5} className="mx-auto mb-3 text-green-400" />
               <p className="font-medium text-gray-600">ไม่มีคิวงานที่รอดำเนินการ</p>
               <p className="text-xs text-gray-400 mt-1">รายงานที่ยังรอจะปรากฏที่นี่</p>
             </div>
@@ -740,15 +748,15 @@ function ProfilePage({ user }) {
                 <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center text-2xl shrink-0">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center shrink-0">
                         {r.image_url
                           ? <img src={r.image_url} alt="สัตว์" className="w-full h-full object-cover" />
-                          : (r.animal_type?.includes('แมว') ? '🐈' : '🐕')
+                          : <AnimalIcon ชนิด={r.animal_type} size={24} className="text-orange-400" />
                         }
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800 text-sm">{r.animal_type || 'ไม่ระบุ'}</p>
-                        <p className="text-xs text-gray-500">📍 {r.location_text}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {r.location_text}</p>
                         <p className="text-xs text-gray-400">{แปลงวันที่(r.created_at)}</p>
                       </div>
                     </div>
@@ -779,13 +787,13 @@ function ProfilePage({ user }) {
             <>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { ชื่อ: 'ผู้ใช้งานทั้งหมด', ค่า: ภาพรวมAdmin.ผู้ใช้,    emoji: '👥', สี: 'bg-blue-50 text-blue-600' },
-                  { ชื่อ: 'รายงานทั้งหมด',    ค่า: ภาพรวมAdmin.รายงาน,   emoji: '📋', สี: 'bg-orange-50 text-orange-600' },
-                  { ชื่อ: 'สัตว์ในระบบ',       ค่า: ภาพรวมAdmin.สัตว์,    emoji: '🐾', สี: 'bg-green-50 text-green-600' },
-                  { ชื่อ: 'รับเลี้ยงแล้ว',     ค่า: ภาพรวมAdmin.รับเลี้ยง, emoji: '❤️', สี: 'bg-red-50 text-red-600' },
+                  { ชื่อ: 'ผู้ใช้งานทั้งหมด', ค่า: ภาพรวมAdmin.ผู้ใช้,    Icon: Users,    สี: 'bg-blue-50 text-blue-600' },
+                  { ชื่อ: 'รายงานทั้งหมด',    ค่า: ภาพรวมAdmin.รายงาน,   Icon: FileText, สี: 'bg-orange-50 text-orange-600' },
+                  { ชื่อ: 'สัตว์ในระบบ',       ค่า: ภาพรวมAdmin.สัตว์,    Icon: PawPrint, สี: 'bg-green-50 text-green-600' },
+                  { ชื่อ: 'รับเลี้ยงแล้ว',     ค่า: ภาพรวมAdmin.รับเลี้ยง, Icon: Heart,    สี: 'bg-red-50 text-red-600' },
                 ].map((stat) => (
                   <div key={stat.ชื่อ} className={`rounded-2xl p-4 shadow-sm ${stat.สี.split(' ')[0]}`}>
-                    <p className="text-3xl mb-1">{stat.emoji}</p>
+                    <stat.Icon size={26} strokeWidth={1.5} className={`mb-1 ${stat.สี.split(' ')[1]}`} />
                     <p className={`text-3xl font-bold ${stat.สี.split(' ')[1]}`}>{stat.ค่า}</p>
                     <p className="text-xs text-gray-500 mt-1">{stat.ชื่อ}</p>
                   </div>

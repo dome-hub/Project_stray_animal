@@ -9,6 +9,11 @@ import 'leaflet/dist/leaflet.css'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+import {
+  Shield, Users, FileText, PawPrint, Heart, User, HardHat, MapPin, Map,
+  Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
+  CheckCircle2, Home, Lock,
+} from 'lucide-react'
 import { supabase } from '../supabase'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
@@ -258,7 +263,7 @@ function AdminPage({ หน้า, user }) {
         <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
         <div>
           <h1 className="font-bold text-gray-800">{titleMap[หน้า]}</h1>
-          <p className="text-xs text-purple-600">🛡️ ผู้ดูแลระบบ</p>
+          <p className="text-xs text-purple-600 flex items-center gap-1"><Shield size={12} className="shrink-0" /> ผู้ดูแลระบบ</p>
         </div>
       </div>
 
@@ -276,13 +281,13 @@ function AdminPage({ หน้า, user }) {
               {/* สถิติหลัก 4 กล่อง */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { ชื่อ: 'ผู้ใช้งานทั้งหมด', ค่า: สถิติ.ผู้ใช้,    emoji: '👥', สี: 'bg-blue-50 text-blue-600' },
-                  { ชื่อ: 'รายงานทั้งหมด',    ค่า: สถิติ.รายงาน,   emoji: '📋', สี: 'bg-orange-50 text-orange-600' },
-                  { ชื่อ: 'สัตว์ในระบบ',       ค่า: สถิติ.สัตว์,    emoji: '🐾', สี: 'bg-green-50 text-green-600' },
-                  { ชื่อ: 'รับเลี้ยงแล้ว',     ค่า: สถิติ.รับเลี้ยง, emoji: '❤️', สี: 'bg-red-50 text-red-600' },
+                  { ชื่อ: 'ผู้ใช้งานทั้งหมด', ค่า: สถิติ.ผู้ใช้,    Icon: Users,    สี: 'bg-blue-50 text-blue-600' },
+                  { ชื่อ: 'รายงานทั้งหมด',    ค่า: สถิติ.รายงาน,   Icon: FileText, สี: 'bg-orange-50 text-orange-600' },
+                  { ชื่อ: 'สัตว์ในระบบ',       ค่า: สถิติ.สัตว์,    Icon: PawPrint, สี: 'bg-green-50 text-green-600' },
+                  { ชื่อ: 'รับเลี้ยงแล้ว',     ค่า: สถิติ.รับเลี้ยง, Icon: Heart,    สี: 'bg-red-50 text-red-600' },
                 ].map((stat) => (
                   <div key={stat.ชื่อ} className={`rounded-2xl p-4 shadow-sm ${stat.สี.split(' ')[0]}`}>
-                    <p className="text-3xl mb-1">{stat.emoji}</p>
+                    <stat.Icon size={26} strokeWidth={1.5} className={`mb-1 ${stat.สี.split(" ")[1]}`} />
                     <p className={`text-3xl font-bold ${stat.สี.split(' ')[1]}`}>{stat.ค่า}</p>
                     <p className="text-xs text-gray-500 mt-1">{stat.ชื่อ}</p>
                   </div>
@@ -349,7 +354,7 @@ function AdminPage({ หน้า, user }) {
 
               {ผู้ใช้กรอง.length === 0 && (
                 <div className="text-center py-12 text-gray-400">
-                  <p className="text-5xl mb-3">👥</p>
+                  <Users size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
                   <p className="font-medium text-gray-500">ยังไม่มีผู้ใช้ในระบบ</p>
                   <p className="text-xs mt-1">ผู้ใช้จะปรากฏหลังจาก Login ด้วย Auth จริง</p>
                 </div>
@@ -368,7 +373,7 @@ function AdminPage({ หน้า, user }) {
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
                         {u.avatar_url
                           ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
-                          : <span className="text-xl">👤</span>
+                          : <User size={20} className="text-gray-400" />
                         }
                       </div>
                       <div className="flex-1 min-w-0">
@@ -386,7 +391,7 @@ function AdminPage({ หน้า, user }) {
                           {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
-                          {u.role === 'admin' ? '🛡️ Admin' : u.role === 'volunteer' ? '🦺 เจ้าหน้าที่' : '👤 ผู้ใช้'}
+                          {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
                         </span>
                       </div>
                     </div>
@@ -403,7 +408,7 @@ function AdminPage({ หน้า, user }) {
         <div className="px-4 pt-4 space-y-4">
 
           <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-            <p className="text-xs font-bold text-indigo-600 mb-1">📍 ขอบเขตพื้นที่ของระบบ</p>
+            <p className="text-xs font-bold text-indigo-600 mb-1 flex items-center gap-1.5"><MapPin size={12} className="shrink-0" /> ขอบเขตพื้นที่ของระบบ</p>
             <p className="text-sm font-semibold text-gray-800">จังหวัดนครปฐม</p>
             <p className="text-sm text-gray-600">ตำบลกำแพงแสน</p>
           </div>
@@ -411,7 +416,7 @@ function AdminPage({ หน้า, user }) {
           {/* แผนที่ภาพรวมรายงาน */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <p className="font-bold text-gray-800">🗺️ แผนที่รายงานทั้งหมด</p>
+              <p className="font-bold text-gray-800 flex items-center gap-2"><Map size={18} className="text-gray-500 shrink-0" /> แผนที่รายงานทั้งหมด</p>
               {!โหลดแผนที่ && (
                 <span className="text-xs text-gray-400">{รายงานพิกัด.length} จุด</span>
               )}
@@ -435,7 +440,7 @@ function AdminPage({ หน้า, user }) {
                         <div className="text-sm">
                           <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
                           <p className="text-gray-600">{r.location_text}</p>
-                          {r.detail && <p className="text-xs text-gray-600 mt-1">📝 {r.detail}</p>}
+                          {r.detail && <p className="text-xs text-gray-600 mt-1 flex items-start gap-1"><FileText size={11} className="shrink-0 mt-0.5" /> {r.detail}</p>}
                           <p className="text-xs mt-1">สถานะ: {r.status}</p>
                           <p className="text-xs text-gray-400">{แปลงวันที่(r.created_at)}</p>
                         </div>
@@ -456,8 +461,8 @@ function AdminPage({ หน้า, user }) {
             <div key={i} className="bg-white rounded-2xl p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-gray-800 text-sm">🗺️ {พื้นที่}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">🦺 ยังไม่ได้กำหนดเจ้าหน้าที่</p>
+                  <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5"><Map size={14} className="text-gray-500 shrink-0" /> {พื้นที่}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5"><HardHat size={11} className="shrink-0" /> ยังไม่ได้กำหนดเจ้าหน้าที่</p>
                 </div>
                 <button className="text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium">
                   แก้ไข
@@ -481,13 +486,13 @@ function AdminPage({ หน้า, user }) {
           ) : (
             <>
               {[
-                { ชื่อ: 'รายงานสัตว์จรทั้งหมด', จำนวน: `${จำนวนExport.รายงาน} รายการ`, emoji: '📋', สี: 'bg-orange-50', ตาราง: 'reports',  ชื่อไฟล์: 'รายงาน' },
-                { ชื่อ: 'ข้อมูลสัตว์ในระบบ',    จำนวน: `${จำนวนExport.สัตว์} ตัว`,    emoji: '🐾', สี: 'bg-green-50',  ตาราง: 'animals',  ชื่อไฟล์: 'สัตว์' },
-                { ชื่อ: 'ข้อมูลผู้ใช้งาน',      จำนวน: `${จำนวนExport.ผู้ใช้} คน`,   emoji: '👥', สี: 'bg-blue-50',   ตาราง: 'users',    ชื่อไฟล์: 'ผู้ใช้งาน' },
+                { ชื่อ: 'รายงานสัตว์จรทั้งหมด', จำนวน: `${จำนวนExport.รายงาน} รายการ`, Icon: FileText, สี: 'bg-orange-50', ตาราง: 'reports',  ชื่อไฟล์: 'รายงาน' },
+                { ชื่อ: 'ข้อมูลสัตว์ในระบบ',    จำนวน: `${จำนวนExport.สัตว์} ตัว`,    Icon: PawPrint, สี: 'bg-green-50',  ตาราง: 'animals',  ชื่อไฟล์: 'สัตว์' },
+                { ชื่อ: 'ข้อมูลผู้ใช้งาน',      จำนวน: `${จำนวนExport.ผู้ใช้} คน`,   Icon: Users,    สี: 'bg-blue-50',   ตาราง: 'users',    ชื่อไฟล์: 'ผู้ใช้งาน' },
               ].map((item, i) => (
                 <div key={i} className={`${item.สี} rounded-2xl p-4 shadow-sm flex items-center justify-between`}>
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.emoji}</span>
+                    <item.Icon size={22} className="text-gray-600 shrink-0" />
                     <div>
                       <p className="font-medium text-gray-800 text-sm">{item.ชื่อ}</p>
                       <p className="text-xs text-gray-500">{item.จำนวน}</p>
@@ -497,13 +502,13 @@ function AdminPage({ หน้า, user }) {
                     onClick={() => exportCSV(item.ตาราง, item.ชื่อไฟล์)}
                     className="text-xs bg-white text-gray-700 px-3 py-1.5 rounded-lg shadow-sm font-medium flex items-center gap-1"
                   >
-                    📥 CSV
+                    <Download size={14} className="shrink-0" /> CSV
                   </button>
                 </div>
               ))}
 
               <div className="bg-gray-50 rounded-2xl p-4 text-xs text-gray-500 space-y-1">
-                <p className="font-medium text-gray-700">💡 เกี่ยวกับไฟล์ CSV</p>
+                <p className="font-medium text-gray-700 flex items-center gap-1.5"><Lightbulb size={14} className="shrink-0" /> เกี่ยวกับไฟล์ CSV</p>
                 <p>• ไฟล์จะดาวน์โหลดอัตโนมัติ</p>
                 <p>• รองรับ Excel (UTF-8 BOM)</p>
                 <p>• ข้อมูลจริงจาก Supabase ณ เวลาที่กด</p>
@@ -517,15 +522,15 @@ function AdminPage({ หน้า, user }) {
       {หน้า === 'settings' && (
         <div className="px-4 pt-4 space-y-4">
           {[
-            { ชื่อ: 'การแจ้งเตือน', ค่า: 'เปิดใช้งาน',         emoji: '🔔' },
-            { ชื่อ: 'ภาษาระบบ',     ค่า: 'ภาษาไทย',            emoji: '🌐' },
-            { ชื่อ: 'เวอร์ชันระบบ', ค่า: 'v1.0.0',              emoji: '⚙️' },
-            { ชื่อ: 'ฐานข้อมูล',    ค่า: 'Supabase (PostgreSQL)', emoji: '🗄️' },
-            { ชื่อ: 'สำรองข้อมูล',  ค่า: 'Supabase Auto Backup', emoji: '💾' },
+            { ชื่อ: 'การแจ้งเตือน', ค่า: 'เปิดใช้งาน',         Icon: Bell },
+            { ชื่อ: 'ภาษาระบบ',     ค่า: 'ภาษาไทย',            Icon: Globe },
+            { ชื่อ: 'เวอร์ชันระบบ', ค่า: 'v1.0.0',              Icon: Settings },
+            { ชื่อ: 'ฐานข้อมูล',    ค่า: 'Supabase (PostgreSQL)', Icon: Database },
+            { ชื่อ: 'สำรองข้อมูล',  ค่า: 'Supabase Auto Backup', Icon: Save },
           ].map((item, i) => (
             <div key={i} className="bg-white rounded-2xl px-4 py-3.5 shadow-sm flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-xl">{item.emoji}</span>
+                <item.Icon size={18} className="text-gray-500 shrink-0" />
                 <span className="text-sm font-medium text-gray-800">{item.ชื่อ}</span>
               </div>
               <span className="text-sm text-gray-500">{item.ค่า}</span>
@@ -553,7 +558,7 @@ function AdminPage({ หน้า, user }) {
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
                   {userที่เลือก.avatar_url
                     ? <img src={userที่เลือก.avatar_url} alt={userที่เลือก.name} className="w-full h-full object-cover" />
-                    : <span className="text-4xl">👤</span>
+                    : <User size={36} strokeWidth={1.5} className="text-gray-400" />
                   }
                 </div>
                 <div className="flex-1 min-w-0">
@@ -561,10 +566,10 @@ function AdminPage({ หน้า, user }) {
                   <p className="text-sm text-gray-500">{userที่เลือก.email}</p>
                   <div className="flex gap-2 mt-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[userที่เลือก.role] || สีRole.user}`}>
-                      {userที่เลือก.role === 'admin' ? '🛡️ Admin' : userที่เลือก.role === 'volunteer' ? '🦺 เจ้าหน้าที่' : '👤 ผู้ใช้งาน'}
+                      {userที่เลือก.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : userที่เลือก.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้งาน</>}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${userที่เลือก.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                      {userที่เลือก.status === 'suspended' ? '🚫 ระงับ' : '✅ ใช้งาน'}
+                      {userที่เลือก.status === 'suspended' ? <><Ban size={11} className="shrink-0" /> ระงับ</> : <><CheckCircle2 size={11} className="shrink-0" /> ใช้งาน</>}
                     </span>
                   </div>
                 </div>
@@ -617,7 +622,7 @@ function AdminPage({ หน้า, user }) {
               {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) — อ่านอย่างเดียว */}
               {userที่เลือก.role === 'volunteer' && (
                 <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
-                  <p className="text-xs font-bold text-orange-600 uppercase tracking-wide">🏠 ข้อมูลศูนย์พักพิง</p>
+                  <p className="text-xs font-bold text-orange-600 uppercase tracking-wide flex items-center gap-1.5"><Home size={12} className="shrink-0" /> ข้อมูลศูนย์พักพิง</p>
                   {[
                     { label: 'ชื่อศูนย์',       value: userที่เลือก.shelter_name },
                     { label: 'ที่ตั้ง',           value: userที่เลือก.shelter_location },
@@ -651,15 +656,15 @@ function AdminPage({ หน้า, user }) {
                     }}
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
                   >
-                    <option value="user">👤 ผู้ใช้งานทั่วไป</option>
-                    <option value="volunteer">🦺 เจ้าหน้าที่ / อาสาสมัคร</option>
-                    <option value="admin">🛡️ ผู้ดูแลระบบ (Admin)</option>
+                    <option value="user">ผู้ใช้งานทั่วไป</option>
+                    <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
+                    <option value="admin">ผู้ดูแลระบบ (Admin)</option>
                   </select>
 
                   {/* ระงับ / ยกเลิกระงับ — แอดมินระงับแอดมินด้วยกันไม่ได้ */}
                   {userที่เลือก.role === 'admin' ? (
                     <div className="bg-gray-50 rounded-xl p-3 text-center">
-                      <p className="text-xs text-gray-500">🔒 ไม่สามารถระงับบัญชีผู้ดูแลระบบ (Admin) ได้</p>
+                      <p className="text-xs text-gray-500 flex items-center gap-1.5"><Lock size={11} className="shrink-0" /> ไม่สามารถระงับบัญชีผู้ดูแลระบบ (Admin) ได้</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">หากต้องการระงับ ให้เปลี่ยน Role เป็นระดับอื่นก่อน</p>
                     </div>
                   ) : (
@@ -675,7 +680,7 @@ function AdminPage({ หน้า, user }) {
                           : 'bg-red-500 text-white'
                       }`}
                     >
-                      {userที่เลือก.status === 'suspended' ? '✅ ยกเลิกการระงับบัญชี' : '🚫 ระงับบัญชีนี้'}
+                      {userที่เลือก.status === 'suspended' ? <><CheckCircle2 size={16} className="shrink-0" /> ยกเลิกการระงับบัญชี</> : <><Ban size={16} className="shrink-0" /> ระงับบัญชีนี้</>}
                     </button>
                   )}
                 </div>
@@ -683,7 +688,7 @@ function AdminPage({ หน้า, user }) {
 
               {userที่เลือก.id === user?.id && (
                 <div className="bg-purple-50 rounded-2xl p-3 text-center">
-                  <p className="text-xs text-purple-500">🔒 ไม่สามารถแก้ไขบัญชีตัวเองได้</p>
+                  <p className="text-xs text-purple-500 flex items-center gap-1.5"><Lock size={11} className="shrink-0" /> ไม่สามารถแก้ไขบัญชีตัวเองได้</p>
                 </div>
               )}
             </div>

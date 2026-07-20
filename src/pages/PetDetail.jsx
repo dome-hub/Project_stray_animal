@@ -3,19 +3,24 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import {
+  Syringe, Scissors, PawPrint, FileText, Home, MapPin, Map,
+  Phone, User, CheckCircle2, XCircle, HelpCircle, ClipboardList,
+} from 'lucide-react'
 import { supabase } from '../supabase'
+import AnimalIcon from '../components/AnimalIcon'
 
 // ---- Image Carousel — เลื่อนดูรูปหลายรูปได้ (swipe บนมือถือ / ปุ่มลูกศร / จุด indicator) ----
-function ImageCarousel({ รูป, emoji, ชื่อ }) {
+function ImageCarousel({ รูป, ชนิด, ชื่อ }) {
   const [ดัชนี, setดัชนี] = useState(0)
   const จุดเริ่มแตะ = useRef(null)
   const n = รูป.length
 
-  // ไม่มีรูปจริง → โชว์ emoji แทน
+  // ไม่มีรูปจริง → โชว์ไอคอนสัตว์แทน
   if (n === 0) {
     return (
       <div className="w-full aspect-square bg-green-100 flex items-center justify-center">
-        <span className="text-8xl">{emoji}</span>
+        <AnimalIcon ชนิด={ชนิด} size={96} className="text-green-500" />
       </div>
     )
   }
@@ -67,7 +72,7 @@ function PetDetail() {
 
   const สัตว์ = state?.สัตว์ || {
     id: 1,
-    emoji: '🐕',
+    ชนิด: 'สุนัข',
     ชื่อ: 'มะม่วง',
     สายพันธุ์: 'สุนัขพันธุ์ไทยผสม',
     อายุ: '2 ปี',
@@ -111,7 +116,7 @@ function PetDetail() {
 
       {/* การ์ดรูปสัตว์และชื่อ — Image Carousel เลื่อนดูได้หลายรูป */}
       <div className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden shadow-sm">
-        <ImageCarousel รูป={รูปทั้งหมด} emoji={สัตว์.emoji} ชื่อ={สัตว์.ชื่อ} />
+        <ImageCarousel รูป={รูปทั้งหมด} ชนิด={สัตว์.ชนิด || สัตว์.สายพันธุ์} ชื่อ={สัตว์.ชื่อ} />
         <div className="p-5 text-center">
           <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
           <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
@@ -123,7 +128,7 @@ function PetDetail() {
         <h3 className="font-bold text-gray-800 mb-4">ข้อมูลทั่วไป</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'ประเภท',    value: สัตว์.emoji === '🐕' ? 'สุนัข' : 'แมว' },
+            { label: 'ประเภท',    value: สัตว์.ชนิด || (สัตว์.สายพันธุ์?.includes('แมว') ? 'แมว' : 'สุนัข') },
             { label: 'เพศ',       value: สัตว์.เพศ       || 'ไม่ระบุ' },
             { label: 'อายุ',      value: สัตว์.อายุ      || 'ไม่ระบุ' },
             { label: 'สายพันธุ์', value: สัตว์.สายพันธุ์ || 'ไม่ระบุ' },
@@ -145,29 +150,33 @@ function PetDetail() {
         <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm space-y-4">
           {สัตว์.วัคซีน && (
             <div>
-              <h3 className="font-bold text-gray-800 mb-3">💉 การฉีดวัคซีน</h3>
-              <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <Syringe size={18} className="text-gray-500 shrink-0" /> การฉีดวัคซีน
+              </h3>
+              <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold ${
                 สัตว์.วัคซีน === 'ฉีดแล้ว'   ? 'bg-green-100 text-green-700' :
                 สัตว์.วัคซีน === 'ยังไม่ฉีด' ? 'bg-red-100 text-red-600'    :
                 'bg-gray-100 text-gray-600'
               }`}>
-                {สัตว์.วัคซีน === 'ฉีดแล้ว'   ? '✅ ฉีดวัคซีนแล้ว'       :
-                 สัตว์.วัคซีน === 'ยังไม่ฉีด' ? '❌ ยังไม่ได้ฉีดวัคซีน' :
-                 '❓ ไม่ทราบประวัติ'}
+                {สัตว์.วัคซีน === 'ฉีดแล้ว'   ? <><CheckCircle2 size={16} className="shrink-0" /> ฉีดวัคซีนแล้ว</>       :
+                 สัตว์.วัคซีน === 'ยังไม่ฉีด' ? <><XCircle size={16} className="shrink-0" /> ยังไม่ได้ฉีดวัคซีน</> :
+                 <><HelpCircle size={16} className="shrink-0" /> ไม่ทราบประวัติ</>}
               </span>
             </div>
           )}
           {สัตว์.ทำหมัน && (
             <div>
-              <h3 className="font-bold text-gray-800 mb-3">✂️ การทำหมัน</h3>
-              <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <Scissors size={18} className="text-gray-500 shrink-0" /> การทำหมัน
+              </h3>
+              <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold ${
                 สัตว์.ทำหมัน === 'ทำแล้ว'   ? 'bg-green-100 text-green-700' :
                 สัตว์.ทำหมัน === 'ยังไม่ทำ' ? 'bg-red-100 text-red-600'    :
                 'bg-gray-100 text-gray-600'
               }`}>
-                {สัตว์.ทำหมัน === 'ทำแล้ว'   ? '✅ ทำหมันแล้ว'   :
-                 สัตว์.ทำหมัน === 'ยังไม่ทำ' ? '❌ ยังไม่ทำหมัน' :
-                 '❓ ไม่ทราบประวัติ'}
+                {สัตว์.ทำหมัน === 'ทำแล้ว'   ? <><CheckCircle2 size={16} className="shrink-0" /> ทำหมันแล้ว</>   :
+                 สัตว์.ทำหมัน === 'ยังไม่ทำ' ? <><XCircle size={16} className="shrink-0" /> ยังไม่ทำหมัน</> :
+                 <><HelpCircle size={16} className="shrink-0" /> ไม่ทราบประวัติ</>}
               </span>
             </div>
           )}
@@ -177,7 +186,9 @@ function PetDetail() {
       {/* นิสัย */}
       {สัตว์.นิสัย && สัตว์.นิสัย.length > 0 && (
         <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">🐾 ลักษณะนิสัย</h3>
+          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <PawPrint size={18} className="text-gray-500 shrink-0" /> ลักษณะนิสัย
+          </h3>
           <div className="flex flex-wrap gap-2">
             {สัตว์.นิสัย.map(function (น) {
               return (
@@ -193,55 +204,63 @@ function PetDetail() {
       {/* รายละเอียดเพิ่มเติม */}
       {สัตว์.ลักษณะ && (
         <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">📝 รายละเอียดเพิ่มเติม</h3>
+          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <FileText size={18} className="text-gray-500 shrink-0" /> รายละเอียดเพิ่มเติม
+          </h3>
           <p className="text-sm text-gray-600 leading-relaxed">{สัตว์.ลักษณะ}</p>
         </div>
       )}
 
       {/* ข้อมูลศูนย์พักพิง */}
       <div className="bg-white mx-4 mt-4 rounded-2xl p-5 shadow-sm">
-        <h3 className="font-bold text-gray-800 mb-3">🏠 ศูนย์พักพิง</h3>
+        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Home size={18} className="text-gray-500 shrink-0" /> ศูนย์พักพิง
+        </h3>
         {โหลดศูนย์ ? (
           <p className="text-sm text-gray-400">กำลังโหลด...</p>
         ) : ศูนย์ ? (
           <div className="space-y-2.5">
             {ศูนย์.shelter_name && (
-              <div className="flex gap-2">
-                <span className="text-base shrink-0">🏠</span>
+              <div className="flex gap-2 items-start">
+                <Home size={16} className="text-gray-400 shrink-0 mt-0.5" />
                 <p className="text-sm font-semibold text-gray-800">{ศูนย์.shelter_name}</p>
               </div>
             )}
             {ศูนย์.shelter_location && (
-              <div className="flex gap-2">
-                <span className="text-base shrink-0">📍</span>
+              <div className="flex gap-2 items-start">
+                <MapPin size={16} className="text-gray-400 shrink-0 mt-0.5" />
                 <p className="text-sm text-gray-600">{ศูนย์.shelter_location}</p>
               </div>
             )}
             {ศูนย์.service_area && (
-              <div className="flex gap-2">
-                <span className="text-base shrink-0">🗺️</span>
+              <div className="flex gap-2 items-start">
+                <Map size={16} className="text-gray-400 shrink-0 mt-0.5" />
                 <p className="text-sm text-gray-600">พื้นที่รับผิดชอบ: {ศูนย์.service_area}</p>
               </div>
             )}
             {ศูนย์.phone && (
               <a href={`tel:${ศูนย์.phone}`}
                 className="flex gap-2 items-center bg-green-50 rounded-xl px-3 py-2.5 mt-1">
-                <span className="text-base shrink-0">📞</span>
+                <Phone size={16} className="text-green-600 shrink-0" />
                 <p className="text-sm font-semibold text-green-700">{ศูนย์.phone}</p>
                 <span className="text-xs text-green-500 ml-auto">โทรเลย</span>
               </a>
             )}
             {ศูนย์.name && (
-              <div className="flex gap-2">
-                <span className="text-base shrink-0">👤</span>
+              <div className="flex gap-2 items-start">
+                <User size={16} className="text-gray-400 shrink-0 mt-0.5" />
                 <p className="text-sm text-gray-500">ผู้รับผิดชอบ: {ศูนย์.name}</p>
               </div>
             )}
           </div>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">📍 {สัตว์.สถานที่}</p>
-            <p className="text-sm text-gray-500">📞 ติดต่อเจ้าหน้าที่เพื่อรับข้อมูลเพิ่มเติม</p>
+            <p className="text-sm text-gray-600 flex items-center gap-1.5">
+              <MapPin size={14} className="text-gray-400 shrink-0" /> {สัตว์.สถานที่}
+            </p>
+            <p className="text-sm text-gray-500 flex items-center gap-1.5">
+              <Phone size={14} className="text-gray-400 shrink-0" /> ติดต่อเจ้าหน้าที่เพื่อรับข้อมูลเพิ่มเติม
+            </p>
           </div>
         )}
       </div>
@@ -252,7 +271,8 @@ function PetDetail() {
           onClick={() => setแสดงContact(true)}
           className="w-full bg-green-500 text-white rounded-xl py-4 font-bold text-base flex items-center justify-center gap-2"
         >
-          📞 ติดต่อขอรับเลี้ยง{สัตว์.ชื่อ !== 'ยังไม่ตั้งชื่อ' ? ` ${สัตว์.ชื่อ}` : ''}
+          <Phone size={18} className="shrink-0" />
+          ติดต่อขอรับเลี้ยง{สัตว์.ชื่อ !== 'ยังไม่ตั้งชื่อ' ? ` ${สัตว์.ชื่อ}` : ''}
         </button>
         <p className="text-center text-xs text-gray-400 mt-2">
           ติดต่อศูนย์พักพิง — เจ้าหน้าที่จะเป็นผู้ยืนยันการรับเลี้ยง
@@ -280,7 +300,7 @@ function PetDetail() {
                 <div className="w-14 h-14 rounded-2xl overflow-hidden bg-green-100 flex items-center justify-center shrink-0">
                   {สัตว์.รูป
                     ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
-                    : <span className="text-3xl">{สัตว์.emoji}</span>
+                    : <AnimalIcon ชนิด={สัตว์.ชนิด || สัตว์.สายพันธุ์} size={28} className="text-green-600" />
                   }
                 </div>
                 <div>
@@ -291,7 +311,9 @@ function PetDetail() {
 
               {/* คำแนะนำ */}
               <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-green-800 mb-1">📋 ขั้นตอนการขอรับเลี้ยง</p>
+                <p className="text-sm font-semibold text-green-800 mb-1 flex items-center gap-1.5">
+                  <ClipboardList size={16} className="shrink-0" /> ขั้นตอนการขอรับเลี้ยง
+                </p>
                 <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside leading-relaxed">
                   <li>โทรติดต่อศูนย์พักพิงด้านล่าง</li>
                   <li>แจ้งชื่อสัตว์ที่ต้องการรับเลี้ยง</li>
@@ -304,7 +326,7 @@ function PetDetail() {
                 <div className="space-y-3">
                   {ศูนย์.shelter_name && (
                     <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                      <span className="text-xl">🏠</span>
+                      <Home size={20} className="text-gray-500 shrink-0" />
                       <div>
                         <p className="text-xs text-gray-400">ศูนย์พักพิง</p>
                         <p className="text-sm font-semibold text-gray-800">{ศูนย์.shelter_name}</p>
@@ -313,7 +335,7 @@ function PetDetail() {
                   )}
                   {ศูนย์.shelter_location && (
                     <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                      <span className="text-xl">📍</span>
+                      <MapPin size={20} className="text-gray-500 shrink-0" />
                       <div>
                         <p className="text-xs text-gray-400">ที่ตั้ง</p>
                         <p className="text-sm text-gray-700">{ศูนย์.shelter_location}</p>
@@ -323,7 +345,7 @@ function PetDetail() {
                   {ศูนย์.phone ? (
                     <a href={`tel:${ศูนย์.phone}`}
                       className="flex items-center gap-3 bg-green-500 rounded-2xl px-5 py-4 w-full">
-                      <span className="text-2xl">📞</span>
+                      <Phone size={24} className="text-white shrink-0" />
                       <div className="flex-1">
                         <p className="text-xs text-green-100">กดเพื่อโทรติดต่อ</p>
                         <p className="text-xl font-bold text-white tracking-wide">{ศูนย์.phone}</p>

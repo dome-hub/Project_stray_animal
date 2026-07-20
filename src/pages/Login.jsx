@@ -3,6 +3,7 @@
 // role มาจาก public.users table เท่านั้น ไม่ให้ผู้ใช้เลือกเอง
 
 import { useState } from 'react'
+import { Mail, MailOpen, CheckCircle2, Dog, Eye, EyeOff, Loader2, Info } from 'lucide-react'
 import { supabase } from '../supabase'
 
 function Login() {
@@ -140,13 +141,19 @@ function Login() {
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
-          <div className="text-7xl mb-4">📧</div>
+          <Mail size={64} strokeWidth={1.5} className="text-blue-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">ตรวจสอบอีเมลของคุณ</h2>
           <p className="text-gray-500 text-sm mb-1">เราส่งลิงก์ยืนยันไปที่</p>
           <p className="font-bold text-blue-600 mb-4">{อีเมลRegister}</p>
           <div className="bg-blue-50 rounded-2xl p-4 mb-6 text-left space-y-2">
-            <p className="text-xs text-gray-600">📬 เปิดอีเมลแล้วกด <strong>"Confirm your mail"</strong></p>
-            <p className="text-xs text-gray-600">✅ กลับมาที่แอปแล้ว Login ได้เลย</p>
+            <p className="text-xs text-gray-600 flex items-start gap-1.5">
+              <MailOpen size={14} className="text-blue-500 shrink-0 mt-0.5" />
+              <span>เปิดอีเมลแล้วกด <strong>"Confirm your mail"</strong></span>
+            </p>
+            <p className="text-xs text-gray-600 flex items-start gap-1.5">
+              <CheckCircle2 size={14} className="text-green-500 shrink-0 mt-0.5" />
+              <span>กลับมาที่แอปแล้ว Login ได้เลย</span>
+            </p>
             <p className="text-xs text-gray-400">* เช็คโฟลเดอร์ Spam ถ้าไม่เห็นอีเมล</p>
           </div>
           <button
@@ -166,7 +173,7 @@ function Login() {
 
         {/* โลโก้ */}
         <div className="flex flex-col items-center mb-6">
-          <div className="text-6xl mb-3">🐕</div>
+          <Dog size={56} strokeWidth={1.5} className="text-blue-500 mb-3" />
           <h1 className="text-2xl font-bold text-gray-800 text-center">ระบบจัดการสัตว์จร</h1>
           <p className="text-gray-500 text-sm text-center mt-1">
             ช่วยเหลือสัตว์จรและค้นหาเพื่อนใหม่ของคุณ
@@ -216,16 +223,18 @@ function Login() {
               <button
                 type="button"
                 onClick={() => setแสดงรหัส(!แสดงรหัส)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                {แสดงรหัส ? '🙈' : '👁️'}
+                {แสดงรหัส ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
             {/* แสดงข้อความเตือนว่า Supabase กำลังตื่น (หลัง 8 วิ) */}
             {กำลังโหลด && ช้า && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-center space-y-1">
-                <p className="text-xs text-orange-700 font-semibold">⏳ Supabase กำลังตื่นจาก sleep...</p>
+                <p className="text-xs text-orange-700 font-semibold flex items-center justify-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin shrink-0" /> Supabase กำลังตื่นจาก sleep...
+                </p>
                 <p className="text-xs text-orange-500">กรุณารอสักครู่ อาจใช้เวลา 20–40 วินาที</p>
                 <div className="flex justify-center gap-1 pt-1">
                   {[0,1,2].map(function(i) {
@@ -244,12 +253,14 @@ function Login() {
             <button
               type="submit"
               disabled={กำลังโหลด}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold transition-colors disabled:opacity-60"
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {กำลังโหลด
-                ? ช้า ? '⏳ รอ Supabase...' : '⏳ กำลังเข้าสู่ระบบ...'
-                : 'เข้าสู่ระบบ'
-              }
+              {กำลังโหลด ? (
+                <>
+                  <Loader2 size={16} className="animate-spin shrink-0" />
+                  {ช้า ? 'รอ Supabase...' : 'กำลังเข้าสู่ระบบ...'}
+                </>
+              ) : 'เข้าสู่ระบบ'}
             </button>
 
           </form>
@@ -281,9 +292,10 @@ function Login() {
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
             />
 
-            <div className="bg-blue-50 rounded-xl px-4 py-3">
-              <p className="text-xs text-blue-600 text-center leading-relaxed">
-                👤 บัญชีใหม่จะได้รับสิทธิ์ <strong>ผู้ใช้งานทั่วไป</strong> เสมอ<br/>
+            <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-start gap-2">
+              <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-600 leading-relaxed">
+                บัญชีใหม่จะได้รับสิทธิ์ <strong>ผู้ใช้งานทั่วไป</strong> เสมอ<br/>
                 ผู้ดูแลระบบเป็นผู้กำหนดสิทธิ์พิเศษ
               </p>
             </div>
@@ -297,9 +309,11 @@ function Login() {
             <button
               type="submit"
               disabled={กำลังโหลด}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold transition-colors disabled:opacity-60"
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {กำลังโหลด ? '⏳ กำลังสมัครสมาชิก...' : 'สมัครสมาชิก'}
+              {กำลังโหลด
+                ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังสมัครสมาชิก...</>
+                : 'สมัครสมาชิก'}
             </button>
 
           </form>

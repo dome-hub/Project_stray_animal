@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { HeartCrack, Heart, MapPin } from 'lucide-react'
+import AnimalIcon from '../components/AnimalIcon'
 
 function WishlistPage() {
   const navigate = useNavigate()
@@ -30,9 +32,11 @@ function WishlistPage() {
         {/* ถ้าไม่มีสัตว์ในรายการ */}
         {รายการ.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 text-center">
-            <div className="text-6xl mb-4">💔</div>
+            <HeartCrack size={56} strokeWidth={1.5} className="text-red-300 mb-4" />
             <p className="text-gray-500 font-medium">ยังไม่มีสัตว์ที่บันทึกไว้</p>
-            <p className="text-gray-400 text-sm mt-1">กดไอคอน ❤️ ในหน้าค้นหาเพื่อบันทึก</p>
+            <p className="text-gray-400 text-sm mt-1 inline-flex items-center gap-1">
+              กดไอคอน <Heart size={14} className="text-red-400 fill-red-400 shrink-0" /> ในหน้าค้นหาเพื่อบันทึก
+            </p>
             <button
               onClick={() => navigate('/find-pet')}
               className="mt-4 bg-green-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium"
@@ -51,9 +55,9 @@ function WishlistPage() {
                 {/* รูปสัตว์ */}
                 <button
                   onClick={() => navigate(`/pet/${สัตว์.id}`, { state: { สัตว์ } })}
-                  className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center text-3xl shrink-0"
+                  className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center shrink-0"
                 >
-                  {สัตว์.emoji}
+                  <AnimalIcon ชนิด={สัตว์.สายพันธุ์} size={32} className="text-red-400" />
                 </button>
 
                 <div className="flex-1">
@@ -67,10 +71,10 @@ function WishlistPage() {
                     {/* ปุ่มลบออกจาก Wishlist — วงกลมสีแดง กดเพื่อยกเลิกบันทึก */}
                     <button
                       onClick={() => ลบออก(สัตว์.id)}
-                      className="w-9 h-9 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center text-lg transition-colors shrink-0"
+                      className="w-9 h-9 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors shrink-0"
                       title="นำออกจากรายการที่บันทึก"
                     >
-                      ❤️
+                      <Heart size={18} className="text-red-500 fill-red-500" />
                     </button>
                   </div>
 
@@ -82,7 +86,9 @@ function WishlistPage() {
                       </span>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">📍 {สัตว์.สถานที่}</p>
+                  <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                    <MapPin size={12} className="shrink-0" /> {สัตว์.สถานที่}
+                  </p>
                 </div>
               </div>
 

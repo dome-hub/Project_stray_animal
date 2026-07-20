@@ -3,9 +3,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Pencil, Trash2, X } from 'lucide-react'
+import {
+  Pencil, Trash2, X, ClipboardList, Clock, FolderClosed, Calendar, MapPin,
+  MessageSquare, FileText, Camera, Save, Ban, HardHat, User, Home,
+  Map, Phone, CheckCircle2, Hourglass,
+} from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import AnimalIcon from '../components/AnimalIcon'
 
 // สีป้ายสถานะ (badge) — ครอบคลุมทุกสถานะจริงที่ backend เขียนได้ (ดู VolunteerPage เวิร์กโฟลว์ตามประเภท)
 const สีสถานะTR = {
@@ -54,9 +59,9 @@ function เวลาTR(dateString) {
 
 // ---- ประเภทการแจ้ง (จาก urgency) — สีของ badge บนการ์ด ----
 const ประเภทแจ้งTR = {
-  'ด่วนมาก': { emoji: '🔴', label: 'ดุร้าย/อันตราย', badge: 'bg-red-50 text-red-700' },
-  'ด่วน':    { emoji: '🟠', label: 'บาดเจ็บ',        badge: 'bg-orange-50 text-orange-700' },
-  'ปานกลาง': { emoji: '🟡', label: 'พลัดหลง/จรจัด',  badge: 'bg-yellow-50 text-yellow-700' },
+  'ด่วนมาก': { dot: 'bg-red-500',    label: 'ดุร้าย/อันตราย', badge: 'bg-red-50 text-red-700' },
+  'ด่วน':    { dot: 'bg-orange-500', label: 'บาดเจ็บ',        badge: 'bg-orange-50 text-orange-700' },
+  'ปานกลาง': { dot: 'bg-yellow-500', label: 'พลัดหลง/จรจัด',  badge: 'bg-yellow-50 text-yellow-700' },
 }
 function ประเภทจากTR(urgency) {
   return ประเภทแจ้งTR[urgency] || ประเภทแจ้งTR['ปานกลาง']
@@ -339,7 +344,7 @@ function TrackReport({ user }) {
     setรายงานที่เปิด(อัปเดตแล้ว)
     setรายการรายงาน(function (prev) { return prev.map((r) => (r.id === อัปเดตแล้ว.id ? อัปเดตแล้ว : r)) })
     ปิดโหมดแก้ไข()
-    toast('✅ บันทึกการแก้ไขสำเร็จ')
+    toast('บันทึกการแก้ไขสำเร็จ')
   }
 
   // ---- ยกเลิกรายงาน ----
@@ -357,7 +362,7 @@ function TrackReport({ user }) {
     })
     setแสดงModalยกเลิก(false)
     ปิดรายละเอียด()
-    toast('🚫 ยกเลิกรายงานแล้ว')
+    toast('ยกเลิกรายงานแล้ว')
   }
 
   // แยกเคสกำลังดำเนินการ vs ประวัติ (ปิดเคสแล้ว) — ใช้ helper เป็นเคสปิดTR เดิม (นับ "อยู่ศูนย์พักพิง"
@@ -411,7 +416,7 @@ function TrackReport({ user }) {
         {/* ไม่มีรายงานเลยสักรายการ */}
         {!กำลังโหลด && รายการรายงาน.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 text-center">
-            <div className="text-6xl mb-4">📋</div>
+            <ClipboardList size={56} strokeWidth={1.5} className="text-gray-300 mb-4" />
             <p className="text-gray-600 font-semibold">คุณยังไม่มีรายงาน</p>
             <p className="text-gray-400 text-sm mt-1">รายการแจ้งสัตว์จรของคุณจะแสดงที่นี่</p>
             <button onClick={() => navigate('/report')}
@@ -424,7 +429,7 @@ function TrackReport({ user }) {
         {/* มีรายงาน แต่ไม่มีรายการในแท็บที่เลือกอยู่ */}
         {!กำลังโหลด && รายการรายงาน.length > 0 && รายการที่แสดง.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-16 text-center">
-            <div className="text-5xl mb-3">{แท็บ === 'in-progress' ? '🕒' : '🗂️'}</div>
+            {แท็บ === 'in-progress' ? <Clock size={48} strokeWidth={1.5} className="text-gray-300 mb-3" /> : <FolderClosed size={48} strokeWidth={1.5} className="text-gray-300 mb-3" />}
             <p className="text-gray-600 font-semibold">
               {แท็บ === 'in-progress' ? 'ไม่มีรายการที่กำลังดำเนินการ' : 'ยังไม่มีประวัติการแจ้ง'}
             </p>
@@ -437,10 +442,9 @@ function TrackReport({ user }) {
         {รายงานตามวันที่.map(function (กลุ่ม) {
           return (
             <div key={กลุ่ม.label}>
-              <p className="text-xs font-semibold text-gray-500 mb-2 px-1">📅 {กลุ่ม.label}</p>
+              <p className="text-xs font-semibold text-gray-500 mb-2 px-1 flex items-center gap-1.5"><Calendar size={13} className="shrink-0" /> {กลุ่ม.label}</p>
               <div className="space-y-3">
                 {กลุ่ม.items.map(function (รายงาน) {
-                  const emoji = รายงาน.animal_type?.includes('แมว') ? '🐈' : '🐕'
                   const รับเรื่องแล้ว = สถานะที่รับเรื่อง.includes(รายงาน.status)
                   const ประเภท = ประเภทจากTR(รายงาน.urgency)
                   const รอสายพันธุ์ = รายงาน.animal_type === 'ไม่สามารถวิเคราะห์ได้'
@@ -453,23 +457,23 @@ function TrackReport({ user }) {
                       {/* แถวบน */}
                       <div className="flex items-start justify-between gap-2 mb-4">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 bg-indigo-50 rounded-xl overflow-hidden flex items-center justify-center text-2xl shrink-0">
+                          <div className="w-12 h-12 bg-indigo-50 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                             {รายงาน.image_url
                               ? <img src={รายงาน.image_url} alt="สัตว์" className="w-full h-full object-cover" />
-                              : emoji
+                              : <AnimalIcon ชนิด={รายงาน.animal_type} size={24} className="text-indigo-400" />
                             }
                           </div>
                           <div className="min-w-0">
                             <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
-                              {ประเภท.emoji} {ประเภท.label}
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภท.dot}`} /> {ประเภท.label}
                             </span>
                             {รอสายพันธุ์ ? (
                               <p className="text-gray-400 text-sm">รอยืนยันสายพันธุ์</p>
                             ) : (
                               <p className="font-bold text-gray-800 text-sm">{รายงาน.animal_type || 'ไม่ระบุประเภท'}</p>
                             )}
-                            <p className="text-xs text-gray-500 truncate">📍 {รายงาน.location_text}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">⏱️ {เวลาTR(รายงาน.created_at)}</p>
+                            <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {รายงาน.location_text}</p>
+                            <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><Clock size={11} className="shrink-0" /> {เวลาTR(รายงาน.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
@@ -553,7 +557,7 @@ function TrackReport({ user }) {
                     ) : รายงานที่เปิด.image_url ? (
                       <img src={รายงานที่เปิด.image_url} alt="สัตว์" className="w-full h-full object-contain" />
                     ) : (
-                      <span className="text-6xl">{รายงานที่เปิด.animal_type?.includes('แมว') ? '🐈' : '🐕'}</span>
+                      <AnimalIcon ชนิด={รายงานที่เปิด.animal_type} size={56} className="text-indigo-300" />
                     )}
                     {พรีวิวรูปแก้ไข && (
                       <span className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -564,13 +568,13 @@ function TrackReport({ user }) {
                   <input ref={inputรูปแก้ไข} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปแก้ไข} />
                   <button onClick={() => inputรูปแก้ไข.current.click()}
                     className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-orange-300 rounded-xl py-2.5 text-sm font-medium text-orange-600 bg-orange-50/50">
-                    📷 {รายงานที่เปิด.image_url || พรีวิวรูปแก้ไข ? 'เปลี่ยนรูปภาพ' : 'อัปโหลดรูปภาพ'}
+                    <Camera size={16} className="shrink-0" /> {รายงานที่เปิด.image_url || พรีวิวรูปแก้ไข ? 'เปลี่ยนรูปภาพ' : 'อัปโหลดรูปภาพ'}
                   </button>
                 </div>
 
                 {/* สถานที่พบ */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 mb-1.5">📍 สถานที่พบ <span className="text-red-400">*</span></p>
+                  <p className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5"><MapPin size={13} className="shrink-0" /> สถานที่พบ <span className="text-red-400">*</span></p>
                   <input value={ตำแหน่งแก้ไข} onChange={(e) => setตำแหน่งแก้ไข(e.target.value)}
                     placeholder="เช่น หน้าวัดกำแพงแสน หรือ ถนนสาย 1"
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
@@ -578,7 +582,7 @@ function TrackReport({ user }) {
 
                 {/* รายละเอียดเพิ่มเติม */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-600 mb-1.5">💬 รายละเอียดเพิ่มเติม</p>
+                  <p className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5"><MessageSquare size={13} className="shrink-0" /> รายละเอียดเพิ่มเติม</p>
                   <textarea value={รายละเอียดแก้ไข} onChange={(e) => setรายละเอียดแก้ไข(e.target.value)}
                     placeholder="เช่น สัตว์อยู่ใต้ร่มไม้ ขาเป๋ข้างซ้าย"
                     rows={3}
@@ -595,7 +599,7 @@ function TrackReport({ user }) {
                     className="flex-[2] bg-orange-500 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
                     {กำลังบันทึกแก้ไข
                       ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> กำลังบันทึก...</>
-                      : '💾 บันทึกการแก้ไข'}
+                      : <><Save size={15} className="shrink-0" /> บันทึกการแก้ไข</>}
                   </button>
                 </div>
               </div>
@@ -606,7 +610,7 @@ function TrackReport({ user }) {
               <div className="w-full h-36 rounded-2xl overflow-hidden bg-indigo-50 flex items-center justify-center">
                 {รายงานที่เปิด.image_url
                   ? <img src={รายงานที่เปิด.image_url} alt="สัตว์" className="w-full h-full object-contain" />
-                  : <span className="text-6xl">{รายงานที่เปิด.animal_type?.includes('แมว') ? '🐈' : '🐕'}</span>
+                  : <AnimalIcon ชนิด={รายงานที่เปิด.animal_type} size={56} className="text-indigo-300" />
                 }
               </div>
 
@@ -625,7 +629,7 @@ function TrackReport({ user }) {
 
               {/* ตำแหน่งที่พบสัตว์ */}
               <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                <p className="text-xs text-gray-400 mb-1">📍 ตำแหน่งที่พบสัตว์</p>
+                <p className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><MapPin size={12} className="shrink-0" /> ตำแหน่งที่พบสัตว์</p>
                 <p className="text-sm font-semibold text-gray-800">{รายงานที่เปิด.location_text || '-'}</p>
                 {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
                   <a
@@ -633,7 +637,7 @@ function TrackReport({ user }) {
                     target="_blank" rel="noreferrer"
                     className="inline-flex items-center gap-1.5 mt-2 bg-green-500 text-white text-xs font-semibold px-4 py-2 rounded-full"
                   >
-                    🗺️ เปิดใน Google Maps →
+                    <Map size={14} className="shrink-0" /> เปิดใน Google Maps →
                   </a>
                 )}
               </div>
@@ -641,7 +645,7 @@ function TrackReport({ user }) {
               {/* รายละเอียดจากผู้แจ้ง */}
               {รายงานที่เปิด.detail && (
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">💬 รายละเอียดที่แจ้ง</p>
+                  <p className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><MessageSquare size={12} className="shrink-0" /> รายละเอียดที่แจ้ง</p>
                   <p className="text-sm text-gray-700">"{รายงานที่เปิด.detail}"</p>
                 </div>
               )}
@@ -649,7 +653,7 @@ function TrackReport({ user }) {
               {/* บันทึกเจ้าหน้าที่ */}
               {รายงานที่เปิด.volunteer_notes && (
                 <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
-                  <p className="text-xs text-purple-500 font-semibold mb-1">📝 บันทึกจากเจ้าหน้าที่</p>
+                  <p className="text-xs text-purple-500 font-semibold mb-1 flex items-center gap-1.5"><FileText size={12} className="shrink-0" /> บันทึกจากเจ้าหน้าที่</p>
                   <p className="text-sm text-gray-700">{รายงานที่เปิด.volunteer_notes}</p>
                 </div>
               )}
@@ -657,13 +661,13 @@ function TrackReport({ user }) {
               {/* ข้อมูลเจ้าหน้าที่/ศูนย์พักพิง (แสดงเฉพาะเมื่อรับเรื่องแล้ว) */}
               {รายงานที่เปิด.status === 'ยกเลิกโดยผู้แจ้ง' ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
-                  <p className="text-2xl mb-2">🚫</p>
+                  <Ban size={28} className="text-gray-400 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-gray-600">คุณได้ยกเลิกรายงานนี้แล้ว</p>
                   <p className="text-xs text-gray-400 mt-1">หากยังพบสัตว์ตัวนี้อยู่ สามารถแจ้งใหม่ได้ทุกเมื่อ</p>
                 </div>
               ) : สถานะที่รับเรื่อง.includes(รายงานที่เปิด.status) ? (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">
-                  <p className="text-xs font-bold text-blue-700">🦺 ข้อมูลเจ้าหน้าที่ผู้รับผิดชอบ</p>
+                  <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5"><HardHat size={13} className="shrink-0" /> ข้อมูลเจ้าหน้าที่ผู้รับผิดชอบ</p>
 
                   {ข้อมูลศูนย์ ? (
                     <>
@@ -673,7 +677,7 @@ function TrackReport({ user }) {
                           <div className="w-10 h-10 bg-blue-100 rounded-full overflow-hidden flex items-center justify-center shrink-0">
                             {ข้อมูลศูนย์.avatar_url
                               ? <img src={ข้อมูลศูนย์.avatar_url} alt="เจ้าหน้าที่" className="w-full h-full object-cover" />
-                              : <span className="text-xl">👤</span>
+                              : <User size={20} className="text-blue-400" />
                             }
                           </div>
                           <div>
@@ -686,7 +690,7 @@ function TrackReport({ user }) {
                       {/* ชื่อศูนย์พักพิง */}
                       {ข้อมูลศูนย์.shelter_name && (
                         <div className="flex items-start gap-2 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
-                          <span className="text-base mt-0.5 shrink-0">🏠</span>
+                          <Home size={15} className="text-gray-400 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-gray-400">ศูนย์พักพิง</p>
                             <p className="text-sm font-semibold text-gray-800">{ข้อมูลศูนย์.shelter_name}</p>
@@ -697,7 +701,7 @@ function TrackReport({ user }) {
                       {/* ที่ตั้งศูนย์ */}
                       {ข้อมูลศูนย์.shelter_location && (
                         <div className="flex items-start gap-2 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
-                          <span className="text-base mt-0.5 shrink-0">📍</span>
+                          <MapPin size={15} className="text-gray-400 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-gray-400">ที่ตั้งศูนย์</p>
                             <p className="text-sm text-gray-700">{ข้อมูลศูนย์.shelter_location}</p>
@@ -708,7 +712,7 @@ function TrackReport({ user }) {
                       {/* พื้นที่รับผิดชอบ */}
                       {ข้อมูลศูนย์.service_area && (
                         <div className="flex items-start gap-2 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
-                          <span className="text-base mt-0.5 shrink-0">🗺️</span>
+                          <Map size={15} className="text-gray-400 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-gray-400">พื้นที่รับผิดชอบ</p>
                             <p className="text-sm text-gray-700">{ข้อมูลศูนย์.service_area}</p>
@@ -720,7 +724,7 @@ function TrackReport({ user }) {
                       {ข้อมูลศูนย์.phone && (
                         <a href={`tel:${ข้อมูลศูนย์.phone}`}
                           className="flex items-center gap-3 bg-blue-500 rounded-xl px-4 py-3 w-full">
-                          <span className="text-xl">📞</span>
+                          <Phone size={20} className="text-white shrink-0" />
                           <div className="flex-1">
                             <p className="text-xs text-blue-100">โทรติดต่อเจ้าหน้าที่</p>
                             <p className="text-base font-bold text-white">{ข้อมูลศูนย์.phone}</p>
@@ -736,7 +740,7 @@ function TrackReport({ user }) {
               ) : (
                 /* ยังรอดำเนินการ */
                 <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-                  <p className="text-2xl mb-2">⏳</p>
+                  <Hourglass size={28} className="text-yellow-500 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-yellow-700">รอเจ้าหน้าที่รับเรื่อง</p>
                   <p className="text-xs text-yellow-600 mt-1">เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง</p>
                 </div>
@@ -759,7 +763,7 @@ function TrackReport({ user }) {
             <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 
             <div className="text-center mb-5">
-              <div className="text-4xl mb-2">🚫</div>
+              <Ban size={40} strokeWidth={1.5} className="text-red-400 mx-auto mb-2" />
               <h2 className="text-lg font-bold text-gray-800">ยกเลิกการแจ้งเหตุนี้?</h2>
               <p className="text-sm text-gray-500 mt-1">
                 คุณต้องการยกเลิกการแจ้งเหตุนี้ใช่หรือไม่? รายงาน #{String(รายงานที่เปิด.id).padStart(6, '0')} จะถูกปิดและไม่มีเจ้าหน้าที่มาดำเนินการ
@@ -770,7 +774,7 @@ function TrackReport({ user }) {
               className="w-full bg-red-500 text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2">
               {กำลังยกเลิก
                 ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> กำลังยกเลิก...</>
-                : '✅ ยืนยัน ยกเลิกรายงาน'}
+                : <><CheckCircle2 size={18} className="shrink-0" /> ยืนยัน ยกเลิกรายงาน</>}
             </button>
             <button onClick={() => setแสดงModalยกเลิก(false)} disabled={กำลังยกเลิก}
               className="w-full mt-2 border-2 border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm disabled:opacity-50">

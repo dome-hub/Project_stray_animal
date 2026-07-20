@@ -5,7 +5,9 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Search, PawPrint, MapPin } from 'lucide-react'
 import { supabase } from '../supabase'   // นำเข้า supabase client
+import AnimalIcon from '../components/AnimalIcon'
 
 // ช่วงอายุที่เจ้าหน้าที่เลือกได้ตอนกรอกข้อมูลสัตว์ (VolunteerPage) — ใช้ map เป็นกลุ่ม "เด็ก/โต" ตอนกรอง
 const อายุกลุ่มเด็ก = ['น้อยกว่า 1 ปี', '1–2 ปี']
@@ -53,9 +55,9 @@ function FindPet() {
           return {
             id: สัตว์.id,
             // ประเภท สุนัข/แมว — ใช้ species ที่เจ้าหน้าที่เลือกชัดเจนก่อน, ข้อมูลเก่าที่ยังไม่มี species ค่อย fallback เดาจาก breed
-            emoji: สัตว์.species === 'แมว' ? '🐈'
-                 : สัตว์.species === 'สุนัข' ? '🐕'
-                 : (สัตว์.breed?.includes('แมว') ? '🐈' : '🐕'),
+            ชนิด: สัตว์.species === 'แมว' ? 'แมว'
+                : สัตว์.species === 'สุนัข' ? 'สุนัข'
+                : (สัตว์.breed?.includes('แมว') ? 'แมว' : 'สุนัข'),
             รูป: (Array.isArray(สัตว์.photos) && สัตว์.photos[0]) || สัตว์.photo_url || null, // cover สำหรับการ์ด
             // คลังรูปทั้งหมดสำหรับ carousel หน้ารายละเอียด — รองรับข้อมูลเก่าที่มีแค่ photo_url
             รูปทั้งหมด: (Array.isArray(สัตว์.photos) && สัตว์.photos.length > 0)
@@ -87,8 +89,7 @@ function FindPet() {
   // ฟังก์ชันค้นหาสัตว์ — กรองจากข้อมูลจริงตามเงื่อนไขที่เลือก
   function ค้นหาสัตว์() {
     const กรอง = สัตว์ทั้งหมด.filter(function (สัตว์) {
-      if (ประเภทสัตว์ === 'สุนัข' && สัตว์.emoji !== '🐕') return false
-      if (ประเภทสัตว์ === 'แมว'   && สัตว์.emoji !== '🐈') return false
+      if (สัตว์.ชนิด !== ประเภทสัตว์) return false
       if (เพศ && สัตว์.เพศ !== เพศ) return false
       if (ขนาด && สัตว์.ขนาด !== ขนาด) return false
       if (ช่วงอายุ === 'เด็ก' && !อายุกลุ่มเด็ก.includes(สัตว์.อายุ)) return false
@@ -127,23 +128,23 @@ function FindPet() {
       <div className="flex mx-4 mt-4 bg-gray-100 rounded-xl p-1">
         <button
           onClick={() => setแท็บ('form')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
             แท็บ === 'form' || แท็บ === 'result'
               ? 'bg-white text-green-700 shadow-sm'
               : 'text-gray-500'
           }`}
         >
-          🔍 ค้นหาแบบละเอียด
+          <Search size={15} className="shrink-0" /> ค้นหาแบบละเอียด
         </button>
         <button
           onClick={() => setแท็บ('all')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
             แท็บ === 'all'
               ? 'bg-white text-green-700 shadow-sm'
               : 'text-gray-500'
           }`}
         >
-          🐾 ดูทั้งหมด ({สัตว์ทั้งหมด.length})
+          <PawPrint size={15} className="shrink-0" /> ดูทั้งหมด ({สัตว์ทั้งหมด.length})
         </button>
       </div>
 
@@ -156,7 +157,7 @@ function FindPet() {
 
           {ผลค้นหา.length === 0 && (
             <div className="text-center py-10 text-gray-400">
-              <p className="text-4xl mb-2">🔍</p>
+              <Search size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
               <p>ไม่พบสัตว์ที่ตรงกับเงื่อนไข</p>
             </div>
           )}
@@ -187,7 +188,7 @@ function FindPet() {
 
           {สัตว์ทั้งหมด.length === 0 && (
             <div className="text-center py-10 text-gray-400">
-              <p className="text-4xl mb-2">🐾</p>
+              <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
               <p>ยังไม่มีสัตว์ที่พร้อมหาบ้านในตอนนี้</p>
               <p className="text-xs mt-1">เจ้าหน้าที่ศูนย์พักพิงกำลังคัดกรองสัตว์อยู่</p>
             </div>
@@ -209,19 +210,21 @@ function FindPet() {
 
           {/* เลือกประเภทสัตว์ */}
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3">🐾 ประเภทสัตว์</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+              <PawPrint size={15} className="text-gray-500 shrink-0" /> ประเภทสัตว์
+            </p>
             <div className="flex gap-3">
               {['สุนัข', 'แมว'].map((ประเภท) => (
                 <button
                   key={ประเภท}
                   onClick={() => setประเภทสัตว์(ประเภท)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1.5 ${
                     ประเภทสัตว์ === ประเภท
                       ? 'border-green-500 bg-green-500 text-white'
                       : 'border-gray-200 bg-white text-gray-700'
                   }`}
                 >
-                  {ประเภท === 'สุนัข' ? '🐕' : '🐈'} {ประเภท}
+                  <AnimalIcon ชนิด={ประเภท} size={18} className="shrink-0" /> {ประเภท}
                 </button>
               ))}
             </div>
@@ -311,10 +314,10 @@ function การ์ดสัตว์({ สัตว์, onClick }) {
     >
       <div className="flex items-start gap-4">
         {/* รูปสัตว์ */}
-        <div className="w-16 h-16 bg-green-100 rounded-2xl overflow-hidden flex items-center justify-center text-3xl shrink-0">
+        <div className="w-16 h-16 bg-green-100 rounded-2xl overflow-hidden flex items-center justify-center shrink-0">
           {สัตว์.รูป
             ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
-            : สัตว์.emoji
+            : <AnimalIcon ชนิด={สัตว์.ชนิด} size={32} className="text-green-600" />
           }
         </div>
 
@@ -334,7 +337,9 @@ function การ์ดสัตว์({ สัตว์, onClick }) {
             ))}
           </div>
 
-          <p className="text-xs text-gray-400 mt-2">📍 {สัตว์.สถานที่}</p>
+          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+            <MapPin size={12} className="shrink-0" /> {สัตว์.สถานที่}
+          </p>
         </div>
       </div>
     </button>

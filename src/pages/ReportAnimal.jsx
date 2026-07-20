@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom'
 import {
   Footprints, HeartPulse, ShieldAlert, Circle, CircleDot,
   MapPin, LocateFixed, Loader2, Map, X,
+  CheckCircle2, XCircle, Camera, ImageIcon, Smartphone, AlertTriangle,
+  PawPrint, Clock, Bot,
 } from 'lucide-react'
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -291,11 +293,11 @@ function ReportAnimal({ user }) {
     } catch (err) {
       console.error(err)
       if (err.name === 'NotAllowedError') {
-        setErrorกล้อง('❌ ไม่ได้รับอนุญาตใช้กล้อง\nกรุณาอนุญาตการเข้าถึงกล้องในการตั้งค่าเบราว์เซอร์')
+        setErrorกล้อง('ไม่ได้รับอนุญาตใช้กล้อง\nกรุณาอนุญาตการเข้าถึงกล้องในการตั้งค่าเบราว์เซอร์')
       } else if (err.name === 'NotFoundError') {
-        setErrorกล้อง('❌ ไม่พบกล้องในอุปกรณ์นี้')
+        setErrorกล้อง('ไม่พบกล้องในอุปกรณ์นี้')
       } else {
-        setErrorกล้อง('❌ ไม่สามารถเปิดกล้องได้: ' + err.message)
+        setErrorกล้อง('ไม่สามารถเปิดกล้องได้: ' + err.message)
       }
     }
   }
@@ -559,7 +561,7 @@ function ReportAnimal({ user }) {
   if (ส่งสำเร็จ) {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-7xl mb-4">✅</div>
+        <CheckCircle2 size={72} strokeWidth={1.5} className="text-green-500 mx-auto mb-4" />
         <h2 className="text-2xl font-bold text-gray-800 mb-2">แจ้งสำเร็จแล้ว!</h2>
         <p className="text-gray-600 mb-1 font-medium">เดี๋ยวจะมีเจ้าหน้าที่ติดต่อกลับในไม่ช้า</p>
         <p className="text-gray-400 text-sm mb-6">กรุณาเตรียมรับสาย / ข้อความจากเจ้าหน้าที่</p>
@@ -605,7 +607,7 @@ function ReportAnimal({ user }) {
             <button onClick={ปิดกล้อง} className="text-white text-sm px-3 py-1 bg-white/20 rounded-full">
               ✕ ยกเลิก
             </button>
-            <p className="text-white font-medium text-sm">📷 ถ่ายรูปสัตว์</p>
+            <p className="text-white font-medium text-sm flex items-center justify-center gap-1.5"><Camera size={15} className="shrink-0" /> ถ่ายรูปสัตว์</p>
             <div className="w-16" />
           </div>
 
@@ -677,7 +679,7 @@ function ReportAnimal({ user }) {
 
             {/* icon + หัวข้อ */}
             <div className="text-center mb-5">
-              <div className="text-5xl mb-3">📱</div>
+              <Smartphone size={48} strokeWidth={1.5} className="text-orange-400 mx-auto mb-3" />
               <h2 className="text-lg font-bold text-gray-800">กรอกเบอร์โทรศัพท์ก่อน</h2>
               <p className="text-sm text-gray-500 mt-1">
                 เจ้าหน้าที่จะติดต่อกลับผ่านเบอร์นี้เมื่อรับเรื่องแล้ว
@@ -713,7 +715,7 @@ function ReportAnimal({ user }) {
             >
               {กำลังบันทึกโทรศัพท์
                 ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> บันทึก...</>
-                : '✅ บันทึกเบอร์โทรศัพท์'}
+                : <><CheckCircle2 size={16} className="shrink-0" /> บันทึกเบอร์โทรศัพท์</>}
             </button>
 
             <p className="text-center text-xs text-gray-400 mt-3">
@@ -732,7 +734,7 @@ function ReportAnimal({ user }) {
             <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 
             <div className="text-center mb-4">
-              <div className="text-4xl mb-2">⚠️</div>
+              <AlertTriangle size={40} strokeWidth={1.5} className="text-orange-500 mx-auto mb-2" />
               <h2 className="text-lg font-bold text-gray-800">มีผู้แจ้งเหตุในบริเวณนี้แล้ว</h2>
               <p className="text-sm text-gray-500 mt-1">
                 พบรายงานที่ยังดำเนินการอยู่ ห่างจากจุดที่คุณปักหมุดประมาณ{' '}
@@ -745,14 +747,14 @@ function ReportAnimal({ user }) {
               <div className="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center shrink-0">
                 {เคสซ้ำ.image_url
                   ? <img src={เคสซ้ำ.image_url} alt="เคสที่แจ้งไว้แล้ว" className="w-full h-full object-cover" />
-                  : <span className="text-3xl">🐾</span>}
+                  : <PawPrint size={28} className="text-orange-300" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-gray-800 text-sm truncate">
                   {เคสซ้ำ.animal_type && เคสซ้ำ.animal_type !== 'ไม่สามารถวิเคราะห์ได้'
                     ? เคสซ้ำ.animal_type : 'รอระบุสายพันธุ์'}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">🕒 แจ้งเมื่อ {เวลาผ่านมา(เคสซ้ำ.created_at)}</p>
+                <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Clock size={12} className="shrink-0" /> แจ้งเมื่อ {เวลาผ่านมา(เคสซ้ำ.created_at)}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   #{String(เคสซ้ำ.id).padStart(6, '0')} · {เคสซ้ำ.status}
                 </p>
@@ -771,7 +773,7 @@ function ReportAnimal({ user }) {
             >
               {กำลังรวมเคส
                 ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> กำลังแนบข้อมูล...</>
-                : '✅ ใช่ ตัวเดียวกัน (แนบรูปเพิ่มให้เจ้าหน้าที่)'}
+                : <><CheckCircle2 size={18} className="shrink-0" /> ใช่ ตัวเดียวกัน (แนบรูปเพิ่มให้เจ้าหน้าที่)</>}
             </button>
 
             {/* ปุ่ม B — คนละตัว → สร้างใบใหม่ */}
@@ -780,7 +782,7 @@ function ReportAnimal({ user }) {
               disabled={กำลังรวมเคส || กำลังส่ง}
               className="w-full mt-2 border-2 border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm disabled:opacity-50"
             >
-              ❌ ไม่ใช่ นี่คือสัตว์คนละตัว (แจ้งเคสใหม่)
+              <span className="inline-flex items-center justify-center gap-1.5"><XCircle size={16} className="shrink-0" /> ไม่ใช่ นี่คือสัตว์คนละตัว (แจ้งเคสใหม่)</span>
             </button>
 
             <p className="text-center text-xs text-gray-400 mt-3">
@@ -818,12 +820,12 @@ function ReportAnimal({ user }) {
               <div className="absolute bottom-0 inset-x-0 bg-black/50 flex items-center justify-center gap-3 px-5 py-3">
                 <button onClick={เปิดกล้อง}
                   className="flex items-center gap-1.5 text-white text-sm font-medium">
-                  <span className="text-xl">📷</span> ถ่ายรูป
+                  <Camera size={20} className="shrink-0" /> ถ่ายรูป
                 </button>
                 <span className="w-px h-4 bg-white/30" />
                 <button onClick={() => inputGallery.current.click()}
                   className="flex items-center gap-1.5 text-white text-sm font-medium">
-                  <span className="text-xl">🖼️</span> เลือกจากคลัง
+                  <ImageIcon size={20} className="shrink-0" /> เลือกจากคลัง
                 </button>
               </div>
             </div>
@@ -834,7 +836,7 @@ function ReportAnimal({ user }) {
                 onClick={เปิดกล้อง}
                 className="w-full h-64 border-2 border-dashed border-orange-300 rounded-2xl bg-white flex flex-col items-center justify-center active:bg-orange-50 transition-colors"
               >
-                <span className="text-6xl mb-3">📷</span>
+                <Camera size={56} strokeWidth={1.5} className="mb-3" />
                 <p className="text-base font-semibold text-gray-600">แตะเพื่อถ่ายรูป</p>
                 <p className="text-xs text-gray-400 mt-1">ระบบจะขอสิทธิ์เข้าถึงกล้อง</p>
               </button>
@@ -843,7 +845,7 @@ function ReportAnimal({ user }) {
                 onClick={() => inputGallery.current.click()}
                 className="absolute bottom-3 right-3 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm flex items-center gap-1.5 text-gray-600 text-xs font-medium"
               >
-                <span className="text-base">🖼️</span> คลัง
+                <ImageIcon size={16} className="shrink-0" /> คลัง
               </button>
             </div>
           )}
@@ -852,12 +854,12 @@ function ReportAnimal({ user }) {
         </div>
 
         {กำลังวิเคราะห์ && (
-          <p className="text-orange-600 animate-pulse font-medium">🤖 AI กำลังวิเคราะห์สายพันธุ์...</p>
+          <p className="text-orange-600 animate-pulse font-medium flex items-center justify-center gap-1.5"><Bot size={16} className="shrink-0" /> AI กำลังวิเคราะห์สายพันธุ์...</p>
         )}
 
         {ผลAI && !กำลังวิเคราะห์ && (
           <div className="bg-white border border-orange-200 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-orange-600 mb-3">🤖 ผลวิเคราะห์จาก AI</p>
+            <p className="text-xs font-bold text-orange-600 mb-3 flex items-center gap-1.5"><Bot size={14} className="shrink-0" /> ผลวิเคราะห์จาก AI</p>
             <div className="space-y-2">
               {[
                 { label: 'สายพันธุ์', value: ผลAI.สายพันธุ์ },
@@ -950,7 +952,7 @@ function ReportAnimal({ user }) {
             <p key={สั่นครั้งที่}
               className={`mt-2 text-xs ${errorไม่มีGPS ? 'text-red-500 font-medium animate-shake' : 'text-gray-400'}`}
             >
-              ⚠️ จำเป็นต้องระบุพิกัด GPS หรือปักหมุดบนแผนที่ก่อนส่งรายงาน
+              <span className="inline-flex items-center gap-1.5"><AlertTriangle size={14} className="shrink-0" /> จำเป็นต้องระบุพิกัด GPS หรือปักหมุดบนแผนที่ก่อนส่งรายงาน</span>
             </p>
           )}
         </div>
@@ -969,7 +971,7 @@ function ReportAnimal({ user }) {
         {/* ส่ง */}
         <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !เหตุผลแจ้ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
           className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-          {กำลังส่ง ? '⏳ กำลังอัปโหลดและบันทึก...' : 'ส่งรายงานให้เจ้าหน้าที่'}
+          {กำลังส่ง ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin shrink-0" /> กำลังอัปโหลดและบันทึก...</span> : 'ส่งรายงานให้เจ้าหน้าที่'}
         </button>
 
         {/* แสดงเมื่อปิด modal โดยไม่กรอกเบอร์ */}
@@ -978,7 +980,7 @@ function ReportAnimal({ user }) {
             onClick={() => setแสดงModalโทรศัพท์(true)}
             className="w-full flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl py-3 text-sm text-red-600 font-medium"
           >
-            <span>📱</span>
+            <Smartphone size={14} className="shrink-0" />
             <span>กรุณากรอกเบอร์โทรศัพท์ก่อนส่ง</span>
             <span className="text-red-400">→ กรอกเบอร์</span>
           </button>

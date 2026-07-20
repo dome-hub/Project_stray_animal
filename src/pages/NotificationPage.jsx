@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Siren, HardHat, Car, Home, CheckCircle2, ClipboardList, Bell, User, Shield,
+  Calendar, Clock, Trash2,
+} from 'lucide-react'
 import { supabase } from '../supabase'
 
 // parse string เป็น UTC เสมอ — ถ้าไม่มี timezone suffix ให้ต่อ Z เข้าไป
@@ -61,14 +65,14 @@ function จัดกลุ่มแจ้งเตือน(รายการ)
   }, [])
 }
 
-// emoji ตามสถานะรายงาน
-function emojiสถานะ(status) {
-  if (status === 'รอดำเนินการ')    return '🚨'
-  if (status === 'รับเรื่องแล้ว')   return '🦺'
-  if (status === 'ลงพื้นที่แล้ว')   return '🚗'
-  if (status === 'อยู่ศูนย์พักพิง') return '🏠'
-  if (status === 'มีผู้รับเลี้ยง')   return '✅'
-  return '📋'
+// ไอคอนตามสถานะรายงาน — คืน component ของ lucide ไปเลย (ใช้เป็น fallback ตอนไม่มีรูปสัตว์)
+function ไอคอนสถานะ(status) {
+  if (status === 'รอดำเนินการ')    return Siren
+  if (status === 'รับเรื่องแล้ว')   return HardHat
+  if (status === 'ลงพื้นที่แล้ว')   return Car
+  if (status === 'อยู่ศูนย์พักพิง') return Home
+  if (status === 'มีผู้รับเลี้ยง')   return CheckCircle2
+  return ClipboardList
 }
 
 const หัวข้อตามRole = {
@@ -136,7 +140,7 @@ function NotificationPage({ user }) {
             const refId = m ? parseInt(m[1], 10) : null
             return {
               id:       n.id,
-              emoji:    n.type === 'report_update' ? '🦺' : '🔔',
+              Icon:     n.type === 'report_update' ? HardHat : Bell,
               หัวข้อ:   n.title || '',
               ข้อความ:  n.body || n.title || '',
               เวลา:     เวลาการ์ด(n.created_at),
@@ -185,9 +189,9 @@ function NotificationPage({ user }) {
               const isNew = r.status === 'รอดำเนินการ'
               return {
                 id:       r.id,
-                emoji:    emojiสถานะ(r.status),
-                หัวข้อ:   isNew ? '🚨 รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
-                ข้อความ:  `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+                Icon:     ไอคอนสถานะ(r.status),
+                หัวข้อ:   isNew ? 'รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
+                ข้อความ:  `${r.animal_type || 'สัตว์จร'} · ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
                 เวลา:     เวลาการ์ด(r.created_at),
                 created:  r.created_at,
                 isNew,
@@ -229,9 +233,9 @@ function NotificationPage({ user }) {
           .map(function (r) {
             return {
               id:      'r' + r.id,
-              emoji:   emojiสถานะ(r.status),
-              หัวข้อ:  r.status === 'รอดำเนินการ' ? '🚨 รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
-              ข้อความ: `${r.animal_type || 'สัตว์จร'} · 📍 ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+              Icon:    ไอคอนสถานะ(r.status),
+              หัวข้อ:  r.status === 'รอดำเนินการ' ? 'รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
+              ข้อความ: `${r.animal_type || 'สัตว์จร'} · ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
               เวลา:    เวลาการ์ด(r.created_at),
               created: r.created_at,
               isNew:   r.status === 'รอดำเนินการ',
@@ -244,7 +248,7 @@ function NotificationPage({ user }) {
           .map(function (u) {
             return {
               id:      'u' + u.id,
-              emoji:   '👤',
+              Icon:    User,
               หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
               ข้อความ: u.name || 'ผู้ใช้ใหม่',
               เวลา:    เวลาการ์ด(u.created_at),
@@ -362,9 +366,9 @@ function NotificationPage({ user }) {
       {/* Badge role */}
       <div className="px-4 pt-3">
         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${ธีม.badge}`}>
-          {role === 'admin'     ? '🛡️ แสดงสำหรับ Admin' :
-           role === 'volunteer' ? '🦺 แสดงสำหรับเจ้าหน้าที่' :
-           '👤 แสดงสำหรับผู้ใช้ทั่วไป'}
+          {role === 'admin'     ? <><Shield size={13} className="shrink-0" /> แสดงสำหรับ Admin</> :
+           role === 'volunteer' ? <><HardHat size={13} className="shrink-0" /> แสดงสำหรับเจ้าหน้าที่</> :
+           <><User size={13} className="shrink-0" /> แสดงสำหรับผู้ใช้ทั่วไป</>}
         </div>
       </div>
 
@@ -379,7 +383,7 @@ function NotificationPage({ user }) {
       {/* ว่าง */}
       {!โหลด && รายการ.length === 0 && (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-5xl mb-3">🔔</p>
+          <Bell size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
           <p className="font-medium">ยังไม่มีการแจ้งเตือน</p>
           <p className="text-xs mt-1">
             {role === 'user'
@@ -397,7 +401,9 @@ function NotificationPage({ user }) {
           {กลุ่มวันที่.map(function (กลุ่ม) {
           return (
           <div key={กลุ่ม.label}>
-            <p className="text-xs font-semibold text-gray-400 mb-2 px-1">📅 {กลุ่ม.label}</p>
+            <p className="text-xs font-semibold text-gray-400 mb-2 px-1 flex items-center gap-1.5">
+              <Calendar size={13} className="shrink-0" /> {กลุ่ม.label}
+            </p>
             <div className="space-y-3">
           {กลุ่ม.items.map(function (n) {
             const read    = isอ่านแล้ว(n)
@@ -415,11 +421,11 @@ function NotificationPage({ user }) {
                   className="w-full text-left p-4 pr-10"
                 >
                   <div className="flex items-start gap-3">
-                    {/* รูปภาพสัตว์ของเคส (สี่เหลี่ยมขอบมน) — ไม่มีรูปค่อย fallback เป็น emoji */}
+                    {/* รูปภาพสัตว์ของเคส (สี่เหลี่ยมขอบมน) — ไม่มีรูปค่อย fallback เป็นไอคอนตามสถานะ */}
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
                       {n.image_url
                         ? <img src={n.image_url} alt="" className="w-full h-full object-cover" />
-                        : <span className="text-2xl">{n.emoji}</span>}
+                        : <n.Icon size={22} className="text-gray-500" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       {n.หัวข้อ && (
@@ -430,7 +436,9 @@ function NotificationPage({ user }) {
                       <p className={`text-sm leading-snug ${read ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
                         {n.ข้อความ}
                       </p>
-                      <p className="text-[11px] text-gray-400 mt-1">⏱️ {n.เวลา}</p>
+                      <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+                        <Clock size={11} className="shrink-0" /> {n.เวลา}
+                      </p>
                     </div>
                     {!read && (
                       <div className={`w-2.5 h-2.5 ${ธีม.unreadDot} rounded-full mt-1 shrink-0`} />
@@ -460,14 +468,14 @@ function NotificationPage({ user }) {
                         onClick={() => { กดอ่าน(n); setเมนูเปิด(null) }}
                         className="flex items-center gap-2 px-4 py-3 text-sm text-gray-600 font-medium hover:bg-gray-50 w-full text-left border-b border-gray-100"
                       >
-                        ✓ ทำเครื่องหมายว่าอ่านแล้ว
+                        <CheckCircle2 size={16} className="shrink-0" /> ทำเครื่องหมายว่าอ่านแล้ว
                       </button>
                     )}
                     <button
                       onClick={() => ลบแจ้งเตือน(n)}
                       className="flex items-center gap-2 px-4 py-3 text-sm text-red-500 font-medium hover:bg-red-50 w-full text-left"
                     >
-                      🗑️ ลบการแจ้งเตือน
+                      <Trash2 size={16} className="shrink-0" /> ลบการแจ้งเตือน
                     </button>
                   </div>
                 )}

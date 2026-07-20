@@ -13,7 +13,7 @@ function SuspendedPage({ onBackToLogin }) {
       </div>
 
       <h1 className="text-xl font-bold text-gray-800 mb-2">
-        ⚠️ บัญชีของคุณถูกระงับการใช้งาน
+        บัญชีของคุณถูกระงับการใช้งาน
       </h1>
       <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
         คุณไม่สามารถเข้าใช้งานแอปนี้ได้ในขณะนี้
