@@ -11,7 +11,7 @@ import {
   Circle, CircleDot, Plus, X, FileSpreadsheet, Navigation, Camera, Star,
   PawPrint, HelpCircle, HardHat, PartyPopper, ClipboardList, MapPin,
   AlertTriangle, Settings, Search, FileText, Map, MessageSquare, User, Trash2,
-  Phone, Loader2, CheckCircle2, XCircle, Save, Zap, Link2, Globe, Lock,
+  Phone, Loader2, CheckCircle2, XCircle, Save, Zap, Link2, Lock, Megaphone, Home,
   Hourglass, Heart, ExternalLink,
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
@@ -254,8 +254,47 @@ function คลังรูปสัตว์(สัตว์) {
   return []
 }
 
-// ---- Helper: ข้อมูลขั้นต่ำก่อน "เผยแพร่หาบ้าน" ----
-// ต้องครบเพื่อให้ตัวกรอง "ค้นหาแบบละเอียด" ฝั่ง user (FindPet) match เจอ: ประเภท, เพศ, อายุ(ช่วงจริง), ขนาด
+// ---- โหมดการเผยแพร่ (publish_mode) ----
+// แยก "ประกาศอะไรอยู่" ออกจาก status ที่บอกแค่ "ตอนนี้สัตว์อยู่ไหน"
+// เดิมใช้ status ทำสองหน้าที่ พอเปลี่ยนเป็น "อยู่ศูนย์พักพิง" ประกาศตามหาเจ้าของเลยถูกทับหายไป
+// ตอนนี้สัตว์ "อยู่ศูนย์พักพิง" + "ยังตามหาเจ้าของเดิม" พร้อมกันได้แล้ว
+const โหมดเผยแพร่ = [
+  {
+    value: 'none',
+    label: 'ไม่เผยแพร่ (ข้อมูลภายใน)',
+    desc:  'เห็นเฉพาะเจ้าหน้าที่ ผู้ใช้ทั่วไปจะไม่เห็นน้องเลย',
+    Icon:  Lock,
+    active: 'border-gray-400 bg-gray-100 text-gray-700',
+    dot:   'text-gray-500',
+  },
+  {
+    value: 'lost_and_found',
+    label: 'ประกาศตามหาเจ้าของเดิม',
+    desc:  'ขึ้นหน้า "สัตว์หาย / พลัดหลง" — ใช้ตอนคาดว่าน้องมีเจ้าของอยู่แล้ว',
+    Icon:  Megaphone,
+    active: 'border-rose-500 bg-rose-50 text-rose-700',
+    dot:   'text-rose-500',
+  },
+  {
+    value: 'adoption',
+    label: 'ประกาศหาบ้านใหม่',
+    desc:  'ขึ้นหน้า "ค้นหาสัตว์เลี้ยง" — ใช้เมื่อแน่ใจว่าไม่มีเจ้าของเดิมมารับแล้ว',
+    Icon:  Home,
+    active: 'border-teal-600 bg-teal-50 text-teal-700',
+    dot:   'text-teal-600',
+  },
+]
+
+// สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว → ประกาศต่อไม่ได้ ต้องบังคับเป็น 'none'
+const สถานะสัตว์ออกไปแล้ว = ['มีผู้รับเลี้ยง', 'ส่งคืนเจ้าของสำเร็จ']
+
+function โหมดจาก(สัตว์) {
+  return สัตว์?.publish_mode || 'none'
+}
+
+// ---- Helper: ข้อมูลขั้นต่ำก่อน "ประกาศหาบ้านใหม่" ----
+// บังคับเฉพาะโหมด adoption เพราะตัวกรอง "ค้นหาแบบละเอียด" ฝั่ง user (FindPet) ต้องใช้ ประเภท/เพศ/อายุ/ขนาด
+// ส่วนโหมดตามหาเจ้าของไม่บังคับ — ยิ่งประกาศเร็วยิ่งดี เจ้าของจำน้องได้จากรูปอยู่แล้ว
 // อายุต้องเป็นช่วงจริง ไม่ใช่ "ไม่ทราบ" เพราะตัวกรอง เด็ก/โต ของ user จับคู่กับช่วงอายุที่ชัดเจนเท่านั้น
 function ข้อมูลครบพอเผยแพร่(สัตว์) {
   if (!สัตว์) return false
@@ -446,13 +485,15 @@ function VolunteerPage({ หน้า }) {
     if (หน้า === 'map')     ดึงรายงานพิกัด()
   }, [หน้า])
 
-  // เผยแพร่ได้เฉพาะสถานะ "รอการรับเลี้ยง" — ถ้าสัตว์ที่กำลังแก้ไขมีสถานะอื่นแต่ยังเผยแพร่อยู่
-  // (เช่น ข้อมูลเก่าไม่สอดคล้อง หรือเพิ่งเปลี่ยนสถานะกลับไปรักษา) ให้บังคับปิดเผยแพร่อัตโนมัติ
+  // สัตว์ที่ออกจากความดูแลไปแล้ว (มีผู้รับเลี้ยง / ส่งคืนเจ้าของ) ประกาศต่อไม่ได้ → บังคับเป็น 'none'
+  // ครอบคลุมทั้งตอนกดเปลี่ยนสถานะ และตอนเปิดฟอร์มเจอข้อมูลเก่าที่ไม่สอดคล้อง
+  // หมายเหตุ: ไม่บังคับปิดตอน "อยู่ศูนย์พักพิง/อยู่ระหว่างรักษา" อีกแล้ว เพราะสัตว์อยู่ศูนย์
+  // แล้วยังประกาศตามหาเจ้าของเดิมต่อได้ (คือหัวใจของการแยก publish_mode ออกจาก status)
   useEffect(function () {
-    if (สัตว์ที่แก้ไข && สัตว์ที่แก้ไข.is_adoptable && สัตว์ที่แก้ไข.status !== 'รอการรับเลี้ยง') {
-      setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: false } })
+    if (สัตว์ที่แก้ไข && โหมดจาก(สัตว์ที่แก้ไข) !== 'none' && สถานะสัตว์ออกไปแล้ว.includes(สัตว์ที่แก้ไข.status)) {
+      setSัตว์ที่แก้ไข(function (prev) { return { ...prev, publish_mode: 'none' } })
     }
-  }, [สัตว์ที่แก้ไข?.status, สัตว์ที่แก้ไข?.is_adoptable])
+  }, [สัตว์ที่แก้ไข?.status, สัตว์ที่แก้ไข?.publish_mode])
 
   async function ดึงรายงานพิกัด() {
     setโหลดแผนที่(true)
@@ -650,15 +691,25 @@ function VolunteerPage({ หน้า }) {
         .maybeSingle()
 
       if (!existing) {
+        // สืบทอดการประกาศตามหาเจ้าของมาด้วย — report.status ยังเป็นสถานะ "ก่อนหน้า" ตรงนี้
+        // ถ้าเคยประกาศตามหาเจ้าของไว้ หรือเป็นเคสสัตว์พลัดหลง (ปานกลาง = น่าจะมีเจ้าของ)
+        // ให้ประกาศต่อทันทีที่ศูนย์ ไม่ให้หลุดหายจากหน้า "สัตว์หาย / พลัดหลง" ตอนย้ายเข้าศูนย์
+        const โหมดเริ่มต้น =
+          (report.status === 'ประกาศตามหาเจ้าของ' || report.urgency === 'ปานกลาง')
+            ? 'lost_and_found'
+            : 'none'
+
         const { error: animalErr } = await supabase.from('animals').insert({
-          name:      'ยังไม่ตั้งชื่อ',
-          breed:     report.animal_type || 'ไม่ระบุ',
-          status:    'อยู่ศูนย์พักพิง',
-          health:    'ยังไม่ตรวจ',
-          photo_url: report.image_url || null,                     // รูปหลัก (cover) — sync กับ photos[0]
-          photos:    report.image_url ? [report.image_url] : null, // เริ่มคลังรูปด้วยรูปจากจุดเกิดเหตุ
-          location:  report.location_text || 'กำแพงแสน นครปฐม',
-          report_id: report.id,
+          name:         'ยังไม่ตั้งชื่อ',
+          breed:        report.animal_type || 'ไม่ระบุ',
+          status:       'อยู่ศูนย์พักพิง',
+          health:       'ยังไม่ตรวจ',
+          photo_url:    report.image_url || null,                     // รูปหลัก (cover) — sync กับ photos[0]
+          photos:       report.image_url ? [report.image_url] : null, // เริ่มคลังรูปด้วยรูปจากจุดเกิดเหตุ
+          location:     report.location_text || 'กำแพงแสน นครปฐม',
+          report_id:    report.id,
+          publish_mode: โหมดเริ่มต้น,
+          is_adoptable: false,
         })
         if (animalErr) console.error('เพิ่มสัตว์ไม่สำเร็จ:', animalErr.message)
         else console.log('เพิ่มสัตว์ในระบบอัตโนมัติสำเร็จ (report_id:', report.id, ')')
@@ -814,6 +865,10 @@ function VolunteerPage({ หน้า }) {
       health:       สัตว์ที่แก้ไข.health,
       status:       สัตว์ที่แก้ไข.status,
       species:      สัตว์ที่แก้ไข.species      || null,
+      publish_mode: โหมดจาก(สัตว์ที่แก้ไข),
+      // is_adoptable เป็นคอลัมน์เดิม — เขียนตาม publish_mode ไว้ให้ค่าไม่ค้างเก่า
+      // (publish_mode คือแหล่งความจริงหลักแล้ว ทุกหน้าอ่านจากตัวนี้)
+      is_adoptable: โหมดจาก(สัตว์ที่แก้ไข) === 'adoption',
       photos:       photos.length > 0 ? photos : null,
       photo_url:    photo_url,
       traits:       สัตว์ที่แก้ไข.traits       || null,
@@ -821,7 +876,6 @@ function VolunteerPage({ หน้า }) {
       neutered:     สัตว์ที่แก้ไข.neutered     || null,
       size:         สัตว์ที่แก้ไข.size         || null,
       description:  สัตว์ที่แก้ไข.description  || null,
-      is_adoptable: !!สัตว์ที่แก้ไข.is_adoptable,
     }).eq('id', สัตว์ที่แก้ไข.id)
 
     if (!error) {
@@ -842,7 +896,9 @@ function VolunteerPage({ หน้า }) {
     // กันไม่ให้ข้อความนี้โผล่ในช่องกรอกตอนแก้ไข (เจ้าหน้าที่ควรกรอกสายพันธุ์จริงเอง)
     const breedสะอาด = สัตว์.breed === 'ไม่สามารถวิเคราะห์ได้' ? '' : สัตว์.breed
     // normalize คลังรูปให้เป็น array เสมอ (ข้อมูลเก่ามีแค่ photo_url) — ทั้งฟอร์มจะทำงานกับ photos[] อย่างเดียว
-    setSัตว์ที่แก้ไข({ ...สัตว์, breed: breedสะอาด, photos: คลังรูปสัตว์(สัตว์) })
+    // normalize publish_mode ด้วย — ข้อมูลเก่าที่ยังไม่มีคอลัมน์นี้ ให้เดาจาก is_adoptable เดิม
+    const โหมดเดิม = สัตว์.publish_mode || (สัตว์.is_adoptable ? 'adoption' : 'none')
+    setSัตว์ที่แก้ไข({ ...สัตว์, breed: breedสะอาด, photos: คลังรูปสัตว์(สัตว์), publish_mode: โหมดเดิม })
     setinputนิสัย('')
     setข้อมูลรายงานสัตว์(null)
 
@@ -1410,11 +1466,24 @@ function VolunteerPage({ หน้า }) {
                               <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
                                 {สัตว์.status}
                               </span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${
-                                สัตว์.is_adoptable ? 'text-green-700 bg-green-50' : 'text-gray-500 bg-gray-100'
-                              }`}>
-                                {สัตว์.is_adoptable ? <><Globe size={11} className="shrink-0" /> เผยแพร่แล้ว</> : <><Lock size={11} className="shrink-0" /> ยังไม่เผยแพร่</>}
-                              </span>
+                              {(function () {
+                                const โหมด = โหมดจาก(สัตว์)
+                                if (โหมด === 'lost_and_found') return (
+                                  <span className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium text-rose-700 bg-rose-50">
+                                    <Megaphone size={11} className="shrink-0" /> ตามหาเจ้าของ
+                                  </span>
+                                )
+                                if (โหมด === 'adoption') return (
+                                  <span className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium text-teal-700 bg-teal-50">
+                                    <Home size={11} className="shrink-0" /> ประกาศหาบ้าน
+                                  </span>
+                                )
+                                return (
+                                  <span className="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium text-gray-500 bg-gray-100">
+                                    <Lock size={11} className="shrink-0" /> ไม่เผยแพร่
+                                  </span>
+                                )
+                              })()}
                             </div>
                           </div>
                           <span className="text-gray-300 text-xl shrink-0 self-center">›</span>
@@ -2269,7 +2338,7 @@ function VolunteerPage({ หน้า }) {
               <div>
                 <p className="text-xs font-semibold text-gray-600 mb-2">
                   สถานะ
-                  <span className="text-gray-400 font-normal ml-1.5">— "รอการรับเลี้ยง" คือสถานะที่พร้อมให้เจ้าหน้าที่กดเผยแพร่หาบ้าน</span>
+                  <span className="text-gray-400 font-normal ml-1.5">— บอกแค่ว่าตอนนี้น้องอยู่ไหน ส่วนจะประกาศอะไรเลือกที่หัวข้อถัดไป</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {['อยู่ศูนย์พักพิง', 'อยู่ระหว่างรักษา', 'รอการรับเลี้ยง', 'มีผู้รับเลี้ยง'].map(function (ส) {
@@ -2279,10 +2348,10 @@ function VolunteerPage({ หน้า }) {
                       <button key={ส}
                         onClick={function () {
                           setSัตว์ที่แก้ไข(function (prev) {
-                            // เลือกสถานะอื่นที่ไม่ใช่ "รอการรับเลี้ยง" → ปิดเผยแพร่อัตโนมัติเสมอ
-                            // กันสัตว์ที่รับเลี้ยงแล้ว/ยังไม่พร้อม ค้างโชว์ในหน้า "ค้นหาสัตว์เลี้ยง" ของ user
-                            const is_adoptable = ส === 'รอการรับเลี้ยง' ? prev.is_adoptable : false
-                            return { ...prev, status: ส, is_adoptable }
+                            // สถานะบอกแค่ที่อยู่ ไม่ยุ่งกับการประกาศแล้ว
+                            // ยกเว้นสถานะที่แปลว่าน้องออกไปแล้ว → ประกาศต่อไม่ได้ ปิดให้อัตโนมัติ
+                            const publish_mode = สถานะสัตว์ออกไปแล้ว.includes(ส) ? 'none' : โหมดจาก(prev)
+                            return { ...prev, status: ส, publish_mode }
                           })
                         }}
                         className={`py-2.5 rounded-xl text-xs font-medium border-2 flex items-center justify-center gap-1 ${
@@ -2418,56 +2487,69 @@ function VolunteerPage({ หน้า }) {
                 />
               </div>
 
-              {/* เผยแพร่หาบ้าน — ตัวคัดกรองก่อนขึ้นหน้า "ค้นหาสัตว์เลี้ยง" ของ user
-                  กดเปิดได้ก็ต่อเมื่อข้อมูลหลัก (ประเภท/เพศ/อายุ/ขนาด) ครบ — กันสัตว์ที่ค้นหาละเอียดแล้ว match ไม่เจอ */}
+              {/* การเผยแพร่สู่สาธารณะ — แยกจาก status โดยสิ้นเชิง
+                  สัตว์ "อยู่ศูนย์พักพิง" + "ประกาศตามหาเจ้าของเดิม" พร้อมกันได้ (เดิมทำไม่ได้เพราะใช้ status ตัวเดียว) */}
               {(function () {
-                const เปิดอยู่   = !!สัตว์ที่แก้ไข.is_adoptable
-                const สถานะพร้อม = สัตว์ที่แก้ไข.status === 'รอการรับเลี้ยง' // เผยแพร่ได้เฉพาะสถานะนี้
-                const ข้อมูลครบ  = ข้อมูลครบพอเผยแพร่(สัตว์ที่แก้ไข)
-                const เผยแพร่ได้ = สถานะพร้อม && ข้อมูลครบ
+                const โหมดปัจจุบัน = โหมดจาก(สัตว์ที่แก้ไข)
+                const ออกไปแล้ว   = สถานะสัตว์ออกไปแล้ว.includes(สัตว์ที่แก้ไข.status)
+                const ข้อมูลครบ   = ข้อมูลครบพอเผยแพร่(สัตว์ที่แก้ไข)
+
+                function เลือกโหมด(ค่า) {
+                  if (ออกไปแล้ว && ค่า !== 'none') {
+                    toast(`ประกาศไม่ได้: น้องมีสถานะ "${สัตว์ที่แก้ไข.status}" แล้ว`)
+                    return
+                  }
+                  // โหมดหาบ้านใหม่เท่านั้นที่บังคับข้อมูลครบ เพราะ FindPet ต้องใช้กรอง
+                  if (ค่า === 'adoption' && !ข้อมูลครบ) {
+                    toast('กรุณาระบุ ประเภท, เพศ, อายุ และขนาดตัว ก่อนประกาศหาบ้านใหม่')
+                    return
+                  }
+                  setSัตว์ที่แก้ไข(function (prev) { return { ...prev, publish_mode: ค่า } })
+                }
+
                 return (
-                  <div className={`rounded-2xl p-4 border-2 transition-all ${
-                    เปิดอยู่ ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-gray-800">
-                          {เปิดอยู่ ? <span className="inline-flex items-center gap-1.5"><Globe size={15} className="shrink-0" /> เผยแพร่หาบ้านอยู่</span> : <span className="inline-flex items-center gap-1.5"><Lock size={15} className="shrink-0" /> ยังไม่เผยแพร่</span>}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          เปิดแล้วผู้ใช้ทั่วไปจะเห็นน้องในหน้า "ค้นหาสัตว์เลี้ยง"
-                        </p>
-                      </div>
-                      <button
-                        onClick={function () {
-                          // ปิดได้เสมอ
-                          if (เปิดอยู่) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: false } }); return }
-                          // จะเปิด — ต้องผ่านทั้งสถานะและข้อมูล (สวิตช์ยังกดได้เพื่อให้ toast อธิบายเหตุผล)
-                          if (!สถานะพร้อม) { toast('เผยแพร่ไม่ได้: สัตว์ต้องอยู่สถานะ "รอการรับเลี้ยง" เท่านั้น'); return }
-                          if (!ข้อมูลครบ)  { toast('กรุณาระบุ ประเภท, เพศ, อายุ และขนาดตัว ก่อนเผยแพร่สู่สาธารณะ'); return }
-                          setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: true } })
-                        }}
-                        className={`w-11 h-6 rounded-full shrink-0 transition-colors relative ${
-                          เปิดอยู่ ? 'bg-green-500' : เผยแพร่ได้ ? 'bg-gray-300' : 'bg-gray-300 opacity-60 cursor-not-allowed'
-                        }`}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${
-                          เปิดอยู่ ? 'translate-x-5 bg-white' : 'translate-x-0 bg-white'
-                        }`} />
-                      </button>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 mb-2">
+                      การเผยแพร่สู่สาธารณะ
+                      <span className="text-gray-400 font-normal ml-1.5">— เลือกได้อิสระจากสถานะด้านบน</span>
+                    </p>
+
+                    <div className="space-y-2">
+                      {โหมดเผยแพร่.map(function (m) {
+                        const เลือกอยู่ = โหมดปัจจุบัน === m.value
+                        const ปิดกั้น   = (ออกไปแล้ว && m.value !== 'none') ||
+                                          (m.value === 'adoption' && !ข้อมูลครบ)
+                        return (
+                          <button key={m.value} onClick={() => เลือกโหมด(m.value)}
+                            className={`w-full text-left rounded-xl border-2 px-4 py-3 flex items-start gap-3 transition-all ${
+                              เลือกอยู่ ? m.active : ปิดกั้น ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-gray-200 bg-white'
+                            }`}
+                          >
+                            {เลือกอยู่
+                              ? <CircleDot size={17} className={`shrink-0 mt-0.5 ${m.dot}`} />
+                              : <Circle size={17} className="shrink-0 mt-0.5 text-gray-300" />}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium flex items-center gap-1.5">
+                                <m.Icon size={14} className="shrink-0" /> {m.label}
+                              </p>
+                              <p className={`text-xs mt-0.5 ${เลือกอยู่ ? 'opacity-80' : 'text-gray-400'}`}>{m.desc}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
 
-                    {/* Helper text — บอกเหตุผลที่เผยแพร่ไม่ได้ (สถานะก่อน แล้วค่อยข้อมูล) */}
-                    {!เปิดอยู่ && !สถานะพร้อม && (
-                      <div className="mt-3 flex items-start gap-1.5 text-xs text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
+                    {/* เหตุผลที่บางโหมดกดไม่ได้ */}
+                    {ออกไปแล้ว && (
+                      <div className="mt-2 flex items-start gap-1.5 text-xs text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
                         <AlertTriangle size={13} className="mt-px shrink-0" />
-                        <span>ไม่สามารถเผยแพร่ได้: สัตว์ต้องอยู่ในสถานะ <b>"รอการรับเลี้ยง"</b> เท่านั้น</span>
+                        <span>น้องมีสถานะ <b>"{สัตว์ที่แก้ไข.status}"</b> แล้ว จึงประกาศต่อไม่ได้</span>
                       </div>
                     )}
-                    {!เปิดอยู่ && สถานะพร้อม && !ข้อมูลครบ && (
-                      <div className="mt-3 flex items-start gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                    {!ออกไปแล้ว && !ข้อมูลครบ && (
+                      <div className="mt-2 flex items-start gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
                         <AlertTriangle size={13} className="mt-px shrink-0" />
-                        <span>กรุณาระบุ <b>ประเภท, เพศ, อายุ</b> และ <b>ขนาดตัว</b> ให้ครบก่อนเผยแพร่สู่สาธารณะ (เพื่อให้ผู้ใช้ค้นหาแบบละเอียดเจอน้อง)</span>
+                        <span>ยังประกาศ <b>หาบ้านใหม่</b> ไม่ได้ — ต้องระบุ <b>ประเภท, เพศ, อายุ, ขนาดตัว</b> ให้ครบก่อน (ประกาศตามหาเจ้าของใช้ได้เลย ไม่ต้องกรอกครบ)</span>
                       </div>
                     )}
                   </div>

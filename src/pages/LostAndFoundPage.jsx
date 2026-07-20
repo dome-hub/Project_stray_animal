@@ -22,11 +22,22 @@ const กำลังตามหา = 'กำลังตามหา'
 
 // ดึงข้อมูลทั้ง 2 แท็บพร้อมกัน — แยกออกนอก component เพราะไม่ได้ใช้ state ใดๆ
 // คืนค่าเฉยๆ ไม่ setState เอง เพื่อให้ทั้ง effect ตอน mount และปุ่มรีเฟรชเรียกใช้ร่วมกันได้
+//
+// แท็บ "ศูนย์พบสัตว์พลัดหลง" รวม 2 แหล่ง เพราะสัตว์ตัวหนึ่งตามหาเจ้าของได้ตั้งแต่ก่อนถึงศูนย์:
+//   1) animals ที่ publish_mode = 'lost_and_found'  → รับตัวเข้าศูนย์แล้ว แต่ยังรอเจ้าของเดิมมารับ
+//   2) reports ที่ status = 'ประกาศตามหาเจ้าของ'    → ประกาศแล้วแต่ยังไม่ได้รับตัวเข้าศูนย์
+// ปกติจะไม่ซ้ำกันอยู่แล้ว (report เปลี่ยนเป็น "อยู่ศูนย์พักพิง" ตอนสร้าง animals) แต่กัน
+// ข้อมูลเพี้ยนด้วยการตัด report ที่มี animals ผูกอยู่แล้วออก
 async function โหลดรายการ() {
-  const [ผลFound, ผลLost] = await Promise.all([
+  const [ผลAnimals, ผลReports, ผลLost] = await Promise.all([
+    supabase
+      .from('animals')
+      .select('*')
+      .eq('publish_mode', 'lost_and_found')
+      .order('created_at', { ascending: false }),
     supabase
       .from('reports')
-      .select('id, animal_type, image_url, location_text, detail, created_at, latitude, longitude')
+      .select('id, animal_type, image_url, location_text, created_at')
       .eq('status', สถานะประกาศหาเจ้าของ)
       .order('created_at', { ascending: false }),
     supabase
@@ -35,9 +46,50 @@ async function โหลดรายการ() {
       .eq('status', กำลังตามหา)
       .order('created_at', { ascending: false }),
   ])
-  // ตาราง lost_pets อาจยังไม่ถูกสร้าง (ยังไม่รัน migration) → ไม่ให้ทั้งหน้าพัง
-  if (ผลLost.error) console.error('ดึง lost_pets ไม่สำเร็จ:', ผลLost.error.message)
-  return { found: ผลFound.data || [], lost: ผลLost.data || [] }
+
+  // ตารางใหม่อาจยังไม่ถูกสร้าง (ยังไม่รัน migration) → log ไว้ แต่ไม่ให้ทั้งหน้าพัง
+  if (ผลAnimals.error) console.error('ดึง animals (lost_and_found) ไม่สำเร็จ:', ผลAnimals.error.message)
+  if (ผลLost.error)    console.error('ดึง lost_pets ไม่สำเร็จ:', ผลLost.error.message)
+
+  const สัตว์ในศูนย์ = ผลAnimals.data || []
+  const รายงานที่เข้าศูนย์แล้ว = new Set(สัตว์ในศูนย์.map((a) => a.report_id).filter(Boolean))
+
+  const found = [
+    // 1) เข้าศูนย์แล้ว แต่ยังตามหาเจ้าของเดิม
+    ...สัตว์ในศูนย์.map(function (a) {
+      const มีชื่อ = a.name && a.name !== 'ยังไม่ตั้งชื่อ'
+      return {
+        key:      'a' + a.id,
+        รูป:      (Array.isArray(a.photos) && a.photos[0]) || a.photo_url || null,
+        ชนิด:     a.species || a.breed,
+        ชื่อ:     มีชื่อ ? a.name : (a.species || a.breed || 'รอระบุสายพันธุ์'),
+        สถานที่:  a.location,
+        วันที่:    a.created_at,
+        ที่ศูนย์:  true,
+        รหัส:     a.report_id ? `รหัสรายงาน #${String(a.report_id).padStart(6, '0')}` : 'รับเข้าโดยเจ้าหน้าที่',
+        reportId: a.report_id || null,
+      }
+    }),
+    // 2) ประกาศแล้ว แต่ยังไม่ได้รับตัวเข้าศูนย์
+    ...(ผลReports.data || [])
+      .filter(function (r) { return !รายงานที่เข้าศูนย์แล้ว.has(r.id) })
+      .map(function (r) {
+        const รอสายพันธุ์ = !r.animal_type || r.animal_type === 'ไม่สามารถวิเคราะห์ได้'
+        return {
+          key:      'r' + r.id,
+          รูป:      r.image_url,
+          ชนิด:     r.animal_type,
+          ชื่อ:     รอสายพันธุ์ ? 'รอระบุสายพันธุ์' : r.animal_type,
+          สถานที่:  r.location_text,
+          วันที่:    r.created_at,
+          ที่ศูนย์:  false,
+          รหัส:     `รหัสรายงาน #${String(r.id).padStart(6, '0')}`,
+          reportId: r.id,
+        }
+      }),
+  ]
+
+  return { found, lost: ผลLost.data || [] }
 }
 
 // ---- Helper: วันที่แบบสั้น มีปี พ.ศ. เช่น "20 ก.ค. 2569" ----
@@ -398,21 +450,20 @@ function LostAndFoundPage({ user }) {
       {!กำลังโหลด && รายการที่แสดง.length > 0 && (
         <div className="px-4 pt-4 grid grid-cols-2 gap-3">
           {แท็บ === 'found'
-            ? สัตว์ที่ศูนย์พบ.map(function (r) {
-                const รอสายพันธุ์ = !r.animal_type || r.animal_type === 'ไม่สามารถวิเคราะห์ได้'
+            ? สัตว์ที่ศูนย์พบ.map(function (a) {
                 return (
                   <การ์ดประกาศ
-                    key={r.id}
-                    รูป={r.image_url}
-                    ชนิด={r.animal_type}
-                    ชื่อ={รอสายพันธุ์ ? 'รอระบุสายพันธุ์' : r.animal_type}
-                    สถานที่={r.location_text}
-                    วันที่={r.created_at}
-                    ป้าย="อยู่ในการดูแลของศูนย์"
-                    สีป้าย="bg-teal-500 text-white"
-                    PIcon={Home}
-                    ข้อมูลรอง={`รหัส #${String(r.id).padStart(6, '0')}`}
-                    onClick={() => navigate(`/track?open=${r.id}`)}
+                    key={a.key}
+                    รูป={a.รูป}
+                    ชนิด={a.ชนิด}
+                    ชื่อ={a.ชื่อ}
+                    สถานที่={a.สถานที่}
+                    วันที่={a.วันที่}
+                    ป้าย={a.ที่ศูนย์ ? 'อยู่ในการดูแลของศูนย์' : 'กำลังตามหาเจ้าของ'}
+                    สีป้าย={a.ที่ศูนย์ ? 'bg-teal-500 text-white' : 'bg-amber-500 text-white'}
+                    PIcon={a.ที่ศูนย์ ? Home : Megaphone}
+                    ข้อมูลรอง={a.รหัส}
+                    onClick={() => { if (a.reportId) navigate(`/track?open=${a.reportId}`) }}
                   />
                 )
               })
