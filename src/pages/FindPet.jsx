@@ -52,7 +52,10 @@ function FindPet() {
         const แปลงแล้ว = data.map(function (สัตว์) {
           return {
             id: สัตว์.id,
-            emoji: สัตว์.breed?.includes('แมว') ? '🐈' : '🐕',
+            // ประเภท สุนัข/แมว — ใช้ species ที่เจ้าหน้าที่เลือกชัดเจนก่อน, ข้อมูลเก่าที่ยังไม่มี species ค่อย fallback เดาจาก breed
+            emoji: สัตว์.species === 'แมว' ? '🐈'
+                 : สัตว์.species === 'สุนัข' ? '🐕'
+                 : (สัตว์.breed?.includes('แมว') ? '🐈' : '🐕'),
             รูป: (Array.isArray(สัตว์.photos) && สัตว์.photos[0]) || สัตว์.photo_url || null, // cover สำหรับการ์ด
             // คลังรูปทั้งหมดสำหรับ carousel หน้ารายละเอียด — รองรับข้อมูลเก่าที่มีแค่ photo_url
             รูปทั้งหมด: (Array.isArray(สัตว์.photos) && สัตว์.photos.length > 0)

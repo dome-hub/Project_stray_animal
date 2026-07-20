@@ -203,6 +203,18 @@ function คลังรูปสัตว์(สัตว์) {
   return []
 }
 
+// ---- Helper: ข้อมูลขั้นต่ำก่อน "เผยแพร่หาบ้าน" ----
+// ต้องครบเพื่อให้ตัวกรอง "ค้นหาแบบละเอียด" ฝั่ง user (FindPet) match เจอ: ประเภท, เพศ, อายุ(ช่วงจริง), ขนาด
+// อายุต้องเป็นช่วงจริง ไม่ใช่ "ไม่ทราบ" เพราะตัวกรอง เด็ก/โต ของ user จับคู่กับช่วงอายุที่ชัดเจนเท่านั้น
+function ข้อมูลครบพอเผยแพร่(สัตว์) {
+  if (!สัตว์) return false
+  const มีประเภท = สัตว์.species === 'สุนัข' || สัตว์.species === 'แมว'
+  const มีเพศ    = ['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].includes(สัตว์.gender)
+  const มีอายุ   = !!สัตว์.age && สัตว์.age !== 'ไม่ทราบ' && ตัวเลือกอายุสัตว์.includes(สัตว์.age)
+  const มีขนาด   = ['เล็ก', 'กลาง', 'ใหญ่'].includes(สัตว์.size)
+  return มีประเภท && มีเพศ && มีอายุ && มีขนาด
+}
+
 // ---- Helper: แปลงวันที่ ----
 function แปลงวันที่เวลา(str) {
   if (!str) return ''
@@ -655,6 +667,7 @@ function VolunteerPage({ หน้า }) {
       gender:       สัตว์ที่แก้ไข.gender,
       health:       สัตว์ที่แก้ไข.health,
       status:       สัตว์ที่แก้ไข.status,
+      species:      สัตว์ที่แก้ไข.species      || null,
       photos:       photos.length > 0 ? photos : null,
       photo_url:    photo_url,
       traits:       สัตว์ที่แก้ไข.traits       || null,
@@ -1913,6 +1926,22 @@ function VolunteerPage({ หน้า }) {
                 <div className="flex-1 h-px bg-gray-100" />
               </div>
 
+              {/* ประเภทสัตว์ (สุนัข/แมว) — จำเป็นต่อการค้นหาแบบละเอียดฝั่ง user */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ประเภทสัตว์ <span className="text-red-400">*</span></p>
+                <div className="flex gap-2">
+                  {[{ v: 'สุนัข', e: '🐕' }, { v: 'แมว', e: '🐈' }].map(function (t) {
+                    return (
+                      <button key={t.v}
+                        onClick={function () { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, species: t.v } }) }}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 ${
+                          สัตว์ที่แก้ไข.species === t.v ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600'
+                        }`}>{t.e} {t.v}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {[
                 { label: 'ชื่อสัตว์', key: 'name',   placeholder: 'ชื่อสัตว์' },
                 { label: 'สายพันธุ์', key: 'breed',  placeholder: 'เช่น สุนัขพันธุ์ไทย' },
@@ -1931,7 +1960,7 @@ function VolunteerPage({ หน้า }) {
               {/* อายุ — ใช้ select ชุดตัวเลือกเดียวกับฟอร์มเพิ่ม เพราะหน้า "ค้นหาสัตว์เลี้ยง" ฝั่ง user
                   กรอง "เด็ก/โต" โดย match ตรงกับ string ชุดนี้ ถ้าเป็นข้อความอิสระ ตัวกรองจะหาไม่เจอ */}
               <div>
-                <p className="text-xs font-semibold text-gray-600 mb-1">อายุ</p>
+                <p className="text-xs font-semibold text-gray-600 mb-1">อายุ <span className="text-red-400">*</span></p>
                 <select value={สัตว์ที่แก้ไข.age || ''}
                   onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, age: e.target.value } }) }}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-teal-400">
@@ -1943,7 +1972,7 @@ function VolunteerPage({ หน้า }) {
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-gray-600 mb-2">เพศ</p>
+                <p className="text-xs font-semibold text-gray-600 mb-2">เพศ <span className="text-red-400">*</span></p>
                 <div className="flex gap-2">
                   {['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].map(function (เพศ) {
                     return (
@@ -2089,7 +2118,7 @@ function VolunteerPage({ หน้า }) {
 
               {/* ขนาดตัว */}
               <div>
-                <p className="text-xs font-semibold text-gray-600 mb-2">ขนาดตัว</p>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ขนาดตัว <span className="text-red-400">*</span></p>
                 <div className="flex gap-2">
                   {['เล็ก', 'กลาง', 'ใหญ่'].map(function (ข) {
                     return (
@@ -2115,39 +2144,59 @@ function VolunteerPage({ หน้า }) {
                 />
               </div>
 
-              {/* เผยแพร่หาบ้าน — ตัวคัดกรองก่อนขึ้นหน้า "ค้นหาสัตว์เลี้ยง" ของ user */}
-              <div className={`rounded-2xl p-4 border-2 transition-all ${
-                สัตว์ที่แก้ไข.is_adoptable ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-              }`}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-gray-800">
-                      {สัตว์ที่แก้ไข.is_adoptable ? '🌐 เผยแพร่หาบ้านอยู่' : '🔒 ยังไม่เผยแพร่'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      เปิดแล้วผู้ใช้ทั่วไปจะเห็นน้องในหน้า "ค้นหาสัตว์เลี้ยง"
-                    </p>
+              {/* เผยแพร่หาบ้าน — ตัวคัดกรองก่อนขึ้นหน้า "ค้นหาสัตว์เลี้ยง" ของ user
+                  กดเปิดได้ก็ต่อเมื่อข้อมูลหลัก (ประเภท/เพศ/อายุ/ขนาด) ครบ — กันสัตว์ที่ค้นหาละเอียดแล้ว match ไม่เจอ */}
+              {(function () {
+                const เผยแพร่ได้ = ข้อมูลครบพอเผยแพร่(สัตว์ที่แก้ไข)
+                const เปิดอยู่   = !!สัตว์ที่แก้ไข.is_adoptable
+                return (
+                  <div className={`rounded-2xl p-4 border-2 transition-all ${
+                    เปิดอยู่ ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">
+                          {เปิดอยู่ ? '🌐 เผยแพร่หาบ้านอยู่' : '🔒 ยังไม่เผยแพร่'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          เปิดแล้วผู้ใช้ทั่วไปจะเห็นน้องในหน้า "ค้นหาสัตว์เลี้ยง"
+                        </p>
+                      </div>
+                      <button
+                        onClick={function () {
+                          // ยังไม่เผยแพร่ + ข้อมูลไม่ครบ → บล็อก พร้อมแจ้งเตือน (ตัวสวิตช์ยังกดได้เพื่อให้ toast ทำงาน)
+                          if (!เปิดอยู่ && !เผยแพร่ได้) {
+                            toast('⚠️ กรุณาระบุ ประเภท, เพศ, อายุ และขนาดตัว ก่อนเผยแพร่สู่สาธารณะ')
+                            return
+                          }
+                          setSัตว์ที่แก้ไข(function (prev) {
+                            const เปิดเผยแพร่ = !prev.is_adoptable
+                            // เปิดเผยแพร่ตอนสถานะยังเป็น "อยู่ศูนย์พักพิง" → เปลี่ยนสถานะเป็น "รอการรับเลี้ยง" ให้อัตโนมัติ
+                            // การ์ดจะได้ย้ายไป tab "รอหาบ้าน" ทันที ไม่ต้องกดสถานะแยกอีกขั้น
+                            const status = เปิดเผยแพร่ && prev.status === 'อยู่ศูนย์พักพิง' ? 'รอการรับเลี้ยง' : prev.status
+                            return { ...prev, is_adoptable: เปิดเผยแพร่, status }
+                          })
+                        }}
+                        className={`w-11 h-6 rounded-full shrink-0 transition-colors relative ${
+                          เปิดอยู่ ? 'bg-green-500' : เผยแพร่ได้ ? 'bg-gray-300' : 'bg-gray-200 cursor-not-allowed'
+                        }`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${
+                          เปิดอยู่ ? 'translate-x-5 bg-white' : เผยแพร่ได้ ? 'translate-x-0 bg-white' : 'translate-x-0 bg-gray-100'
+                        }`} />
+                      </button>
+                    </div>
+
+                    {/* Helper text แดง — โชว์เมื่อข้อมูลยังไม่ครบและยังไม่เผยแพร่ */}
+                    {!เปิดอยู่ && !เผยแพร่ได้ && (
+                      <div className="mt-3 flex items-start gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                        <span className="mt-px shrink-0">⚠️</span>
+                        <span>กรุณาระบุ <b>ประเภท, เพศ, อายุ</b> และ <b>ขนาดตัว</b> ให้ครบก่อนเผยแพร่สู่สาธารณะ (เพื่อให้ผู้ใช้ค้นหาแบบละเอียดเจอน้อง)</span>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={function () {
-                      setSัตว์ที่แก้ไข(function (prev) {
-                        const เปิดเผยแพร่ = !prev.is_adoptable
-                        // เปิดเผยแพร่ตอนสถานะยังเป็น "อยู่ศูนย์พักพิง" → เปลี่ยนสถานะเป็น "รอการรับเลี้ยง" ให้อัตโนมัติ
-                        // การ์ดจะได้ย้ายไป tab "รอหาบ้าน" ทันที ไม่ต้องกดสถานะแยกอีกขั้น
-                        const status = เปิดเผยแพร่ && prev.status === 'อยู่ศูนย์พักพิง' ? 'รอการรับเลี้ยง' : prev.status
-                        return { ...prev, is_adoptable: เปิดเผยแพร่, status }
-                      })
-                    }}
-                    className={`w-11 h-6 rounded-full shrink-0 transition-colors relative ${
-                      สัตว์ที่แก้ไข.is_adoptable ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                      สัตว์ที่แก้ไข.is_adoptable ? 'translate-x-5' : 'translate-x-0'
-                    }`} />
-                  </button>
-                </div>
-              </div>
+                )
+              })()}
 
               <button onClick={บันทึกแก้ไขสัตว์}
                 className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base active:scale-95 transition-all">
