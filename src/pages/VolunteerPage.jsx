@@ -194,6 +194,15 @@ function แสดงชื่อสัตว์(สัตว์) {
   return `${สัตว์.breed?.includes('แมว') ? 'แมว' : 'สุนัข'} รอระบุชื่อ`
 }
 
+// ---- Helper: คลังรูปสัตว์ (multi-image) — คืน array เสมอ ----
+// รองรับข้อมูลเก่าที่มีแค่ photo_url (ก่อนมีคอลัมน์ photos): ถ้าไม่มี photos[] ให้ fallback เป็น [photo_url]
+// convention: photos[0] = รูปโปรไฟล์หลัก (cover) เสมอ
+function คลังรูปสัตว์(สัตว์) {
+  if (Array.isArray(สัตว์?.photos) && สัตว์.photos.length > 0) return สัตว์.photos
+  if (สัตว์?.photo_url) return [สัตว์.photo_url]
+  return []
+}
+
 // ---- Helper: แปลงวันที่ ----
 function แปลงวันที่เวลา(str) {
   if (!str) return ''
@@ -327,9 +336,7 @@ function VolunteerPage({ หน้า }) {
   const [ข้อมูลรายงานสัตว์,  setข้อมูลรายงานสัตว์]  = useState(null)   // { report + reporter }
   const [โหลดรายงานสัตว์,   setโหลดรายงานสัตว์]   = useState(false)
   const [แสดงฟอร์มเพิ่ม, setแสดงฟอร์มเพิ่ม] = useState(false)
-  const [ไฟล์รูปสัตว์ใหม่,  setไฟล์รูปสัตว์ใหม่]  = useState(null)     // File ที่เลือกอัปโหลดใหม่ (ยังไม่ได้ upload)
-  const [พรีวิวรูปสัตว์ใหม่, setพรีวิวรูปสัตว์ใหม่] = useState(null)     // object URL สำหรับ preview
-  const [กำลังอัปโหลดรูป,   setกำลังอัปโหลดรูป]   = useState(false)
+  const [กำลังอัปโหลดรูป,   setกำลังอัปโหลดรูป]   = useState(false)   // กำลังอัปโหลดรูปเข้าคลังอยู่ไหม
   const inputรูปสัตว์ = useRef(null)
   const [ชื่อสัตว์,       setชื่อสัตว์]       = useState('')
   const [เพศสัตว์,       setเพศสัตว์]       = useState('')
@@ -561,7 +568,8 @@ function VolunteerPage({ หน้า }) {
           breed:     report.animal_type || 'ไม่ระบุ',
           status:    'อยู่ศูนย์พักพิง',
           health:    'ยังไม่ตรวจ',
-          photo_url: report.image_url || null,
+          photo_url: report.image_url || null,                     // รูปหลัก (cover) — sync กับ photos[0]
+          photos:    report.image_url ? [report.image_url] : null, // เริ่มคลังรูปด้วยรูปจากจุดเกิดเหตุ
           location:  report.location_text || 'กำแพงแสน นครปฐม',
           report_id: report.id,
         })
@@ -636,21 +644,9 @@ function VolunteerPage({ หน้า }) {
   async function บันทึกแก้ไขสัตว์() {
     if (!สัตว์ที่แก้ไข || กำลังอัปโหลดรูป) return
 
-    // อัปโหลดรูปโปรไฟล์ใหม่ก่อน (ถ้าเลือกไว้) — ใช้แทนรูปเดิมจากจุดเกิดเหตุ
-    let photo_url = สัตว์ที่แก้ไข.photo_url || null
-    if (ไฟล์รูปสัตว์ใหม่) {
-      setกำลังอัปโหลดรูป(true)
-      const ชื่อไฟล์ = `animal_${Date.now()}_${ไฟล์รูปสัตว์ใหม่.name.replace(/\s/g, '_')}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปสัตว์ใหม่)
-      setกำลังอัปโหลดรูป(false)
-      if (uploadError) {
-        alert('อัปโหลดรูปไม่สำเร็จ: ' + uploadError.message)
-        return
-      }
-      const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
-      photo_url = urlData.publicUrl
-    }
+    // รูปถูกอัปโหลดเข้า storage ทันทีตอนเลือกแล้ว (ดู เลือกรูปสัตว์ใหม่) — ตรงนี้แค่บันทึก array + cover
+    const photos    = Array.isArray(สัตว์ที่แก้ไข.photos) ? สัตว์ที่แก้ไข.photos : []
+    const photo_url = photos[0] || null // photos[0] = รูปหลักเสมอ — sync ลง photo_url ให้โค้ดเก่าที่อ่าน photo_url ใช้ได้
 
     const { error } = await supabase.from('animals').update({
       name:         สัตว์ที่แก้ไข.name,
@@ -659,6 +655,7 @@ function VolunteerPage({ หน้า }) {
       gender:       สัตว์ที่แก้ไข.gender,
       health:       สัตว์ที่แก้ไข.health,
       status:       สัตว์ที่แก้ไข.status,
+      photos:       photos.length > 0 ? photos : null,
       photo_url:    photo_url,
       traits:       สัตว์ที่แก้ไข.traits       || null,
       vaccine_info: สัตว์ที่แก้ไข.vaccine_info || null,
@@ -670,11 +667,8 @@ function VolunteerPage({ หน้า }) {
 
     if (!error) {
       setSัตว์จากDB(function (prev) {
-        return prev.map(function (s) { return s.id === สัตว์ที่แก้ไข.id ? { ...สัตว์ที่แก้ไข, photo_url } : s })
+        return prev.map(function (s) { return s.id === สัตว์ที่แก้ไข.id ? { ...สัตว์ที่แก้ไข, photos, photo_url } : s })
       })
-      if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
-      setไฟล์รูปสัตว์ใหม่(null)
-      setพรีวิวรูปสัตว์ใหม่(null)
       setSัตว์ที่แก้ไข(null)
       setข้อมูลรายงานสัตว์(null)
       toast('✅ บันทึกข้อมูลสัตว์สำเร็จ!')
@@ -688,11 +682,10 @@ function VolunteerPage({ หน้า }) {
     // ถ้า breed เป็นข้อความความล้มเหลวของ AI ("ไม่สามารถวิเคราะห์ได้") ให้เคลียร์เป็นค่าว่าง
     // กันไม่ให้ข้อความนี้โผล่ในช่องกรอกตอนแก้ไข (เจ้าหน้าที่ควรกรอกสายพันธุ์จริงเอง)
     const breedสะอาด = สัตว์.breed === 'ไม่สามารถวิเคราะห์ได้' ? '' : สัตว์.breed
-    setSัตว์ที่แก้ไข({ ...สัตว์, breed: breedสะอาด })
+    // normalize คลังรูปให้เป็น array เสมอ (ข้อมูลเก่ามีแค่ photo_url) — ทั้งฟอร์มจะทำงานกับ photos[] อย่างเดียว
+    setSัตว์ที่แก้ไข({ ...สัตว์, breed: breedสะอาด, photos: คลังรูปสัตว์(สัตว์) })
     setinputนิสัย('')
     setข้อมูลรายงานสัตว์(null)
-    setไฟล์รูปสัตว์ใหม่(null)
-    setพรีวิวรูปสัตว์ใหม่(null)
 
     if (!สัตว์.report_id) return
 
@@ -719,26 +712,42 @@ function VolunteerPage({ หน้า }) {
   }
 
   // เลือกไฟล์รูปโปรไฟล์ใหม่สำหรับสัตว์ (ยังไม่อัปโหลดจนกว่าจะกดบันทึก)
+  // เลือกได้หลายไฟล์พร้อมกัน — validate + อัปโหลดขึ้น storage ทันที แล้วต่อ url เข้าคลังรูป (photos[])
+  // (อัปโหลดตอนเลือกเลย ทำให้ set-cover/ลบ ทำงานกับ url จริงทั้งหมด ไม่ต้องจัดการไฟล์ค้างที่ยังไม่อัปโหลด)
   async function เลือกรูปสัตว์ใหม่(event) {
-    const ไฟล์ = event.target.files[0]
-    if (!ไฟล์) return
-    const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
-    if (!ผลตรวจ.ok) {
-      alert(ผลตรวจ.error)
-      event.target.value = ''
-      return
-    }
-    if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
-    setไฟล์รูปสัตว์ใหม่(ไฟล์)
-    setพรีวิวรูปสัตว์ใหม่(URL.createObjectURL(ไฟล์))
+    const ไฟล์ทั้งหมด = Array.from(event.target.files || [])
     event.target.value = ''
+    if (ไฟล์ทั้งหมด.length === 0) return
+    setกำลังอัปโหลดรูป(true)
+    const urlใหม่ = []
+    for (const ไฟล์ of ไฟล์ทั้งหมด) {
+      const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
+      if (!ผลตรวจ.ok) { alert(`${ไฟล์.name}: ${ผลตรวจ.error}`); continue }
+      const ชื่อไฟล์ = `animal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${ไฟล์.name.replace(/\s/g, '_')}`
+      const { data, error } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์)
+      if (error) { alert(`อัปโหลด ${ไฟล์.name} ไม่สำเร็จ: ${error.message}`); continue }
+      const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(data.path)
+      urlใหม่.push(urlData.publicUrl)
+    }
+    if (urlใหม่.length > 0) {
+      setSัตว์ที่แก้ไข((prev) => ({ ...prev, photos: [...(prev.photos || []), ...urlใหม่] }))
+    }
+    setกำลังอัปโหลดรูป(false)
   }
 
-  // ปิด bottom sheet แก้ไขสัตว์ — เคลียร์ preview รูปที่เลือกไว้ (ถ้ามี) กันหลุดค้างใน memory
+  // ตั้งรูปนี้เป็นรูปหลัก (cover) — ย้ายมาไว้หน้าสุดของ array (photos[0])
+  function ตั้งเป็นรูปหลัก(url) {
+    setSัตว์ที่แก้ไข((prev) => ({ ...prev, photos: [url, ...(prev.photos || []).filter((u) => u !== url)] }))
+  }
+
+  // ลบรูปออกจากคลังของสัตว์ตัวนี้ (เอาออกจาก array เท่านั้น ไม่ลบไฟล์ใน storage —
+  // กันเผลอลบรูปที่ report ต้นทางยังใช้ร่วมอยู่; ไฟล์กำพร้าใน storage ไม่มีผลเสีย)
+  function ลบรูปสัตว์(url) {
+    setSัตว์ที่แก้ไข((prev) => ({ ...prev, photos: (prev.photos || []).filter((u) => u !== url) }))
+  }
+
+  // ปิด bottom sheet แก้ไขสัตว์
   function ปิดแก้ไขสัตว์() {
-    if (พรีวิวรูปสัตว์ใหม่) URL.revokeObjectURL(พรีวิวรูปสัตว์ใหม่)
-    setไฟล์รูปสัตว์ใหม่(null)
-    setพรีวิวรูปสัตว์ใหม่(null)
     setSัตว์ที่แก้ไข(null)
     setข้อมูลรายงานสัตว์(null)
   }
@@ -1750,32 +1759,64 @@ function VolunteerPage({ หน้า }) {
             </div>
 
             <div className="px-5 pb-8 space-y-4">
-              {/* รูปโปรไฟล์ — อัปโหลดรูปใหม่แทนรูปจากจุดเกิดเหตุ ใช้ตอนหาบ้าน */}
+              {/* คลังรูปสัตว์ (หลายรูป) — รูปหลักใหญ่ด้านบน + thumbnail grid ตั้ง cover/ลบได้ */}
               <div>
-                <div className="relative w-full h-36 rounded-2xl overflow-hidden bg-teal-50 flex items-center justify-center">
-                  {พรีวิวรูปสัตว์ใหม่ ? (
-                    <img src={พรีวิวรูปสัตว์ใหม่} alt="รูปใหม่ (พรีวิว)" className="w-full h-full object-contain" />
-                  ) : สัตว์ที่แก้ไข.photo_url ? (
-                    <img src={สัตว์ที่แก้ไข.photo_url} alt={แสดงชื่อสัตว์(สัตว์ที่แก้ไข)} className="w-full h-full object-contain" />
-                  ) : (
-                    <span className="text-6xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>
-                  )}
-                  {พรีวิวรูปสัตว์ใหม่ && (
-                    <span className="absolute top-2 left-2 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      รูปใหม่ (ยังไม่บันทึก)
-                    </span>
-                  )}
-                </div>
-                <input ref={inputรูปสัตว์} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
-                <button
-                  onClick={() => inputรูปสัตว์.current.click()}
-                  className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-teal-300 rounded-xl py-2.5 text-sm font-medium text-teal-600 bg-teal-50/50"
-                >
-                  <Camera size={16} /> {สัตว์ที่แก้ไข.photo_url || พรีวิวรูปสัตว์ใหม่ ? 'เปลี่ยนรูปโปรไฟล์' : 'อัปโหลดรูปโปรไฟล์'}
-                </button>
-                <p className="text-xs text-gray-400 mt-1">
-                  แนะนำให้ถ่ายรูปใหม่ที่หน้าตาน่ารักกว่ารูปตอนเกิดเหตุ ใช้แสดงในหน้าหาบ้าน
+                <p className="text-sm font-semibold text-gray-700 mb-2">
+                  รูปภาพสัตว์ <span className="text-xs font-normal text-gray-400">(รูปแรก = รูปหลักที่โชว์บนการ์ด)</span>
                 </p>
+                {(function () {
+                  const รูป   = สัตว์ที่แก้ไข.photos || []
+                  const cover = รูป[0] || null
+                  return (
+                    <>
+                      {/* รูปหลักขนาดใหญ่ */}
+                      <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-teal-50 flex items-center justify-center">
+                        {cover
+                          ? <img src={cover} alt="รูปหลัก" className="w-full h-full object-cover" />
+                          : <span className="text-6xl">{สัตว์ที่แก้ไข.breed?.includes('แมว') ? '🐈' : '🐕'}</span>}
+                        {cover && (
+                          <span className="absolute top-2 left-2 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">⭐ รูปหลัก</span>
+                        )}
+                        {กำลังอัปโหลดรูป && (
+                          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white">
+                            <div className="w-7 h-7 border-4 border-white border-t-transparent rounded-full animate-spin mb-1.5" />
+                            <span className="text-xs font-medium">กำลังอัปโหลด...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Thumbnail grid + ปุ่มเพิ่มรูป */}
+                      <div className="grid grid-cols-4 gap-2 mt-2">
+                        {รูป.map(function (url, i) {
+                          return (
+                            <div key={url} className={`relative aspect-square rounded-xl overflow-hidden border-2 ${i === 0 ? 'border-teal-500' : 'border-gray-100'}`}>
+                              <img src={url} alt={`รูปที่ ${i + 1}`} className="w-full h-full object-cover" />
+                              {i === 0 ? (
+                                <span className="absolute bottom-0 inset-x-0 bg-teal-600/90 text-white text-[9px] text-center py-0.5 font-bold">หลัก</span>
+                              ) : (
+                                <button type="button" onClick={() => ตั้งเป็นรูปหลัก(url)} title="ตั้งเป็นรูปหลัก"
+                                  className="absolute bottom-0.5 left-0.5 bg-white/90 text-teal-600 rounded-md w-5 h-5 flex items-center justify-center text-xs shadow-sm">⭐</button>
+                              )}
+                              <button type="button" onClick={() => ลบรูปสัตว์(url)} title="ลบรูปนี้"
+                                className="absolute top-0.5 right-0.5 bg-black/55 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none">✕</button>
+                            </div>
+                          )
+                        })}
+                        {/* ปุ่มเพิ่มรูป (เลือกได้หลายรูป) */}
+                        <button type="button" onClick={() => inputรูปสัตว์.current.click()} disabled={กำลังอัปโหลดรูป}
+                          className="aspect-square rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/50 text-teal-500 flex flex-col items-center justify-center disabled:opacity-50">
+                          <Camera size={18} />
+                          <span className="text-[10px] mt-0.5 font-medium">เพิ่มรูป</span>
+                        </button>
+                      </div>
+
+                      <input ref={inputรูปสัตว์} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        เพิ่มได้หลายรูปให้ผู้สนใจรับเลี้ยงเห็นน้องหลายมุม • แตะ ⭐ ตั้งรูปหลัก • แตะ ✕ ลบรูป
+                      </p>
+                    </>
+                  )
+                })()}
               </div>
 
               {สัตว์ที่แก้ไข.report_id && (

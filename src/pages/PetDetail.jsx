@@ -1,9 +1,65 @@
 // PetDetail.jsx — หน้าแสดงรายละเอียดสัตว์แต่ละตัว
 // ผู้ใช้ติดต่อขอรับเลี้ยงผ่านเบอร์ศูนย์พักพิง — เจ้าหน้าที่เป็นคนยืนยันการรับเลี้ยง
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
+
+// ---- Image Carousel — เลื่อนดูรูปหลายรูปได้ (swipe บนมือถือ / ปุ่มลูกศร / จุด indicator) ----
+function ImageCarousel({ รูป, emoji, ชื่อ }) {
+  const [ดัชนี, setดัชนี] = useState(0)
+  const จุดเริ่มแตะ = useRef(null)
+  const n = รูป.length
+
+  // ไม่มีรูปจริง → โชว์ emoji แทน
+  if (n === 0) {
+    return (
+      <div className="w-full aspect-square bg-green-100 flex items-center justify-center">
+        <span className="text-8xl">{emoji}</span>
+      </div>
+    )
+  }
+
+  const เลื่อน = (ทิศ) => setดัชนี((prev) => (prev + ทิศ + n) % n)
+
+  return (
+    <div
+      className="relative w-full aspect-square bg-green-100 overflow-hidden select-none"
+      onTouchStart={(e) => { จุดเริ่มแตะ.current = e.touches[0].clientX }}
+      onTouchEnd={(e) => {
+        if (จุดเริ่มแตะ.current == null) return
+        const ระยะ = e.changedTouches[0].clientX - จุดเริ่มแตะ.current
+        if (Math.abs(ระยะ) > 40) เลื่อน(ระยะ < 0 ? 1 : -1) // ปัดซ้าย = รูปถัดไป
+        จุดเริ่มแตะ.current = null
+      }}
+    >
+      <img src={รูป[ดัชนี]} alt={`${ชื่อ} รูปที่ ${ดัชนี + 1}`} className="w-full h-full object-cover" />
+
+      {n > 1 && (
+        <>
+          {/* ปุ่มลูกศร ซ้าย/ขวา */}
+          <button onClick={() => เลื่อน(-1)} aria-label="รูปก่อนหน้า"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 text-white text-xl flex items-center justify-center active:bg-black/60">‹</button>
+          <button onClick={() => เลื่อน(1)} aria-label="รูปถัดไป"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 text-white text-xl flex items-center justify-center active:bg-black/60">›</button>
+
+          {/* ตัวนับรูป มุมขวาบน */}
+          <span className="absolute top-2 right-2 bg-black/50 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+            {ดัชนี + 1}/{n}
+          </span>
+
+          {/* จุด indicator ด้านล่าง */}
+          <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+            {รูป.map((_, i) => (
+              <button key={i} onClick={() => setดัชนี(i)} aria-label={`ไปรูปที่ ${i + 1}`}
+                className={`h-2 rounded-full transition-all ${i === ดัชนี ? 'w-5 bg-white' : 'w-2 bg-white/60'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 function PetDetail() {
   const navigate = useNavigate()
@@ -20,6 +76,11 @@ function PetDetail() {
     นิสัย: ['เป็นมิตร', 'ขี้เล่น'],
     สถานที่: 'ลาดพร้าว กรุงเทพฯ',
   }
+
+  // คลังรูปสำหรับ carousel — ใช้ รูปทั้งหมด (ส่งมาจาก FindPet) ถ้าไม่มีก็ fallback เป็น [รูป] เดี่ยว
+  const รูปทั้งหมด = (Array.isArray(สัตว์.รูปทั้งหมด) && สัตว์.รูปทั้งหมด.length > 0)
+    ? สัตว์.รูปทั้งหมด
+    : (สัตว์.รูป ? [สัตว์.รูป] : [])
 
   // ---- ข้อมูลศูนย์พักพิงจาก DB ----
   const [ศูนย์,       setศูนย์]       = useState(null)
@@ -48,16 +109,13 @@ function PetDetail() {
         <h1 className="font-bold text-gray-800">ข้อมูลสัตว์</h1>
       </div>
 
-      {/* การ์ดรูปสัตว์และชื่อ */}
-      <div className="bg-white mx-4 mt-4 rounded-2xl p-6 shadow-sm text-center">
-        <div className="w-36 h-36 mx-auto mb-4 rounded-2xl overflow-hidden bg-green-100 flex items-center justify-center">
-          {สัตว์.รูป
-            ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
-            : <span className="text-7xl">{สัตว์.emoji}</span>
-          }
+      {/* การ์ดรูปสัตว์และชื่อ — Image Carousel เลื่อนดูได้หลายรูป */}
+      <div className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden shadow-sm">
+        <ImageCarousel รูป={รูปทั้งหมด} emoji={สัตว์.emoji} ชื่อ={สัตว์.ชื่อ} />
+        <div className="p-5 text-center">
+          <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
+          <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
-        <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
       </div>
 
       {/* ข้อมูลทั่วไป */}

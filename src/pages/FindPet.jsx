@@ -53,7 +53,11 @@ function FindPet() {
           return {
             id: สัตว์.id,
             emoji: สัตว์.breed?.includes('แมว') ? '🐈' : '🐕',
-            รูป: สัตว์.photo_url || null,
+            รูป: (Array.isArray(สัตว์.photos) && สัตว์.photos[0]) || สัตว์.photo_url || null, // cover สำหรับการ์ด
+            // คลังรูปทั้งหมดสำหรับ carousel หน้ารายละเอียด — รองรับข้อมูลเก่าที่มีแค่ photo_url
+            รูปทั้งหมด: (Array.isArray(สัตว์.photos) && สัตว์.photos.length > 0)
+              ? สัตว์.photos
+              : (สัตว์.photo_url ? [สัตว์.photo_url] : []),
             ชื่อ: สัตว์.name,
             สายพันธุ์: สัตว์.breed || 'ไม่ระบุ',
             อายุ: สัตว์.age || 'ไม่ระบุ',
