@@ -205,6 +205,11 @@ function แปลงวันที่เวลา(str) {
     ' น.'
   )
 }
+// วันที่รับเข้าศูนย์ (แบบสั้น มีปี พ.ศ.) เช่น "20 ก.ค. 2569" — ใช้บนการ์ดหน้าจัดการข้อมูลสัตว์
+function วันที่รับเข้า(str) {
+  if (!str) return 'รอระบุ'
+  return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 // ---- Helper: ป้ายกลุ่มวันที่ — วันนี้ / เมื่อวาน / วันที่จริง ----
 function เท่ากันวัน(a, b) {
@@ -382,7 +387,20 @@ function VolunteerPage({ หน้า }) {
       .from('animals')
       .select('*')
       .order('created_at', { ascending: false })
-    if (data) setSัตว์จากDB(data)
+    if (data) {
+      // แปะประเภทการแจ้ง (urgency) ของรายงานต้นทางเข้าไปในแต่ละตัว — ใช้โชว์ป้ายประเภทบนการ์ด
+      // ดึงเฉพาะ report ที่ถูกอ้างถึงจริง (ไม่ดึงทั้งตาราง) แล้ว join ฝั่ง client — ไม่ต้องพึ่ง FK/แก้ schema
+      const รหัสรายงาน = [...new Set(data.map((a) => a.report_id).filter(Boolean))]
+      const urgencyMap = {}
+      if (รหัสรายงาน.length > 0) {
+        const { data: reps } = await supabase
+          .from('reports')
+          .select('id, urgency')
+          .in('id', รหัสรายงาน)
+        if (reps) reps.forEach((r) => { urgencyMap[r.id] = r.urgency })
+      }
+      setSัตว์จากDB(data.map((a) => ({ ...a, _urgency: a.report_id ? (urgencyMap[a.report_id] || null) : null })))
+    }
     setโหลดสัตว์(false)
   }
 
@@ -1158,11 +1176,19 @@ function VolunteerPage({ หน้า }) {
 
                 <div className="space-y-3">
                   {สัตว์ตามแท็บ.map(function (สัตว์) {
+                    // สายพันธุ์ที่ใช้ได้จริง — ตัด sentinel ของ AI + ค่าว่างออก (เหลือ null ให้โชว์ "รอระบุ")
+                    const สายพันธุ์ = (สัตว์.breed && สัตว์.breed !== 'ไม่สามารถวิเคราะห์ได้' && สัตว์.breed !== 'ไม่ระบุ') ? สัตว์.breed : null
+                    // ป้ายประเภทการแจ้งเหตุที่ส่งไม้ต่อมาจากรายงาน (สีตาม urgency) — โชว์เฉพาะตัวที่มาจากรายงาน
+                    const ประเภทแจ้ง = สัตว์._urgency ? ประเภทจาก(สัตว์._urgency) : null
+                    // ค่าที่ยังไม่มี → "รอระบุ" สีเทาอ่อน
+                    const บริบท = (v) => v
+                      ? <span className="text-gray-600">{v}</span>
+                      : <span className="text-gray-400">รอระบุ</span>
                     return (
                       <button key={สัตว์.id} onClick={() => เปิดแก้ไขสัตว์(สัตว์)}
                         className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3">
                           <div className="w-14 h-14 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center shrink-0">
                             {สัตว์.photo_url
                               ? <img src={สัตว์.photo_url} alt={แสดงชื่อสัตว์(สัตว์)} className="w-full h-full object-cover" />
@@ -1170,16 +1196,35 @@ function VolunteerPage({ หน้า }) {
                             }
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-gray-800 truncate">{แสดงชื่อสัตว์(สัตว์)}</p>
-                              {สัตว์.report_id && (
-                                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">📋 จากรายงาน</span>
-                              )}
+                            {/* Row 1: ชื่อ/รหัส (ซ้าย) + ป้ายประเภทการแจ้ง (ขวา) */}
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-bold text-gray-800 text-sm truncate">{แสดงชื่อสัตว์(สัตว์)}</p>
+                              {ประเภทแจ้ง ? (
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${ประเภทแจ้ง.badge}`}>
+                                  {ประเภทแจ้ง.emoji} {ประเภทแจ้ง.short}
+                                </span>
+                              ) : สัตว์.report_id ? (
+                                <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">📋 จากรายงาน</span>
+                              ) : null}
                             </div>
-                            <p className="text-xs text-gray-500 truncate">
-                              {แสดงสายพันธุ์สัตว์(สัตว์.breed)} · {สัตว์.age || '-'} · {สัตว์.gender || '-'}
+
+                            {/* Row 2: สายพันธุ์ • เพศ • อายุ */}
+                            <p className="text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {บริบท(สายพันธุ์)}
+                              <span className="text-gray-300">•</span>
+                              {บริบท(สัตว์.gender)}
+                              <span className="text-gray-300">•</span>
+                              {บริบท(สัตว์.age)}
                             </p>
-                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+
+                            {/* Row 3: สถานที่พบ */}
+                            <p className="text-xs text-gray-500 mt-1 truncate">📍 {สัตว์.location || 'รอระบุ'}</p>
+
+                            {/* Row 4: วันที่รับเข้า */}
+                            <p className="text-xs text-gray-500 mt-0.5">📅 รับเข้า {วันที่รับเข้า(สัตว์.created_at)}</p>
+
+                            {/* Row 5: ป้ายสถานะ + สถานะเผยแพร่ */}
+                            <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                               <span className={`text-xs px-2 py-0.5 rounded-full inline-block font-medium ${สีสถานะสัตว์[สัตว์.status] || 'text-gray-600 bg-gray-50'}`}>
                                 {สัตว์.status}
                               </span>
@@ -1190,7 +1235,7 @@ function VolunteerPage({ หน้า }) {
                               </span>
                             </div>
                           </div>
-                          <span className="text-gray-300 text-xl shrink-0">›</span>
+                          <span className="text-gray-300 text-xl shrink-0 self-center">›</span>
                         </div>
                       </button>
                     )
