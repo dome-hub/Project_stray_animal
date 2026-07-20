@@ -10,6 +10,7 @@ import SuspendedPage    from './pages/SuspendedPage'
 import Home             from './pages/Home'
 import ReportAnimal     from './pages/ReportAnimal'
 import FindPet          from './pages/FindPet'
+import LostAndFoundPage from './pages/LostAndFoundPage'
 import TrackReport      from './pages/TrackReport'
 import PetDetail        from './pages/PetDetail'
 import ProfilePage      from './pages/ProfilePage'
@@ -180,6 +181,7 @@ function App() {
         {/* === ผู้ใช้ทั่วไป === */}
         <Route path="/report"        element={ต้องLogin(<ReportAnimal user={user} />)} />
         <Route path="/find-pet"      element={ต้องLogin(<FindPet />)} />
+        <Route path="/lost-found"    element={ต้องLogin(<LostAndFoundPage user={user} />)} />
         <Route path="/track"         element={ต้องLogin(<TrackReport user={user} />)} />
         <Route path="/pet/:id"       element={ต้องLogin(<PetDetail />)} />
         <Route path="/profile"       element={ต้องLogin(<ProfilePage user={user} />)} />
