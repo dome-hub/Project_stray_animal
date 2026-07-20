@@ -28,7 +28,7 @@ const เหตุผลตัวเลือก = [
 const สีตามความเร่งด่วน = {
   'ด่วนมาก':  { border: 'border-red-500',    bg: 'bg-red-50',    text: 'text-red-600' },
   'ด่วน':     { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-600' },
-  'ปานกลาง':  { border: 'border-blue-500',   bg: 'bg-blue-50',   text: 'text-blue-600' },
+  'ปานกลาง':  { border: 'border-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-600' },
 }
 
 // จับพิกัดกึ่งกลางแผนที่ใหม่ทุกครั้งที่ผู้ใช้เลื่อนแผนที่เสร็จ (นิยามนอก component หลักกันแผนที่ remount ทุก render)
