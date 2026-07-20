@@ -511,12 +511,27 @@ function TrackReport({ user }) {
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
 
-            {/* Title */}
+            {/* Title + Action menu (แก้ไข/ยกเลิก เฉพาะสถานะ "รอดำเนินการ") + ปิด */}
             <div className="flex items-center justify-between px-5 py-3">
               <p className="font-bold text-gray-800">
                 รายงาน #{String(รายงานที่เปิด.id).padStart(6, '0')}
               </p>
-              <button onClick={ปิดรายละเอียด} className="text-gray-400 text-2xl leading-none">✕</button>
+              <div className="flex items-center gap-1">
+                {รายงานที่เปิด.status === 'รอดำเนินการ' && !โหมดแก้ไข && (
+                  <>
+                    <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล"
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200">
+                      ✏️
+                    </button>
+                    <button onClick={() => setแสดงModalยกเลิก(true)} title="ยกเลิกรายงาน"
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 active:bg-red-100">
+                      🗑️
+                    </button>
+                    <div className="w-px h-5 bg-gray-200 mx-1" />
+                  </>
+                )}
+                <button onClick={ปิดรายละเอียด} className="text-gray-400 text-2xl leading-none w-8 h-8 flex items-center justify-center">✕</button>
+              </div>
             </div>
 
             {/* ============================================================
@@ -720,20 +735,6 @@ function TrackReport({ user }) {
                   <p className="text-2xl mb-2">⏳</p>
                   <p className="text-sm font-semibold text-yellow-700">รอเจ้าหน้าที่รับเรื่อง</p>
                   <p className="text-xs text-yellow-600 mt-1">เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง</p>
-                </div>
-              )}
-
-              {/* แก้ไข/ยกเลิก — เฉพาะตอนยัง "รอดำเนินการ" เจ้าหน้าที่ยังไม่รับเรื่อง แจ้งผิดยังแก้ไขเองได้ */}
-              {รายงานที่เปิด.status === 'รอดำเนินการ' && (
-                <div className="flex gap-2 pt-1">
-                  <button onClick={เปิดโหมดแก้ไข}
-                    className="flex-1 border-2 border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-medium active:bg-gray-50">
-                    ✏️ แก้ไขข้อมูล
-                  </button>
-                  <button onClick={() => setแสดงModalยกเลิก(true)}
-                    className="flex-1 border-2 border-red-200 text-red-500 rounded-xl py-2.5 text-sm font-medium active:bg-red-50">
-                    ✕ ยกเลิกรายงาน
-                  </button>
                 </div>
               )}
 
