@@ -17,12 +17,19 @@ const ศูนย์กลางแผนที่เริ่มต้น = [1
 
 const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000'
 
-// ตัวเลือกประเภทการแจ้ง — ใช้กำหนดความเร่งด่วน (urgency) ของรายงาน
+// ตัวเลือกประเภทการแจ้ง — เรียงจากเร่งด่วนมากไปน้อย ใช้กำหนดความเร่งด่วน (urgency) ของรายงาน
 const เหตุผลตัวเลือก = [
-  { label: 'พบสัตว์พลัดหลง / สัตว์จรจัด', Icon: Footprints,  urgency: 'ปานกลาง' },
-  { label: 'สัตว์บาดเจ็บ',                 Icon: HeartPulse,  urgency: 'ด่วน' },
   { label: 'สัตว์ดุร้าย / เสี่ยงก่ออันตราย', Icon: ShieldAlert, urgency: 'ด่วนมาก' },
+  { label: 'สัตว์บาดเจ็บ',                 Icon: HeartPulse,  urgency: 'ด่วน' },
+  { label: 'พบสัตว์พลัดหลง / สัตว์จรจัด', Icon: Footprints,  urgency: 'ปานกลาง' },
 ]
+
+// สีตามระดับความเร่งด่วน — ใช้เฉพาะตอนตัวเลือกถูกเลือก (active state)
+const สีตามความเร่งด่วน = {
+  'ด่วนมาก':  { border: 'border-red-500',    bg: 'bg-red-50',    text: 'text-red-600' },
+  'ด่วน':     { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-600' },
+  'ปานกลาง':  { border: 'border-blue-500',   bg: 'bg-blue-50',   text: 'text-blue-600' },
+}
 
 // จับพิกัดกึ่งกลางแผนที่ใหม่ทุกครั้งที่ผู้ใช้เลื่อนแผนที่เสร็จ (นิยามนอก component หลักกันแผนที่ remount ทุก render)
 function จับการเลื่อนแผนที่({ onMoveEnd }) {
@@ -688,16 +695,17 @@ function ReportAnimal({ user }) {
           <div className="space-y-2">
             {เหตุผลตัวเลือก.map((ตัวเลือก) => {
               const เลือกอยู่ = เหตุผลแจ้ง?.label === ตัวเลือก.label
+              const สี = สีตามความเร่งด่วน[ตัวเลือก.urgency]
               return (
                 <button
                   key={ตัวเลือก.label}
                   onClick={() => setเหตุผลแจ้ง(ตัวเลือก)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border-2 transition-all ${
-                    เลือกอยู่ ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 bg-white text-gray-700'
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border-2 transition-colors duration-200 ${
+                    เลือกอยู่ ? `${สี.border} ${สี.bg} ${สี.text}` : 'border-gray-200 bg-transparent text-gray-500'
                   }`}
                 >
                   {เลือกอยู่
-                    ? <CircleDot size={18} className="shrink-0 text-orange-500" />
+                    ? <CircleDot size={18} className={`shrink-0 ${สี.text}`} />
                     : <Circle size={18} className="shrink-0 text-gray-300" />}
                   <ตัวเลือก.Icon size={18} strokeWidth={2} className="shrink-0" />
                   <span className="text-left">{ตัวเลือก.label}</span>
