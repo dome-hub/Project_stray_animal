@@ -18,6 +18,10 @@ BREED_INFO  = metadata['breed_info']
 IMG_SIZE    = metadata['img_size']
 print(f"✅ โหลดสำเร็จ | {len(CLASS_NAMES)} สายพันธุ์ | Test Acc {metadata['test_accuracy']*100:.1f}%")
 
+# ถ้าความมั่นใจของคลาสที่ทายได้สูงสุดต่ำกว่านี้ ถือว่าโมเดล "ไม่มั่นใจ" (น่าจะไม่ใช่สัตว์ในกลุ่มที่รู้จัก
+# หรือไม่ใช่สัตว์เลย) แล้วตอบว่าระบุไม่ได้ แทนที่จะทายมั่ว ๆ ปรับตัวเลขนี้ได้ตามความเหมาะสม
+CONFIDENCE_THRESHOLD = 50.0
+
 # ── FastAPI ───────────────────────────────────────────────────────────────────
 app = FastAPI(title="Stray Animal Analyzer API", version="2.2-onnx")
 
@@ -46,6 +50,28 @@ def วิเคราะห์ผล(predictions: np.ndarray) -> dict:
     best_idx   = top3_idx[0]
     best_class = CLASS_NAMES[best_idx]
     confidence = float(predictions[best_idx] * 100)
+
+    top3 = [
+        {
+            'สายพันธุ์':   BREED_INFO.get(CLASS_NAMES[i], {}).get('ชื่อไทย', CLASS_NAMES[i]),
+            'ความมั่นใจ': round(float(predictions[i] * 100), 1),
+        }
+        for i in top3_idx
+    ]
+
+    # ความมั่นใจต่ำเกินไป — ไม่ทายมั่ว บอกว่าระบุไม่ได้แทน
+    if confidence < CONFIDENCE_THRESHOLD:
+        return {
+            'สายพันธุ์':   'ไม่สามารถระบุได้',
+            'ประเภท':     'ไม่ทราบ',
+            'ขนาด':       'กรุณาระบุเอง',
+            'นิสัย':      'กรุณาระบุเอง',
+            'ความมั่นใจ': round(confidence, 1),
+            'classKey':   None,
+            'ระบุได้':    False,
+            'top3':       top3,
+        }
+
     info = BREED_INFO.get(best_class, {
         'ชื่อไทย': best_class, 'ประเภท': 'ไม่ทราบ',
         'ขนาด': 'ไม่ทราบ',    'นิสัย': 'ไม่มีข้อมูล',
@@ -57,13 +83,8 @@ def วิเคราะห์ผล(predictions: np.ndarray) -> dict:
         'นิสัย':      info['นิสัย'],
         'ความมั่นใจ': round(confidence, 1),
         'classKey':   best_class,
-        'top3': [
-            {
-                'สายพันธุ์':   BREED_INFO.get(CLASS_NAMES[i], {}).get('ชื่อไทย', CLASS_NAMES[i]),
-                'ความมั่นใจ': round(float(predictions[i] * 100), 1),
-            }
-            for i in top3_idx
-        ],
+        'ระบุได้':    True,
+        'top3':       top3,
     }
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
