@@ -31,6 +31,34 @@ const สีตามความเร่งด่วน = {
   'ปานกลาง':  { border: 'border-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-600' },
 }
 
+// ---- ตรวจจับการแจ้งซ้ำ (Duplicate Detection) ----
+// สถานะที่ถือว่า "ปิดเคสแล้ว" — เคสพวกนี้ไม่ต้องเตือนซ้ำ (ต้องตรงกับ สถานะปิดร่วม ฝั่งเจ้าหน้าที่)
+const สถานะปิดเคส = [
+  'อยู่ศูนย์พักพิง', 'ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง',
+  'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต', 'เคสซ้ำซ้อน',
+]
+const รัศมีเตือนซ้ำเมตร = 100
+
+// Haversine — ระยะทางระหว่าง 2 พิกัด (เมตร)
+function ระยะทางเมตร(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const rad = (d) => (d * Math.PI) / 180
+  const dLat = rad(lat2 - lat1)
+  const dLon = rad(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+// "x นาทีที่แล้ว" สำหรับโชว์เวลาที่เคสเดิมถูกแจ้ง
+function เวลาผ่านมา(str) {
+  const นาที = Math.floor((Date.now() - new Date(str).getTime()) / 60000)
+  if (นาที < 1)  return 'เมื่อสักครู่'
+  if (นาที < 60) return `${นาที} นาทีที่แล้ว`
+  const ชม = Math.floor(นาที / 60)
+  if (ชม < 24)   return `${ชม} ชั่วโมงที่แล้ว`
+  return `${Math.floor(ชม / 24)} วันที่แล้ว`
+}
+
 // จับพิกัดกึ่งกลางแผนที่ใหม่ทุกครั้งที่ผู้ใช้เลื่อนแผนที่เสร็จ (นิยามนอก component หลักกันแผนที่ remount ทุก render)
 function จับการเลื่อนแผนที่({ onMoveEnd }) {
   useMapEvents({
@@ -164,6 +192,11 @@ function ReportAnimal({ user }) {
   const [แสดงกล้อง,   setแสดงกล้อง]   = useState(false)
   const [กล้องพร้อม,  setกล้องพร้อม]  = useState(false)
   const [errorกล้อง,  setErrorกล้อง]  = useState('')
+
+  // ---- Duplicate detection state ----
+  const [เคสซ้ำ,        setเคสซ้ำ]        = useState(null)   // รายงานเดิมที่อยู่ใกล้จุดที่ปักหมุด
+  const [แสดงModalซ้ำ,  setแสดงModalซ้ำ]  = useState(false)
+  const [กำลังรวมเคส,   setกำลังรวมเคส]   = useState(false)
 
   // ---- Phone modal state ----
   const [แสดงModalโทรศัพท์,     setแสดงModalโทรศัพท์]     = useState(false)
@@ -394,7 +427,96 @@ function ReportAnimal({ user }) {
     }
   }
 
-  // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นส่งเลย ----
+  // ---- ตรวจว่ามีคนแจ้งเคสนี้ไปแล้วหรือยัง (ในรัศมี 100 ม. และยังไม่ปิดเคส) ----
+  // กรองด้วยกรอบสี่เหลี่ยมก่อนเพื่อลดจำนวนแถวที่ดึง แล้วค่อยวัดระยะจริงด้วย Haversine
+  async function หาเคสใกล้เคียง() {
+    const เผื่อ = 0.002 // ~220 ม. ครอบคลุมรัศมี 100 ม. แน่นอน
+    const { data } = await supabase
+      .from('reports')
+      .select('id, animal_type, image_url, detail, status, latitude, longitude, created_at')
+      .gte('latitude',  latitude  - เผื่อ).lte('latitude',  latitude  + เผื่อ)
+      .gte('longitude', longitude - เผื่อ).lte('longitude', longitude + เผื่อ)
+      .order('created_at', { ascending: false })
+    if (!data) return null
+
+    const ใกล้ = data
+      .filter((ร) => !สถานะปิดเคส.includes(ร.status) && ร.latitude && ร.longitude)
+      .map((ร) => ({ ...ร, ระยะ: ระยะทางเมตร(latitude, longitude, ร.latitude, ร.longitude) }))
+      .filter((ร) => ร.ระยะ <= รัศมีเตือนซ้ำเมตร)
+      .sort((a, b) => a.ระยะ - b.ระยะ)
+
+    return ใกล้[0] || null
+  }
+
+  // ---- ผ่านด่านเบอร์โทรแล้ว → เช็คเคสซ้ำก่อน ถ้าเจอให้เตือน ไม่เจอค่อยส่งจริง ----
+  async function ตรวจซ้ำแล้วส่ง() {
+    const ซ้ำ = await หาเคสใกล้เคียง()
+    if (ซ้ำ) {
+      setเคสซ้ำ(ซ้ำ)
+      setแสดงModalซ้ำ(true)
+      return
+    }
+    await doSubmit()
+  }
+
+  // ---- ปุ่ม A: ใช่ ตัวเดียวกัน → ไม่สร้างใบใหม่ แต่แนบรูป/รายละเอียดเข้าเคสเดิม ----
+  async function รวมเข้าเคสเดิม() {
+    if (!เคสซ้ำ || กำลังรวมเคส) return
+    setกำลังรวมเคส(true)
+
+    // อัปโหลดรูปของผู้แจ้งคนนี้ (ถ้ามี) แล้วต่อเข้าคลังรูปของเคสเดิม
+    let imageUrl = null
+    if (ไฟล์รูปภาพ) {
+      const ชื่อไฟล์ = `${Date.now()}_${ไฟล์รูปภาพ.name.replace(/\s/g, '_')}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
+        imageUrl = urlData.publicUrl
+      }
+    }
+
+    // ดึงคลังรูปล่าสุดของเคสเดิมมาต่อท้าย (photos เก็บรูปเพิ่มเติมจากผู้แจ้งคนอื่น)
+    const { data: เดิม } = await supabase
+      .from('reports').select('photos, detail').eq('id', เคสซ้ำ.id).single()
+
+    const รูปเดิม  = Array.isArray(เดิม?.photos) ? เดิม.photos : []
+    const รูปใหม่  = imageUrl ? [...รูปเดิม, imageUrl] : รูปเดิม
+    const หมายเหตุ = รายละเอียด.trim()
+      ? [เดิม?.detail, `[แจ้งเพิ่มเติม] ${รายละเอียด.trim()}`].filter(Boolean).join('\n')
+      : เดิม?.detail
+
+    const { error } = await supabase.from('reports').update({
+      photos:     รูปใหม่.length > 0 ? รูปใหม่ : null,
+      detail:     หมายเหตุ,
+      updated_at: new Date().toISOString(),
+    }).eq('id', เคสซ้ำ.id)
+
+    setกำลังรวมเคส(false)
+    if (error) { alert('แนบข้อมูลไม่สำเร็จ: ' + error.message); return }
+
+    if (user?.id) {
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        title:   '🔗 แนบข้อมูลเข้าเคสเดิมแล้ว',
+        body:    `ขอบคุณครับ ข้อมูลของคุณถูกแนบเข้ากับรายงาน #${String(เคสซ้ำ.id).padStart(6, '0')} ที่มีผู้แจ้งไว้ก่อนแล้ว เจ้าหน้าที่จะเห็นรูปเพิ่มเติมของคุณ`,
+        type:    'report_update',
+        is_read: false,
+      })
+    }
+
+    setแสดงModalซ้ำ(false)
+    setรหัสรายงาน(เคสซ้ำ.id)
+    setส่งสำเร็จ(true)
+  }
+
+  // ---- ปุ่ม B: ไม่ใช่ เป็นคนละตัว → ข้ามการเตือน สร้างใบใหม่ตามปกติ ----
+  async function ยืนยันเคสใหม่() {
+    setแสดงModalซ้ำ(false)
+    await doSubmit()
+  }
+
+  // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นเช็คเคสซ้ำแล้วส่ง ----
   async function ส่งรายงาน() {
     if (!ตำแหน่ง || !เหตุผลแจ้ง) return
     // ยังไม่มีพิกัดจริง (ไม่เคยกด GPS/ปักหมุดบนแผนที่) → โชว์ error + สั่นเตือน แล้วหยุดไม่ส่ง
@@ -412,7 +534,7 @@ function ReportAnimal({ user }) {
       setแสดงModalโทรศัพท์(true)
       return
     }
-    await doSubmit()
+    await ตรวจซ้ำแล้วส่ง()
   }
 
   // ---- บันทึกเบอร์โทรศัพท์ → แล้วส่งรายงานต่อเลย ----
@@ -429,7 +551,7 @@ function ReportAnimal({ user }) {
     } else {
       setต้องกรอกเบอร์(false)
       setแสดงModalโทรศัพท์(false)
-      await doSubmit()   // ← ส่งรายงานต่อเลยหลังบันทึกเบอร์
+      await ตรวจซ้ำแล้วส่ง()   // ← เช็คเคสซ้ำแล้วส่งต่อเลยหลังบันทึกเบอร์
     }
   }
 
@@ -596,6 +718,73 @@ function ReportAnimal({ user }) {
 
             <p className="text-center text-xs text-gray-400 mt-3">
               ข้อมูลนี้จะถูกเก็บไว้ในโปรไฟล์ของคุณ
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          MODAL: เตือนเคสซ้ำ — เจอรายงานที่ยังไม่ปิดเคสในรัศมี 100 ม.
+          ============================================================ */}
+      {แสดงModalซ้ำ && เคสซ้ำ && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
+          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8">
+            <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">⚠️</div>
+              <h2 className="text-lg font-bold text-gray-800">มีผู้แจ้งเหตุในบริเวณนี้แล้ว</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                พบรายงานที่ยังดำเนินการอยู่ ห่างจากจุดที่คุณปักหมุดประมาณ{' '}
+                <span className="font-semibold text-gray-700">{Math.round(เคสซ้ำ.ระยะ)} เมตร</span>
+              </p>
+            </div>
+
+            {/* การ์ดเคสเดิม */}
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl p-3 mb-4">
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center shrink-0">
+                {เคสซ้ำ.image_url
+                  ? <img src={เคสซ้ำ.image_url} alt="เคสที่แจ้งไว้แล้ว" className="w-full h-full object-cover" />
+                  : <span className="text-3xl">🐾</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-800 text-sm truncate">
+                  {เคสซ้ำ.animal_type && เคสซ้ำ.animal_type !== 'ไม่สามารถวิเคราะห์ได้'
+                    ? เคสซ้ำ.animal_type : 'รอระบุสายพันธุ์'}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">🕒 แจ้งเมื่อ {เวลาผ่านมา(เคสซ้ำ.created_at)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  #{String(เคสซ้ำ.id).padStart(6, '0')} · {เคสซ้ำ.status}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-center text-sm font-semibold text-gray-700 mb-3">
+              นี่คือสัตว์ตัวเดียวกันกับที่คุณพบใช่หรือไม่?
+            </p>
+
+            {/* ปุ่ม A — ใช่ ตัวเดียวกัน → แนบข้อมูลเข้าเคสเดิม */}
+            <button
+              onClick={รวมเข้าเคสเดิม}
+              disabled={กำลังรวมเคส}
+              className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {กำลังรวมเคส
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> กำลังแนบข้อมูล...</>
+                : '✅ ใช่ ตัวเดียวกัน (แนบรูปเพิ่มให้เจ้าหน้าที่)'}
+            </button>
+
+            {/* ปุ่ม B — คนละตัว → สร้างใบใหม่ */}
+            <button
+              onClick={ยืนยันเคสใหม่}
+              disabled={กำลังรวมเคส || กำลังส่ง}
+              className="w-full mt-2 border-2 border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm disabled:opacity-50"
+            >
+              ❌ ไม่ใช่ นี่คือสัตว์คนละตัว (แจ้งเคสใหม่)
+            </button>
+
+            <p className="text-center text-xs text-gray-400 mt-3">
+              การแนบเข้าเคสเดิมช่วยให้เจ้าหน้าที่ไม่ต้องลงพื้นที่ซ้ำ
             </p>
           </div>
         </div>

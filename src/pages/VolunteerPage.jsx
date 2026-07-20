@@ -85,6 +85,7 @@ const ขั้นตอนตามสถานะ = {
   'เสียชีวิต':           3,
   'มีผู้รับเลี้ยง':       3,
   'ยุติการค้นหา':        3,
+  'เคสซ้ำซ้อน':          3,
 }
 const ขั้นตอนทั้งหมด = ['แจ้งเข้า', 'รับเรื่อง', 'ลงพื้นที่', 'ปิดเคส']
 
@@ -104,6 +105,7 @@ const สีสถานะ = {
   'มีผู้รับเลี้ยง':       'text-green-700 bg-green-50 border-green-200',
   'เสียชีวิต':           'text-gray-600 bg-gray-100 border-gray-200',
   'ยุติการค้นหา':        'text-gray-600 bg-gray-100 border-gray-200',
+  'เคสซ้ำซ้อน':          'text-gray-600 bg-gray-100 border-gray-200',
 }
 
 // สถานะปิดเคส (terminal) เริ่มต้น — ใช้กับสัตว์บาดเจ็บ/พลัดหลง
@@ -155,7 +157,7 @@ const เวิร์กโฟลว์ตามประเภท = {
 // เคสถือว่า "ปิด" (จบภารกิจฝั่ง dispatch) แล้ว → หมุดหายจากแผนที่ + ออกจากหน้าอัปเดตสถานะ + ย้ายไปแท็บประวัติ
 // "อยู่ศูนย์พักพิง" นับเป็นปิดภารกิจภาคสนามของ "ทุกประเภท" (ไม่ใช่แค่สัตว์ดุร้าย) — พอสัตว์มาถึงศูนย์แล้ว
 // การดูแลต่อ (รักษา / พักฟื้น / หาบ้าน) จะย้ายไปทำที่หน้า "จัดการข้อมูลสัตว์" ซึ่งสร้าง profile ให้อัตโนมัติแล้ว
-const สถานะปิดร่วม = ['อยู่ศูนย์พักพิง', 'ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง', 'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต']
+const สถานะปิดร่วม = ['อยู่ศูนย์พักพิง', 'ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง', 'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต', 'เคสซ้ำซ้อน']
 function เป็นเคสปิด(report) {
   return สถานะปิดร่วม.includes(report.status)
 }
@@ -213,6 +215,16 @@ function ข้อมูลครบพอเผยแพร่(สัตว์)
   const มีอายุ   = !!สัตว์.age && สัตว์.age !== 'ไม่ทราบ' && ตัวเลือกอายุสัตว์.includes(สัตว์.age)
   const มีขนาด   = ['เล็ก', 'กลาง', 'ใหญ่'].includes(สัตว์.size)
   return มีประเภท && มีเพศ && มีอายุ && มีขนาด
+}
+
+// Haversine — ระยะทางระหว่าง 2 พิกัด (เมตร) ใช้เรียงเคสใกล้เคียงตอนเลือกเคสหลักเพื่อรวมเคสซ้ำ
+function ระยะทางเมตร(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const rad = (d) => (d * Math.PI) / 180
+  const dLat = rad(lat2 - lat1)
+  const dLon = rad(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
 }
 
 // ---- Helper: แปลงวันที่ ----
@@ -334,6 +346,11 @@ function VolunteerPage({ หน้า }) {
   const [หมายเหตุ,    setหมายเหตุ]    = useState('')
   const [กำลังบันทึก, setกำลังบันทึก] = useState(false)
   const [แจ้งสำเร็จ,  setแจ้งสำเร็จ]  = useState('')   // ข้อความ toast
+
+  // ---- Merge duplicate (รวมเคสซ้ำซ้อน) ----
+  const [แสดงModalรวมเคส, setแสดงModalรวมเคส] = useState(false)
+  const [เคสหลักที่เลือก,  setเคสหลักที่เลือก]  = useState('')     // id ของเคสหลักที่จะรวมเข้า
+  const [กำลังรวมเคส,     setกำลังรวมเคส]     = useState(false)
 
   // ---- Filter (reports) ----
   const [แท็บรายงาน, setแท็บรายงาน] = useState('active')  // active = กำลังดำเนินการ, history = ประวัติการทำงาน
@@ -612,6 +629,7 @@ function VolunteerPage({ หน้า }) {
       'เสียชีวิต':           `เจ้าหน้าที่ขอแจ้งว่าสัตว์ในรายงาน #${รหัส} ได้เสียชีวิตแล้ว ขอบคุณที่ช่วยแจ้งเหตุและดูแล 🙏`,
       'มีผู้รับเลี้ยง':       `สัตว์ที่คุณแจ้ง (#${รหัส}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
       'ยุติการค้นหา':        `รายงาน #${รหัส} ได้ยุติการดำเนินการแล้ว ขอบคุณที่ช่วยแจ้งเหตุ`,
+      'เคสซ้ำซ้อน':          `รายงาน #${รหัส} ถูกรวมกับเคสที่มีผู้แจ้งไว้ก่อนแล้ว เจ้าหน้าที่กำลังดำเนินการอยู่ ขอบคุณที่ช่วยแจ้งเหตุ 🔗`,
     }
     if (report.reporter_id && msgMap[สถานะใหม่]) {
       const { error: notiErr } = await supabase.from('notifications').insert({
@@ -636,6 +654,62 @@ function VolunteerPage({ หน้า }) {
     toast('💾 บันทึกสถานะสำเร็จ!')
     ปิดรายละเอียด()
     setกำลังบันทึก(false)
+  }
+
+  // ================================================================
+  // รวมเคสซ้ำซ้อน — ปิดเคสนี้เป็น "เคสซ้ำซ้อน" แล้วโยงไปเคสหลัก
+  // ================================================================
+  async function รวมเคสซ้ำซ้อน() {
+    const master = Number(เคสหลักที่เลือก)
+    if (!รายงานที่เปิด || !master || กำลังรวมเคส) return
+    if (master === รายงานที่เปิด.id) { alert('เลือกเคสหลักเป็นใบเดียวกันไม่ได้'); return }
+    setกำลังรวมเคส(true)
+
+    // โยนรูปของเคสซ้ำไปรวมในคลังรูปของเคสหลัก เจ้าหน้าที่จะได้เห็นภาพจากผู้แจ้งทุกคน
+    if (รายงานที่เปิด.image_url) {
+      const { data: เคสหลัก } = await supabase
+        .from('reports').select('photos').eq('id', master).single()
+      const รูปเดิม = Array.isArray(เคสหลัก?.photos) ? เคสหลัก.photos : []
+      if (!รูปเดิม.includes(รายงานที่เปิด.image_url)) {
+        await supabase.from('reports')
+          .update({ photos: [...รูปเดิม, รายงานที่เปิด.image_url] })
+          .eq('id', master)
+      }
+    }
+
+    const { error } = await supabase.from('reports').update({
+      status:       'เคสซ้ำซ้อน',
+      duplicate_of: master,
+      updated_at:   new Date().toISOString(),
+    }).eq('id', รายงานที่เปิด.id)
+
+    if (error) {
+      alert('รวมเคสไม่สำเร็จ: ' + error.message)
+      setกำลังรวมเคส(false)
+      return
+    }
+
+    // แจ้งผู้แจ้งของเคสซ้ำว่าเรื่องถูกรวมแล้ว (ไม่ได้ถูกเมิน)
+    if (รายงานที่เปิด.reporter_id) {
+      await supabase.from('notifications').insert({
+        user_id: รายงานที่เปิด.reporter_id,
+        title:   `อัปเดตรายงาน #${String(รายงานที่เปิด.id).padStart(6, '0')}`,
+        body:    `รายงานของคุณถูกรวมกับเคส #${String(master).padStart(6, '0')} ที่มีผู้แจ้งไว้ก่อนแล้ว เจ้าหน้าที่กำลังดำเนินการอยู่ ขอบคุณที่ช่วยแจ้งเหตุ 🔗`,
+        type:    'report_update',
+        is_read: false,
+      })
+    }
+
+    setรายงานทั้งหมด(function (prev) {
+      return prev.map(function (r) {
+        return r.id === รายงานที่เปิด.id ? { ...r, status: 'เคสซ้ำซ้อน', duplicate_of: master } : r
+      })
+    })
+    setกำลังรวมเคส(false)
+    setแสดงModalรวมเคส(false)
+    setเคสหลักที่เลือก('')
+    toast(`🔗 รวมเข้าเคส #${String(master).padStart(6, '0')} แล้ว`)
+    ปิดรายละเอียด()
   }
 
   // ================================================================
@@ -1732,6 +1806,16 @@ function VolunteerPage({ หน้า }) {
                         <div className="space-y-2">
                           {close.map(ปุ่มสถานะ)}
                         </div>
+
+                        {/* รวมเคสซ้ำซ้อน — เป็น action แยก เพราะต้องเลือกเคสหลักก่อน ไม่ใช่แค่เปลี่ยนสถานะ */}
+                        <button
+                          onClick={function () { setเคสหลักที่เลือก(''); setแสดงModalรวมเคส(true) }}
+                          className="w-full mt-2 py-3 px-4 rounded-xl text-sm font-medium border-2 border-dashed border-gray-300 text-gray-600 text-left flex items-center gap-2.5 active:bg-gray-50"
+                        >
+                          <span className="text-base">🔗</span>
+                          <span className="flex-1">แจ้งซ้ำซ้อน / รวมเคส</span>
+                          <span className="text-xs text-gray-400">เลือกเคสหลัก →</span>
+                        </button>
                       </>
                     )}
                   </div>
@@ -1764,6 +1848,95 @@ function VolunteerPage({ หน้า }) {
           </div>
         </div>
       )}
+
+      {/* ============================================================
+          MODAL: รวมเคสซ้ำซ้อน — เลือกเคสหลักที่จะรวมเข้า
+          ============================================================ */}
+      {แสดงModalรวมเคส && รายงานที่เปิด && (function () {
+        // เคสหลักที่เลือกได้ = เคสที่ยังไม่ปิด และไม่ใช่ใบนี้ — เรียงตามระยะทางจากใบนี้ (ใกล้สุดก่อน)
+        const ตัวเลือกเคสหลัก = รายงานทั้งหมด
+          .filter(function (r) { return r.id !== รายงานที่เปิด.id && !เป็นเคสปิด(r) })
+          .map(function (r) {
+            const วัดได้ = รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && r.latitude && r.longitude
+            return { ...r, ระยะ: วัดได้ ? ระยะทางเมตร(รายงานที่เปิด.latitude, รายงานที่เปิด.longitude, r.latitude, r.longitude) : null }
+          })
+          .sort(function (a, b) { return (a.ระยะ ?? Infinity) - (b.ระยะ ?? Infinity) })
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-end"
+               onClick={() => setแสดงModalรวมเคส(false)}>
+            <div className="bg-white w-full rounded-t-3xl max-h-[85vh] overflow-y-auto"
+                 onClick={function (e) { e.stopPropagation() }}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+              <div className="flex items-center justify-between px-5 py-3">
+                <p className="font-bold text-gray-800">🔗 รวมเคสซ้ำซ้อน</p>
+                <button onClick={() => setแสดงModalรวมเคส(false)} className="text-gray-400 text-2xl leading-none">✕</button>
+              </div>
+
+              <div className="px-5 pb-8 space-y-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                  <p className="text-xs text-gray-500">กำลังปิดใบนี้เป็น "เคสซ้ำซ้อน"</p>
+                  <p className="text-sm font-bold text-gray-800 mt-0.5">
+                    #{String(รายงานที่เปิด.id).padStart(6, '0')} · {รายงานที่เปิด.animal_type || 'ไม่ระบุ'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">ซ้ำซ้อนกับรายงานหมายเลขใด?</p>
+                  {ตัวเลือกเคสหลัก.length === 0 ? (
+                    <p className="text-sm text-gray-400 bg-gray-50 rounded-xl px-4 py-6 text-center">
+                      ไม่มีเคสที่กำลังดำเนินการอยู่ให้รวมด้วย
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {ตัวเลือกเคสหลัก.map(function (r) {
+                        const เลือกอยู่ = String(เคสหลักที่เลือก) === String(r.id)
+                        return (
+                          <button key={r.id}
+                            onClick={function () { setเคสหลักที่เลือก(String(r.id)) }}
+                            className={`w-full text-left rounded-xl border-2 p-3 flex items-center gap-3 transition-all ${
+                              เลือกอยู่ ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white'
+                            }`}
+                          >
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
+                              {r.image_url
+                                ? <img src={r.image_url} alt="" className="w-full h-full object-cover" />
+                                : <span className="text-xl">🐾</span>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-800 truncate">
+                                #{String(r.id).padStart(6, '0')} · {r.animal_type || 'ไม่ระบุ'}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">📍 {r.location_text || '-'}</p>
+                              <p className="text-xs text-gray-400">
+                                {แปลงวันที่เวลา(r.created_at)}
+                                {r.ระยะ != null && <span className="text-teal-600 font-medium"> · ห่าง {Math.round(r.ระยะ)} ม.</span>}
+                              </p>
+                            </div>
+                            {เลือกอยู่ && <span className="text-teal-600 text-lg shrink-0">✓</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-400">
+                  เมื่อยืนยัน ใบนี้จะถูกปิดเป็น "เคสซ้ำซ้อน" และหายจากหน้าอัปเดตสถานะ พร้อมโยนรูปไปรวมในเคสหลักให้อัตโนมัติ
+                </p>
+
+                <button
+                  onClick={รวมเคสซ้ำซ้อน}
+                  disabled={!เคสหลักที่เลือก || กำลังรวมเคส}
+                  className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all"
+                >
+                  {กำลังรวมเคส ? '⏳ กำลังรวมเคส...' : '🔗 ยืนยันรวมเคส'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ============================================================
           BOTTOM SHEET: แก้ไขสัตว์
