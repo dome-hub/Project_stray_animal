@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Pencil, Trash2, X } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 
@@ -520,17 +521,20 @@ function TrackReport({ user }) {
                 {รายงานที่เปิด.status === 'รอดำเนินการ' && !โหมดแก้ไข && (
                   <>
                     <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล"
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200">
-                      ✏️
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200">
+                      <Pencil size={18} strokeWidth={2} />
                     </button>
                     <button onClick={() => setแสดงModalยกเลิก(true)} title="ยกเลิกรายงาน"
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 active:bg-red-100">
-                      🗑️
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-red-300 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors duration-200">
+                      <Trash2 size={18} strokeWidth={2} />
                     </button>
                     <div className="w-px h-5 bg-gray-200 mx-1" />
                   </>
                 )}
-                <button onClick={ปิดรายละเอียด} className="text-gray-400 text-2xl leading-none w-8 h-8 flex items-center justify-center">✕</button>
+                <button onClick={ปิดรายละเอียด} title="ปิด"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors duration-200">
+                  <X size={20} strokeWidth={2} />
+                </button>
               </div>
             </div>
 
