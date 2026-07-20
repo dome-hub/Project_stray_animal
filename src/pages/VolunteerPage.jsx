@@ -162,6 +162,46 @@ function เป็นเคสปิด(report) {
   return สถานะปิดร่วม.includes(report.status)
 }
 
+// ---- ตรวจจับ "เคสที่อาจซ้ำ" จากข้อมูลที่โหลดมาแล้ว (ไม่ต้อง query เพิ่ม) ----
+// เตือนเฉพาะเคสที่ยังไม่ปิดและมีพิกัด — คืน object: report.id -> { เคส, ระยะ } ของเคสที่ใกล้ที่สุด
+// O(n²) แต่ n = จำนวนเคสที่ยัง active ในตำบลเดียว ซึ่งน้อยมาก จึงคำนวณสดตอน render ได้
+const รัศมีเตือนซ้ำเมตร = 50
+function สร้างแผนที่เคสซ้ำ(รายงาน) {
+  const active = รายงาน.filter(function (r) { return !เป็นเคสปิด(r) && r.latitude && r.longitude })
+  const ผล = {}
+  for (let i = 0; i < active.length; i++) {
+    for (let j = i + 1; j < active.length; j++) {
+      const a = active[i]
+      const b = active[j]
+      const ระยะ = ระยะทางเมตร(a.latitude, a.longitude, b.latitude, b.longitude)
+      if (ระยะ > รัศมีเตือนซ้ำเมตร) continue
+      if (!ผล[a.id] || ระยะ < ผล[a.id].ระยะ) ผล[a.id] = { เคส: b, ระยะ }
+      if (!ผล[b.id] || ระยะ < ผล[b.id].ระยะ) ผล[b.id] = { เคส: a, ระยะ }
+    }
+  }
+  return ผล
+}
+
+// ช่องรูปเล็กสำหรับเทียบภาพ 2 เคสใน modal รวมเคส (นิยามนอก component กัน remount รูปทุกครั้งที่ re-render)
+function ช่องเทียบเคส({ เคส, ป้าย, สี }) {
+  return (
+    <div className="flex-1 min-w-0">
+      <p className={`text-[10px] font-bold mb-1 text-center ${สี}`}>{ป้าย}</p>
+      <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+        {เคส?.image_url
+          ? <img src={เคส.image_url} alt={ป้าย} className="w-full h-full object-cover" />
+          : <span className="text-3xl">{เคส ? '🐾' : '❓'}</span>}
+      </div>
+      <p className="text-[11px] font-bold text-gray-700 mt-1 text-center truncate">
+        {เคส ? `#${String(เคส.id).padStart(6, '0')}` : 'ยังไม่เลือก'}
+      </p>
+      <p className="text-[10px] text-gray-400 text-center truncate">
+        {เคส ? (เคส.animal_type || 'ไม่ระบุ') : '—'}
+      </p>
+    </div>
+  )
+}
+
 // สร้างตัวเลือกสถานะสำหรับ report หนึ่งๆ — แยกเป็นกลุ่ม "อัปเดตความคืบหน้า" และ "ปิดเคส"
 function ตัวเลือกอัปเดตสถานะ(report) {
   const stepIdx    = ขั้นตอนตามสถานะ[report.status] ?? 0
@@ -348,6 +388,9 @@ function VolunteerPage({ หน้า }) {
   const [แจ้งสำเร็จ,  setแจ้งสำเร็จ]  = useState('')   // ข้อความ toast
 
   // ---- Merge duplicate (รวมเคสซ้ำซ้อน) ----
+  // เคสที่จะรวม = ใบที่กำลังจะถูกปิดเป็น "เคสซ้ำซ้อน" — แยกจาก รายงานที่เปิด เพราะเปิด modal ได้
+  // ทั้งจากปุ่มในหน้าอัปเดตสถานะ และจากป้าย "อาจซ้ำ" บนการ์ดหน้ารายการ (ที่ไม่ควรเปิด bottom sheet ค้างไว้)
+  const [เคสที่จะรวม,     setเคสที่จะรวม]     = useState(null)
   const [แสดงModalรวมเคส, setแสดงModalรวมเคส] = useState(false)
   const [เคสหลักที่เลือก,  setเคสหลักที่เลือก]  = useState('')     // id ของเคสหลักที่จะรวมเข้า
   const [กำลังรวมเคส,     setกำลังรวมเคส]     = useState(false)
@@ -659,20 +702,33 @@ function VolunteerPage({ หน้า }) {
   // ================================================================
   // รวมเคสซ้ำซ้อน — ปิดเคสนี้เป็น "เคสซ้ำซ้อน" แล้วโยงไปเคสหลัก
   // ================================================================
+  // เปิด modal รวมเคส — ใช้ได้ทั้งจากปุ่มในหน้าอัปเดต และจากป้าย "อาจซ้ำ" (ส่งเคสหลักมา pre-fill ได้เลย)
+  function เปิดรวมเคส(เคสนี้, เคสหลัก) {
+    setเคสที่จะรวม(เคสนี้)
+    setเคสหลักที่เลือก(เคสหลัก ? String(เคสหลัก.id) : '')
+    setแสดงModalรวมเคส(true)
+  }
+
+  function ปิดรวมเคส() {
+    setแสดงModalรวมเคส(false)
+    setเคสที่จะรวม(null)
+    setเคสหลักที่เลือก('')
+  }
+
   async function รวมเคสซ้ำซ้อน() {
     const master = Number(เคสหลักที่เลือก)
-    if (!รายงานที่เปิด || !master || กำลังรวมเคส) return
-    if (master === รายงานที่เปิด.id) { alert('เลือกเคสหลักเป็นใบเดียวกันไม่ได้'); return }
+    if (!เคสที่จะรวม || !master || กำลังรวมเคส) return
+    if (master === เคสที่จะรวม.id) { alert('เลือกเคสหลักเป็นใบเดียวกันไม่ได้'); return }
     setกำลังรวมเคส(true)
 
     // โยนรูปของเคสซ้ำไปรวมในคลังรูปของเคสหลัก เจ้าหน้าที่จะได้เห็นภาพจากผู้แจ้งทุกคน
-    if (รายงานที่เปิด.image_url) {
+    if (เคสที่จะรวม.image_url) {
       const { data: เคสหลัก } = await supabase
         .from('reports').select('photos').eq('id', master).single()
       const รูปเดิม = Array.isArray(เคสหลัก?.photos) ? เคสหลัก.photos : []
-      if (!รูปเดิม.includes(รายงานที่เปิด.image_url)) {
+      if (!รูปเดิม.includes(เคสที่จะรวม.image_url)) {
         await supabase.from('reports')
-          .update({ photos: [...รูปเดิม, รายงานที่เปิด.image_url] })
+          .update({ photos: [...รูปเดิม, เคสที่จะรวม.image_url] })
           .eq('id', master)
       }
     }
@@ -681,7 +737,7 @@ function VolunteerPage({ หน้า }) {
       status:       'เคสซ้ำซ้อน',
       duplicate_of: master,
       updated_at:   new Date().toISOString(),
-    }).eq('id', รายงานที่เปิด.id)
+    }).eq('id', เคสที่จะรวม.id)
 
     if (error) {
       alert('รวมเคสไม่สำเร็จ: ' + error.message)
@@ -690,26 +746,27 @@ function VolunteerPage({ หน้า }) {
     }
 
     // แจ้งผู้แจ้งของเคสซ้ำว่าเรื่องถูกรวมแล้ว (ไม่ได้ถูกเมิน)
-    if (รายงานที่เปิด.reporter_id) {
+    if (เคสที่จะรวม.reporter_id) {
       await supabase.from('notifications').insert({
-        user_id: รายงานที่เปิด.reporter_id,
-        title:   `อัปเดตรายงาน #${String(รายงานที่เปิด.id).padStart(6, '0')}`,
+        user_id: เคสที่จะรวม.reporter_id,
+        title:   `อัปเดตรายงาน #${String(เคสที่จะรวม.id).padStart(6, '0')}`,
         body:    `รายงานของคุณถูกรวมกับเคส #${String(master).padStart(6, '0')} ที่มีผู้แจ้งไว้ก่อนแล้ว เจ้าหน้าที่กำลังดำเนินการอยู่ ขอบคุณที่ช่วยแจ้งเหตุ 🔗`,
         type:    'report_update',
         is_read: false,
       })
     }
 
+    const รวมไปแล้ว = เคสที่จะรวม.id
     setรายงานทั้งหมด(function (prev) {
       return prev.map(function (r) {
-        return r.id === รายงานที่เปิด.id ? { ...r, status: 'เคสซ้ำซ้อน', duplicate_of: master } : r
+        return r.id === รวมไปแล้ว ? { ...r, status: 'เคสซ้ำซ้อน', duplicate_of: master } : r
       })
     })
     setกำลังรวมเคส(false)
-    setแสดงModalรวมเคส(false)
-    setเคสหลักที่เลือก('')
+    ปิดรวมเคส()
     toast(`🔗 รวมเข้าเคส #${String(master).padStart(6, '0')} แล้ว`)
-    ปิดรายละเอียด()
+    // ถ้ากำลังเปิด bottom sheet ของใบที่เพิ่งรวมอยู่ ให้ปิดตามไปด้วย
+    if (รายงานที่เปิด && รายงานที่เปิด.id === รวมไปแล้ว) ปิดรายละเอียด()
   }
 
   // ================================================================
@@ -877,6 +934,9 @@ function VolunteerPage({ หน้า }) {
       && !เป็นเคสปิด(ร)
   })
 
+  // แผนที่เคสที่อาจซ้ำ (id -> เคสใกล้สุด) — คำนวณสดจากรายงานที่โหลดมาแล้ว ใช้โชว์ป้าย "อาจซ้ำ" บนการ์ด
+  const เคสซ้ำแผนที่ = สร้างแผนที่เคสซ้ำ(รายงานทั้งหมด)
+
   const titleMap = {
     reports: 'รายการแจ้งสัตว์จร',
     update:  'อัปเดตสถานะสัตว์',
@@ -1027,6 +1087,17 @@ function VolunteerPage({ หน้า }) {
                               <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
                               {ร.detail && (
                                 <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
+                              )}
+
+                              {/* ป้ายเตือนเคสอาจซ้ำ — กดแล้วเปิด modal รวมเคสพร้อม pre-fill เคสหลักให้เลย */}
+                              {!ปิดเคสแล้ว && เคสซ้ำแผนที่[ร.id] && (
+                                <button
+                                  onClick={function (e) { e.stopPropagation(); เปิดรวมเคส(ร, เคสซ้ำแผนที่[ร.id].เคส) }}
+                                  className="mt-1.5 inline-flex items-center gap-1 bg-orange-100 text-orange-600 text-[11px] font-bold px-2 py-1 rounded-full active:bg-orange-200"
+                                >
+                                  ⚠️ อาจซ้ำกับ #{String(เคสซ้ำแผนที่[ร.id].เคส.id).padStart(6, '0')}
+                                  <span className="font-normal text-orange-400">· ห่าง {Math.round(เคสซ้ำแผนที่[ร.id].ระยะ)} ม.</span>
+                                </button>
                               )}
                             </div>
                             <span className="text-gray-300 text-xl shrink-0">›</span>
@@ -1809,7 +1880,7 @@ function VolunteerPage({ หน้า }) {
 
                         {/* รวมเคสซ้ำซ้อน — เป็น action แยก เพราะต้องเลือกเคสหลักก่อน ไม่ใช่แค่เปลี่ยนสถานะ */}
                         <button
-                          onClick={function () { setเคสหลักที่เลือก(''); setแสดงModalรวมเคส(true) }}
+                          onClick={function () { เปิดรวมเคส(รายงานที่เปิด, เคสซ้ำแผนที่[รายงานที่เปิด.id]?.เคส) }}
                           className="w-full mt-2 py-3 px-4 rounded-xl text-sm font-medium border-2 border-dashed border-gray-300 text-gray-600 text-left flex items-center gap-2.5 active:bg-gray-50"
                         >
                           <span className="text-base">🔗</span>
@@ -1852,33 +1923,46 @@ function VolunteerPage({ หน้า }) {
       {/* ============================================================
           MODAL: รวมเคสซ้ำซ้อน — เลือกเคสหลักที่จะรวมเข้า
           ============================================================ */}
-      {แสดงModalรวมเคส && รายงานที่เปิด && (function () {
+      {แสดงModalรวมเคส && เคสที่จะรวม && (function () {
         // เคสหลักที่เลือกได้ = เคสที่ยังไม่ปิด และไม่ใช่ใบนี้ — เรียงตามระยะทางจากใบนี้ (ใกล้สุดก่อน)
         const ตัวเลือกเคสหลัก = รายงานทั้งหมด
-          .filter(function (r) { return r.id !== รายงานที่เปิด.id && !เป็นเคสปิด(r) })
+          .filter(function (r) { return r.id !== เคสที่จะรวม.id && !เป็นเคสปิด(r) })
           .map(function (r) {
-            const วัดได้ = รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && r.latitude && r.longitude
-            return { ...r, ระยะ: วัดได้ ? ระยะทางเมตร(รายงานที่เปิด.latitude, รายงานที่เปิด.longitude, r.latitude, r.longitude) : null }
+            const วัดได้ = เคสที่จะรวม.latitude && เคสที่จะรวม.longitude && r.latitude && r.longitude
+            return { ...r, ระยะ: วัดได้ ? ระยะทางเมตร(เคสที่จะรวม.latitude, เคสที่จะรวม.longitude, r.latitude, r.longitude) : null }
           })
           .sort(function (a, b) { return (a.ระยะ ?? Infinity) - (b.ระยะ ?? Infinity) })
 
+        // เคสหลักที่ถูกเลือกอยู่ (ใช้โชว์เทียบภาพซ้าย-ขวา)
+        const เคสหลักObj = ตัวเลือกเคสหลัก.find(function (r) { return String(r.id) === String(เคสหลักที่เลือก) }) || null
+
         return (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-end"
-               onClick={() => setแสดงModalรวมเคส(false)}>
+               onClick={ปิดรวมเคส}>
             <div className="bg-white w-full rounded-t-3xl max-h-[85vh] overflow-y-auto"
                  onClick={function (e) { e.stopPropagation() }}>
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
               <div className="flex items-center justify-between px-5 py-3">
                 <p className="font-bold text-gray-800">🔗 รวมเคสซ้ำซ้อน</p>
-                <button onClick={() => setแสดงModalรวมเคส(false)} className="text-gray-400 text-2xl leading-none">✕</button>
+                <button onClick={ปิดรวมเคส} className="text-gray-400 text-2xl leading-none">✕</button>
               </div>
 
               <div className="px-5 pb-8 space-y-4">
-                <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                  <p className="text-xs text-gray-500">กำลังปิดใบนี้เป็น "เคสซ้ำซ้อน"</p>
-                  <p className="text-sm font-bold text-gray-800 mt-0.5">
-                    #{String(รายงานที่เปิด.id).padStart(6, '0')} · {รายงานที่เปิด.animal_type || 'ไม่ระบุ'}
-                  </p>
+                {/* เทียบภาพซ้าย-ขวา ก่อนตัดสินใจ */}
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
+                  <p className="text-xs font-semibold text-gray-500 text-center mb-2">เทียบภาพก่อนยืนยัน</p>
+                  <div className="flex items-start gap-2">
+                    <ช่องเทียบเคส เคส={เคสที่จะรวม} ป้าย="ใบนี้ (จะถูกปิด)" สี="text-orange-500" />
+                    <div className="flex items-center self-center pt-4">
+                      <span className="text-xl text-gray-300">→</span>
+                    </div>
+                    <ช่องเทียบเคส เคส={เคสหลักObj} ป้าย="เคสหลัก (คงไว้)" สี="text-teal-600" />
+                  </div>
+                  {เคสหลักObj?.ระยะ != null && (
+                    <p className="text-[11px] text-center text-teal-600 font-medium mt-2">
+                      📍 ห่างกัน {Math.round(เคสหลักObj.ระยะ)} เมตร
+                    </p>
+                  )}
                 </div>
 
                 <div>
