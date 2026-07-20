@@ -379,6 +379,14 @@ function VolunteerPage({ หน้า }) {
     if (หน้า === 'map')     ดึงรายงานพิกัด()
   }, [หน้า])
 
+  // เผยแพร่ได้เฉพาะสถานะ "รอการรับเลี้ยง" — ถ้าสัตว์ที่กำลังแก้ไขมีสถานะอื่นแต่ยังเผยแพร่อยู่
+  // (เช่น ข้อมูลเก่าไม่สอดคล้อง หรือเพิ่งเปลี่ยนสถานะกลับไปรักษา) ให้บังคับปิดเผยแพร่อัตโนมัติ
+  useEffect(function () {
+    if (สัตว์ที่แก้ไข && สัตว์ที่แก้ไข.is_adoptable && สัตว์ที่แก้ไข.status !== 'รอการรับเลี้ยง') {
+      setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: false } })
+    }
+  }, [สัตว์ที่แก้ไข?.status, สัตว์ที่แก้ไข?.is_adoptable])
+
   async function ดึงรายงานพิกัด() {
     setโหลดแผนที่(true)
     const { data, error } = await supabase
@@ -2147,8 +2155,10 @@ function VolunteerPage({ หน้า }) {
               {/* เผยแพร่หาบ้าน — ตัวคัดกรองก่อนขึ้นหน้า "ค้นหาสัตว์เลี้ยง" ของ user
                   กดเปิดได้ก็ต่อเมื่อข้อมูลหลัก (ประเภท/เพศ/อายุ/ขนาด) ครบ — กันสัตว์ที่ค้นหาละเอียดแล้ว match ไม่เจอ */}
               {(function () {
-                const เผยแพร่ได้ = ข้อมูลครบพอเผยแพร่(สัตว์ที่แก้ไข)
                 const เปิดอยู่   = !!สัตว์ที่แก้ไข.is_adoptable
+                const สถานะพร้อม = สัตว์ที่แก้ไข.status === 'รอการรับเลี้ยง' // เผยแพร่ได้เฉพาะสถานะนี้
+                const ข้อมูลครบ  = ข้อมูลครบพอเผยแพร่(สัตว์ที่แก้ไข)
+                const เผยแพร่ได้ = สถานะพร้อม && ข้อมูลครบ
                 return (
                   <div className={`rounded-2xl p-4 border-2 transition-all ${
                     เปิดอยู่ ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
@@ -2164,31 +2174,31 @@ function VolunteerPage({ หน้า }) {
                       </div>
                       <button
                         onClick={function () {
-                          // ยังไม่เผยแพร่ + ข้อมูลไม่ครบ → บล็อก พร้อมแจ้งเตือน (ตัวสวิตช์ยังกดได้เพื่อให้ toast ทำงาน)
-                          if (!เปิดอยู่ && !เผยแพร่ได้) {
-                            toast('⚠️ กรุณาระบุ ประเภท, เพศ, อายุ และขนาดตัว ก่อนเผยแพร่สู่สาธารณะ')
-                            return
-                          }
-                          setSัตว์ที่แก้ไข(function (prev) {
-                            const เปิดเผยแพร่ = !prev.is_adoptable
-                            // เปิดเผยแพร่ตอนสถานะยังเป็น "อยู่ศูนย์พักพิง" → เปลี่ยนสถานะเป็น "รอการรับเลี้ยง" ให้อัตโนมัติ
-                            // การ์ดจะได้ย้ายไป tab "รอหาบ้าน" ทันที ไม่ต้องกดสถานะแยกอีกขั้น
-                            const status = เปิดเผยแพร่ && prev.status === 'อยู่ศูนย์พักพิง' ? 'รอการรับเลี้ยง' : prev.status
-                            return { ...prev, is_adoptable: เปิดเผยแพร่, status }
-                          })
+                          // ปิดได้เสมอ
+                          if (เปิดอยู่) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: false } }); return }
+                          // จะเปิด — ต้องผ่านทั้งสถานะและข้อมูล (สวิตช์ยังกดได้เพื่อให้ toast อธิบายเหตุผล)
+                          if (!สถานะพร้อม) { toast('⚠️ เผยแพร่ไม่ได้: สัตว์ต้องอยู่สถานะ "รอการรับเลี้ยง" เท่านั้น'); return }
+                          if (!ข้อมูลครบ)  { toast('⚠️ กรุณาระบุ ประเภท, เพศ, อายุ และขนาดตัว ก่อนเผยแพร่สู่สาธารณะ'); return }
+                          setSัตว์ที่แก้ไข(function (prev) { return { ...prev, is_adoptable: true } })
                         }}
                         className={`w-11 h-6 rounded-full shrink-0 transition-colors relative ${
-                          เปิดอยู่ ? 'bg-green-500' : เผยแพร่ได้ ? 'bg-gray-300' : 'bg-gray-200 cursor-not-allowed'
+                          เปิดอยู่ ? 'bg-green-500' : เผยแพร่ได้ ? 'bg-gray-300' : 'bg-gray-300 opacity-60 cursor-not-allowed'
                         }`}
                       >
                         <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${
-                          เปิดอยู่ ? 'translate-x-5 bg-white' : เผยแพร่ได้ ? 'translate-x-0 bg-white' : 'translate-x-0 bg-gray-100'
+                          เปิดอยู่ ? 'translate-x-5 bg-white' : 'translate-x-0 bg-white'
                         }`} />
                       </button>
                     </div>
 
-                    {/* Helper text แดง — โชว์เมื่อข้อมูลยังไม่ครบและยังไม่เผยแพร่ */}
-                    {!เปิดอยู่ && !เผยแพร่ได้ && (
+                    {/* Helper text — บอกเหตุผลที่เผยแพร่ไม่ได้ (สถานะก่อน แล้วค่อยข้อมูล) */}
+                    {!เปิดอยู่ && !สถานะพร้อม && (
+                      <div className="mt-3 flex items-start gap-1.5 text-xs text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
+                        <span className="mt-px shrink-0">⚠️</span>
+                        <span>ไม่สามารถเผยแพร่ได้: สัตว์ต้องอยู่ในสถานะ <b>"รอการรับเลี้ยง"</b> เท่านั้น</span>
+                      </div>
+                    )}
+                    {!เปิดอยู่ && สถานะพร้อม && !ข้อมูลครบ && (
                       <div className="mt-3 flex items-start gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
                         <span className="mt-px shrink-0">⚠️</span>
                         <span>กรุณาระบุ <b>ประเภท, เพศ, อายุ</b> และ <b>ขนาดตัว</b> ให้ครบก่อนเผยแพร่สู่สาธารณะ (เพื่อให้ผู้ใช้ค้นหาแบบละเอียดเจอน้อง)</span>
