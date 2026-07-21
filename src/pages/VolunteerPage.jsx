@@ -612,6 +612,13 @@ function VolunteerPage({ หน้า }) {
     setหมายเหตุ('')
   }
 
+  // เปิด modal จัดการจากหน้าแผนที่ (double-click การ์ด) — ดึงข้อมูลเต็มของรายงานก่อน
+  // เพราะ ดึงรายงานพิกัด() เลือกมาไม่ครบทุกฟิลด์ (ไม่มี reporter_id / image_url / volunteer_notes)
+  async function เปิดจัดการจากแผนที่(r) {
+    const { data } = await supabase.from('reports').select('*').eq('id', r.id).single()
+    เปิดรายละเอียด(data || r)
+  }
+
   function toast(msg) {
     setแจ้งสำเร็จ(msg)
     setTimeout(() => setแจ้งสำเร็จ(''), 3500)
@@ -1658,13 +1665,16 @@ function VolunteerPage({ หน้า }) {
 
                 {/* List รายการเคส — กดแล้วแผนที่บินไปที่จุดนั้น */}
                 <div className="px-4 space-y-2 pb-4">
-                  <p className="text-xs text-gray-400">{จุดกรอง.length} จุดในมุมมองนี้</p>
+                  <p className="text-xs text-gray-400">
+                    {จุดกรอง.length} จุดในมุมมองนี้ · แตะเพื่อซูมแผนที่ · แตะสองครั้งเพื่อจัดการ
+                  </p>
                   {จุดกรอง.length === 0 && (
                     <div className="text-center py-8 text-gray-400 text-sm">ไม่มีจุดในตัวกรองนี้</div>
                   )}
                   {จุดกรอง.map((r) => (
                     <div key={r.id}
                       onClick={() => setโฟกัสจุด({ lat: r.latitude, lng: r.longitude, id: r.id, t: Date.now() })}
+                      onDoubleClick={() => เปิดจัดการจากแผนที่(r)}
                       style={{ borderLeftColor: ประเภทจาก(r.urgency).hex }}
                       className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-all border-l-4"
                     >
@@ -1694,8 +1704,9 @@ function VolunteerPage({ หน้า }) {
 
       {/* ============================================================
           BOTTOM SHEET: รายละเอียดรายงาน (Reports Inbox)
+          ใช้ทั้งหน้า reports และหน้า map (double-click การ์ดในแผนที่)
           ============================================================ */}
-      {รายงานที่เปิด && หน้า === 'reports' && (
+      {รายงานที่เปิด && (หน้า === 'reports' || หน้า === 'map') && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={ปิดรายละเอียด}>
           <div className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
