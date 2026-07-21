@@ -874,10 +874,17 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
             <div className="px-5 pb-8 space-y-4">
 
               {/* รูปสัตว์ */}
-              <div className="w-full h-36 rounded-2xl overflow-hidden bg-rose-50 flex items-center justify-center">
+              <div className="relative w-full h-36 rounded-2xl overflow-hidden bg-rose-50 flex items-center justify-center">
                 {โพสต์.photo_url
                   ? <img src={โพสต์.photo_url} alt={โพสต์.pet_name} className="w-full h-full object-contain" />
                   : <AnimalIcon ชนิด={โพสต์.species || โพสต์.breed} size={56} className="text-rose-300" />}
+
+                {/* ป้ายเงินรางวัล — ลอยเด่นบนรูปด้านบน ให้เห็นก่อนอย่างอื่นทั้งหมด */}
+                {มีรางวัล && (
+                  <span className="absolute top-2 right-2 inline-flex items-center gap-1.5 text-sm font-extrabold px-3 py-1.5 rounded-full shadow-lg bg-amber-400 text-amber-900 animate-pulse">
+                    <Gift size={15} className="shrink-0" /> ฿{Number(โพสต์.reward_amount).toLocaleString('th-TH')}
+                  </span>
+                )}
               </div>
 
               {/* ชื่อ + สถานะ */}
