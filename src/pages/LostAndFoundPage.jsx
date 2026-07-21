@@ -9,10 +9,25 @@ import { useNavigate } from 'react-router-dom'
 import {
   Megaphone, Search, MapPin, Calendar, Loader2, X, Camera,
   PawPrint, Home, HeartCrack, CheckCircle2, Phone, Building2, Info,
+  Eye, Hospital, ExternalLink,
 } from 'lucide-react'
+import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+
+// แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite (idempotent — เรียกซ้ำได้)
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+})
 
 // สถานะที่เจ้าหน้าที่ตั้งไว้แปลว่า "กำลังประกาศตามหาเจ้าของ" — แท็บที่ 1 ดึงเฉพาะอันนี้
 const สถานะประกาศหาเจ้าของ = 'ประกาศตามหาเจ้าของ'
@@ -37,7 +52,7 @@ async function โหลดรายการ() {
       .order('created_at', { ascending: false }),
     supabase
       .from('reports')
-      .select('id, animal_type, image_url, location_text, created_at')
+      .select('id, animal_type, image_url, location_text, latitude, longitude, created_at')
       .eq('status', สถานะประกาศหาเจ้าของ)
       .order('created_at', { ascending: false }),
     supabase
@@ -54,12 +69,25 @@ async function โหลดรายการ() {
   const สัตว์ในศูนย์ = ผลAnimals.data || []
   const รายงานที่เข้าศูนย์แล้ว = new Set(สัตว์ในศูนย์.map((a) => a.report_id).filter(Boolean))
 
+  // ดึง report ต้นทางของสัตว์ในศูนย์ เพื่อเอา "เวลาที่มีคนแจ้งพบครั้งแรก" + พิกัดจุดที่พบมาแสดง
+  // (สัตว์ที่เข้าศูนย์แล้ว report จะเปลี่ยนสถานะไปจาก 'ประกาศตามหาเจ้าของ' แล้ว จึงไม่อยู่ในชุด ผลReports)
+  const idต้นทาง = [...รายงานที่เข้าศูนย์แล้ว]
+  const reportต้นทาง = {}
+  if (idต้นทาง.length > 0) {
+    const { data: ต้นทาง } = await supabase
+      .from('reports')
+      .select('id, created_at, latitude, longitude, location_text')
+      .in('id', idต้นทาง)
+    ;(ต้นทาง || []).forEach(function (r) { reportต้นทาง[r.id] = r })
+  }
+
   const found = [
     // 1) เข้าศูนย์แล้ว แต่ยังตามหาเจ้าของเดิม
     ...สัตว์ในศูนย์.map(function (a) {
       const มีชื่อ = a.name && a.name !== 'ยังไม่ตั้งชื่อ'
       const รูปทั้งหมด = (Array.isArray(a.photos) ? a.photos : []).filter(Boolean)
       if (รูปทั้งหมด.length === 0 && a.photo_url) รูปทั้งหมด.push(a.photo_url)
+      const ต้นทาง = a.report_id ? reportต้นทาง[a.report_id] : null
       return {
         key:      'a' + a.id,
         รูป:      รูปทั้งหมด[0] || null,
@@ -71,8 +99,12 @@ async function โหลดรายการ() {
         อายุ:     a.age || null,
         ขนาด:     a.size || null,
         สุขภาพ:   a.health || null,
-        สถานที่:  a.location,
+        สถานที่:  a.location || ต้นทาง?.location_text || null,
         วันที่:    a.created_at,
+        พบเห็นเมื่อ: ต้นทาง?.created_at || null,   // เวลาที่มีคนแจ้งพบครั้งแรก
+        รับเข้าเมื่อ: a.created_at,                  // เวลาที่สร้างเรคคอร์ดสัตว์ = รับเข้าศูนย์
+        lat:      ต้นทาง?.latitude ?? null,
+        lng:      ต้นทาง?.longitude ?? null,
         ที่ศูนย์:  true,
         รหัส:     a.report_id ? `รหัสรายงาน #${String(a.report_id).padStart(6, '0')}` : 'รับเข้าโดยเจ้าหน้าที่',
         reportId: a.report_id || null,
@@ -96,6 +128,10 @@ async function โหลดรายการ() {
           สุขภาพ:   null,
           สถานที่:  r.location_text,
           วันที่:    r.created_at,
+          พบเห็นเมื่อ: r.created_at,   // เวลาที่มีคนแจ้งพบครั้งแรก
+          รับเข้าเมื่อ: null,          // ยังไม่รับตัวเข้าศูนย์
+          lat:      r.latitude ?? null,
+          lng:      r.longitude ?? null,
           ที่ศูนย์:  false,
           รหัส:     `รหัสรายงาน #${String(r.id).padStart(6, '0')}`,
           reportId: r.id,
@@ -110,6 +146,15 @@ async function โหลดรายการ() {
 function วันที่สั้น(str) {
   if (!str) return 'ไม่ระบุ'
   return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// ---- Helper: วันที่ + เวลา เช่น "20 ก.ค. 2569 เวลา 08:30 น." ----
+function วันเวลาไทย(str) {
+  if (!str) return null
+  const d = new Date(str)
+  const วัน  = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+  const เวลา = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+  return `${วัน} เวลา ${เวลา} น.`
 }
 
 // ================================================================
@@ -170,6 +215,15 @@ function FoundPetDetailModal({ สัตว์, onClose }) {
   const รูปทั้งหมด = (สัตว์.รูปทั้งหมด || []).filter(Boolean)
   const มีหลายรูป = รูปทั้งหมด.length > 1
   const ที่ศูนย์ = สัตว์.ที่ศูนย์
+
+  // พิกัดจุดที่พบ (มาจาก report ที่ผู้แจ้งปักหมุดไว้) — แสดงเป็นแผนที่ถ้ามีครบ
+  const lat = สัตว์.lat != null ? Number(สัตว์.lat) : null
+  const lng = สัตว์.lng != null ? Number(สัตว์.lng) : null
+  const มีพิกัด = Number.isFinite(lat) && Number.isFinite(lng)
+
+  // 2 ช่วงเวลาที่สื่อความหมายชัด กันผู้ใช้/เจ้าหน้าที่สับสน
+  const พบเห็นเมื่อ  = วันเวลาไทย(สัตว์.พบเห็นเมื่อ)   // เวลาที่มีคนแจ้งพบครั้งแรก
+  const รับเข้าเมื่อ = วันเวลาไทย(สัตว์.รับเข้าเมื่อ)  // เวลาที่รับตัวเข้าศูนย์
 
   // แสดงเฉพาะฟิลด์ที่มีค่า — รายงานที่ยังไม่เข้าศูนย์จะไม่มีเพศ/อายุ/ขนาด
   const ข้อมูลพื้นฐาน = [
@@ -245,17 +299,60 @@ function FoundPetDetailModal({ สัตว์, onClose }) {
             </div>
           )}
 
-          {/* ข้อมูลการพบเจอ */}
-          <div className="space-y-2">
-            <div className="flex items-start gap-2 text-sm text-gray-600">
-              <MapPin size={16} className="shrink-0 mt-0.5 text-gray-400" />
-              <span>{สัตว์.สถานที่ || 'ไม่ระบุตำแหน่งที่พบ'}</span>
-            </div>
-            <div className="flex items-start gap-2 text-sm text-gray-600">
-              <Calendar size={16} className="shrink-0 mt-0.5 text-gray-400" />
-              <span>{ที่ศูนย์ ? 'วันที่รับเข้าศูนย์' : 'วันที่แจ้งพบ'} {วันที่สั้น(สัตว์.วันที่)}</span>
-            </div>
+          {/* ตำแหน่งที่พบสัตว์ — มีป้ายกำกับชัดเจนเสมอ กันคนเข้าใจผิดว่าแผนที่คือที่อยู่ศูนย์ */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+              <MapPin size={14} className="text-rose-400" /> ตำแหน่งที่พบสัตว์ตัวนี้
+            </p>
+
+            {มีพิกัด ? (
+              <div className="rounded-2xl overflow-hidden border border-gray-100">
+                <MapContainer
+                  center={[lat, lng]} zoom={16}
+                  scrollWheelZoom={false} dragging={false} doubleClickZoom={false}
+                  zoomControl={false} attributionControl={false}
+                  style={{ height: 150, width: '100%' }}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <Marker position={[lat, lng]} />
+                </MapContainer>
+                {สัตว์.สถานที่ && (
+                  <p className="text-sm text-gray-700 px-3 pt-2.5 pb-1">{สัตว์.สถานที่}</p>
+                )}
+                <a href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                  target="_blank" rel="noreferrer"
+                  className="flex items-center justify-center gap-1.5 bg-gray-50 text-gray-700 text-xs font-medium py-2.5 mt-1 hover:bg-gray-100 transition-colors">
+                  <ExternalLink size={13} /> เปิดใน Google Maps
+                </a>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-700">{สัตว์.สถานที่ || 'ไม่ระบุตำแหน่ง'}</p>
+            )}
           </div>
+
+          {/* 2 ช่วงเวลา แยกให้ชัด: พบเห็นครั้งแรก vs รับเข้าศูนย์ */}
+          {(พบเห็นเมื่อ || รับเข้าเมื่อ) && (
+            <div className="bg-gray-50 rounded-xl divide-y divide-gray-100">
+              {พบเห็นเมื่อ && (
+                <div className="flex items-start gap-2.5 px-3 py-2.5">
+                  <Eye size={16} className="shrink-0 mt-0.5 text-sky-500" />
+                  <div>
+                    <p className="text-[11px] text-gray-400">พบเห็นครั้งแรกเมื่อ</p>
+                    <p className="text-sm text-gray-700">{พบเห็นเมื่อ}</p>
+                  </div>
+                </div>
+              )}
+              {รับเข้าเมื่อ && (
+                <div className="flex items-start gap-2.5 px-3 py-2.5">
+                  <Hospital size={16} className="shrink-0 mt-0.5 text-teal-500" />
+                  <div>
+                    <p className="text-[11px] text-gray-400">รับเข้าศูนย์พักพิงเมื่อ</p>
+                    <p className="text-sm text-gray-700">{รับเข้าเมื่อ}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* คำแนะนำก่อนติดต่อ */}
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
