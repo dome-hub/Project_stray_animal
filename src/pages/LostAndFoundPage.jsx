@@ -9,9 +9,9 @@ import { useNavigate } from 'react-router-dom'
 import {
   Megaphone, Search, MapPin, Calendar, Loader2, X, Camera,
   PawPrint, Home, HeartCrack, CheckCircle2, Phone, Building2, Info,
-  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban,
+  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban, LocateFixed,
 } from 'lucide-react'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -28,6 +28,9 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 })
+
+// ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ (ตรงกับ ReportAnimal)
+const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
 
 // สถานะที่เจ้าหน้าที่ตั้งไว้แปลว่า "กำลังประกาศตามหาเจ้าของ" — แท็บที่ 1 ดึงเฉพาะอันนี้
 const สถานะประกาศหาเจ้าของ = 'ประกาศตามหาเจ้าของ'
@@ -155,6 +158,147 @@ function วันเวลาไทย(str) {
   const วัน  = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
   const เวลา = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
   return `${วัน} เวลา ${เวลา} น.`
+}
+
+// จับพิกัดกึ่งกลางแผนที่ทุกครั้งที่เลื่อนเสร็จ (นอก component กันแผนที่ remount)
+function MapMoveTracker({ onMoveEnd }) {
+  useMapEvents({
+    moveend: function (e) {
+      const c = e.target.getCenter()
+      onMoveEnd({ lat: c.lat, lng: c.lng })
+    },
+  })
+  return null
+}
+
+// ================================================================
+// Modal เลือกพิกัดที่หาย — หมุดลอยตายตัวกลางจอ เลื่อนแผนที่เอง (แบบแอปเรียกรถ)
+// ใช้แพทเทิร์นเดียวกับ LocationPickerModal ใน ReportAnimal
+// ================================================================
+function Modalเลือกพิกัด({ ตำแหน่งเริ่มต้น, onConfirm, onClose }) {
+  const [center, setCenter] = useState(ตำแหน่งเริ่มต้น)
+  const [กำลังหาGPS, setกำลังหาGPS] = useState(!ตำแหน่งเริ่มต้น)
+
+  // ยังไม่มีพิกัดเริ่มต้น → ขอ GPS ปัจจุบันมาเป็นจุดกึ่งกลางทันที
+  useEffect(function () {
+    if (ตำแหน่งเริ่มต้น) return
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setกำลังหาGPS(false)
+      },
+      function () {
+        setCenter({ lat: ศูนย์กลางแผนที่เริ่มต้น[0], lng: ศูนย์กลางแผนที่เริ่มต้น[1] })
+        setกำลังหาGPS(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function กลับตำแหน่งฉัน() {
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-500">
+          <X size={20} />
+        </button>
+        <p className="font-semibold text-gray-800 text-sm">เลื่อนแผนที่ไปยังจุดที่หาย</p>
+        <div className="w-8" />
+      </div>
+
+      <div className="flex-1 relative bg-gray-100">
+        {กำลังหาGPS ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <Loader2 size={24} className="animate-spin text-rose-500" />
+            <p className="text-sm text-gray-400">กำลังค้นหาตำแหน่งปัจจุบัน...</p>
+          </div>
+        ) : (
+          <>
+            <MapContainer center={[center.lat, center.lng]} zoom={17} style={{ height: '100%', width: '100%' }}>
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MapMoveTracker onMoveEnd={setCenter} />
+            </MapContainer>
+
+            {/* หมุดตายตัวกลางจอ */}
+            <div className="pointer-events-none absolute inset-0 z-[1100] flex items-center justify-center" style={{ marginTop: -20 }}>
+              <MapPin size={40} className="text-rose-500 drop-shadow-lg" fill="#fecdd3" strokeWidth={2} />
+            </div>
+
+            <button onClick={กลับตำแหน่งฉัน}
+              className="absolute bottom-4 right-4 z-[1100] w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center text-rose-500">
+              <LocateFixed size={20} />
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="px-4 py-4 border-t border-gray-100 shrink-0 bg-white">
+        {center && (
+          <p className="text-center text-xs text-gray-400 mb-2">{center.lat.toFixed(5)}, {center.lng.toFixed(5)}</p>
+        )}
+        <button onClick={() => onConfirm(center.lat, center.lng)} disabled={!center}
+          className="w-full bg-rose-500 text-white rounded-xl py-3.5 font-semibold text-base disabled:opacity-50 flex items-center justify-center gap-2">
+          <MapPin size={16} className="shrink-0" /> ใช้ตำแหน่งนี้
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ================================================================
+// Fieldปักหมุดในฟอร์ม — ปุ่มเปิด picker + พรีวิวแผนที่เมื่อปักแล้ว
+// ================================================================
+function Fieldปักหมุด({ lat, lng, onChange }) {
+  const [เปิดpicker, setเปิดpicker] = useState(false)
+  const มีพิกัด = Number.isFinite(lat) && Number.isFinite(lng)
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+        <MapPin size={14} className="text-rose-400" /> ปักหมุดตำแหน่งที่หาย (ถ้ามี)
+      </p>
+
+      {มีพิกัด ? (
+        <div className="rounded-xl overflow-hidden border border-gray-200">
+          <MapContainer
+            center={[lat, lng]} zoom={16}
+            scrollWheelZoom={false} dragging={false} doubleClickZoom={false}
+            zoomControl={false} attributionControl={false}
+            style={{ height: 120, width: '100%' }}
+          >
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <Marker position={[lat, lng]} />
+          </MapContainer>
+          <button onClick={() => setเปิดpicker(true)}
+            className="w-full bg-gray-50 text-rose-600 text-xs font-medium py-2.5 hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5">
+            <MapPin size={13} /> แก้ไขตำแหน่ง
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => setเปิดpicker(true)}
+          className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-rose-300 rounded-xl py-3 text-sm font-medium text-rose-600 bg-rose-50/50">
+          <MapPin size={16} /> ปักหมุดบนแผนที่
+        </button>
+      )}
+
+      {เปิดpicker && (
+        <Modalเลือกพิกัด
+          ตำแหน่งเริ่มต้น={มีพิกัด ? { lat, lng } : null}
+          onClose={() => setเปิดpicker(false)}
+          onConfirm={function (la, ln) { onChange(la, ln); setเปิดpicker(false) }}
+        />
+      )}
+    </div>
+  )
 }
 
 // ================================================================
@@ -412,6 +556,8 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
   const [วันที่หาย,  setวันที่หาย]  = useState('')
   const [เบอร์ติดต่อ, setเบอร์ติดต่อ] = useState('')
   const [เงินรางวัล, setเงินรางวัล] = useState('')
+  const [lat,        setLat]        = useState(null)
+  const [lng,        setLng]        = useState(null)
   const [ไฟล์รูป,    setไฟล์รูป]    = useState(null)
   const [พรีวิว,     setพรีวิว]     = useState(null)
   const [กำลังบันทึก, setกำลังบันทึก] = useState(false)
@@ -472,6 +618,8 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
       lost_date:     วันที่หาย || null,
       contact_phone: เบอร์ติดต่อ.trim(),
       reward_amount: เงินรางวัล ? Number(เงินรางวัล) : null,
+      latitude:      lat,
+      longitude:     lng,
       photo_url,
       status:        กำลังตามหา,
     })
@@ -558,6 +706,10 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
               placeholder="เช่น หน้าตลาดกำแพงแสน"
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
           </div>
+
+          {/* ปักหมุดตำแหน่งที่หาย */}
+          <Fieldปักหมุด lat={lat} lng={lng} onChange={function (la, ln) { setLat(la); setLng(ln) }} />
+
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-1.5">วันที่หาย</p>
             <input type="date" value={วันที่หาย} onChange={(e) => setวันที่หาย(e.target.value)}
@@ -615,6 +767,11 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
   const เป็นเจ้าของ = !!user?.id && โพสต์.owner_id === user.id
   const มีรางวัล = โพสต์.reward_amount > 0
 
+  // พิกัดที่เจ้าของปักหมุดไว้ (ถ้ามี) — แสดงเป็นแผนที่ในโหมดดู
+  const ดูLat = โพสต์.latitude != null ? Number(โพสต์.latitude) : null
+  const ดูLng = โพสต์.longitude != null ? Number(โพสต์.longitude) : null
+  const มีพิกัด = Number.isFinite(ดูLat) && Number.isFinite(ดูLng)
+
   const [โหมดแก้ไข, setโหมดแก้ไข] = useState(false)
 
   // ฟิลด์ฟอร์มแก้ไข — เติมค่าตอนกด "แก้ไขข้อมูล" ผ่าน เปิดโหมดแก้ไข()
@@ -626,6 +783,8 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
   const [วันที่หาย,  setวันที่หาย]  = useState('')
   const [เบอร์ติดต่อ, setเบอร์ติดต่อ] = useState('')
   const [เงินรางวัล, setเงินรางวัล] = useState('')
+  const [lat,        setLat]        = useState(null)
+  const [lng,        setLng]        = useState(null)
   const [ไฟล์รูป,    setไฟล์รูป]    = useState(null)
   const [พรีวิว,     setพรีวิว]     = useState(null)
   const [กำลังบันทึก, setกำลังบันทึก] = useState(false)
@@ -643,6 +802,8 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
     setวันที่หาย(โพสต์.lost_date || '')
     setเบอร์ติดต่อ(โพสต์.contact_phone || '')
     setเงินรางวัล(โพสต์.reward_amount != null ? String(โพสต์.reward_amount) : '')
+    setLat(โพสต์.latitude != null ? Number(โพสต์.latitude) : null)
+    setLng(โพสต์.longitude != null ? Number(โพสต์.longitude) : null)
     setไฟล์รูป(null)
     setพรีวิว(null)
     setError('')
@@ -699,6 +860,8 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
       lost_date:     วันที่หาย || null,
       contact_phone: เบอร์ติดต่อ.trim(),
       reward_amount: เงินรางวัล ? Number(เงินรางวัล) : null,
+      latitude:      lat,
+      longitude:     lng,
       photo_url,
     }
 
@@ -822,6 +985,10 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
                 <input value={สถานที่หาย} onChange={(e) => setSถานที่หาย(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
               </div>
+
+              {/* ปักหมุดตำแหน่งที่หาย */}
+              <Fieldปักหมุด lat={lat} lng={lng} onChange={function (la, ln) { setLat(la); setLng(ln) }} />
+
               <div>
                 <p className="text-xs font-semibold text-gray-600 mb-1.5">วันที่หาย</p>
                 <input type="date" value={วันที่หาย} onChange={(e) => setวันที่หาย(e.target.value)}
@@ -925,15 +1092,48 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
                 </div>
               )}
 
+              {/* แผนที่ตำแหน่งที่หาย — แสดงเมื่อเจ้าของปักหมุดไว้ */}
+              {มีพิกัด && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                    <MapPin size={14} className="text-rose-400" /> ตำแหน่งที่หายสัตว์ตัวนี้
+                  </p>
+                  <div className="rounded-2xl overflow-hidden border border-gray-100">
+                    <MapContainer
+                      center={[ดูLat, ดูLng]} zoom={16}
+                      scrollWheelZoom={false} dragging={false} doubleClickZoom={false}
+                      zoomControl={false} attributionControl={false}
+                      style={{ height: 150, width: '100%' }}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <Marker position={[ดูLat, ดูLng]} />
+                    </MapContainer>
+                    {โพสต์.lost_location && (
+                      <p className="text-sm text-gray-700 px-3 pt-2.5 pb-1">{โพสต์.lost_location}</p>
+                    )}
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${ดูLat},${ดูLng}`}
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center justify-center gap-1.5 bg-gray-50 text-gray-700 text-xs font-medium py-2.5 mt-1 hover:bg-gray-100 transition-colors">
+                      <ExternalLink size={13} /> เปิดใน Google Maps
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* สถานที่ + วันที่หาย + เบอร์ติดต่อ */}
               <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-2">
-                <div>
-                  <p className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><MapPin size={12} className="shrink-0" /> สถานที่ที่หาย</p>
-                  <p className="text-sm font-semibold text-gray-800">{โพสต์.lost_location || 'ไม่ระบุ'}</p>
-                </div>
+                {!มีพิกัด && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><MapPin size={12} className="shrink-0" /> สถานที่ที่หาย</p>
+                    <p className="text-sm font-semibold text-gray-800">{โพสต์.lost_location || 'ไม่ระบุ'}</p>
+                  </div>
+                )}
                 <p className="text-xs text-gray-400 flex items-center gap-1.5"><Calendar size={12} className="shrink-0" /> หายเมื่อ {วันที่สั้น(โพสต์.lost_date || โพสต์.created_at)}</p>
                 {โพสต์.contact_phone && (
-                  <p className="text-xs text-gray-400 flex items-center gap-1.5"><Phone size={12} className="shrink-0" /> เบอร์ติดต่อกลับ {โพสต์.contact_phone}</p>
+                  <a href={`tel:${โพสต์.contact_phone}`}
+                    className="text-xs text-rose-600 font-medium flex items-center gap-1.5 hover:underline w-fit">
+                    <Phone size={12} className="shrink-0" /> เบอร์ติดต่อกลับ {โพสต์.contact_phone}
+                  </a>
                 )}
               </div>
 
@@ -1007,6 +1207,16 @@ function LostAndFoundPage({ user }) {
       setSัตว์ที่ศูนย์พบ(ผล.found)
       setโพสต์ตามหา(ผล.lost)
       setกำลังโหลด(false)
+
+      // มาจากลิงก์ ?open=<id> (เช่น กดจากแบนเนอร์หน้า Home) → เปิด modal โพสต์นั้นเลย
+      // อ่านจาก window โดยตรง ไม่ผูกเป็น dep ของ effect เพื่อไม่ให้เกิด lint warning ใหม่
+      const openId = new URLSearchParams(window.location.search).get('open')
+      if (openId) {
+        const เจอ = ผล.lost.find(function (p) { return String(p.id) === openId })
+        if (เจอ) { setแท็บ('lost'); setโพสต์ที่ดู(เจอ) }
+        // ล้าง param กันเปิด modal ซ้ำตอน refresh
+        window.history.replaceState(null, '', window.location.pathname)
+      }
     })
     return function () { ยกเลิก = true }
   }, [])
