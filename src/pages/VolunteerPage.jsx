@@ -1623,9 +1623,9 @@ function VolunteerPage({ หน้า }) {
               </div>
             ) : (
               <>
-                {/* แผนที่ */}
+                {/* แผนที่ — isolate: กัก z-index ภายในของ Leaflet (สูงถึง 1000) ไม่ให้ทะลุขึ้นทับ modal */}
                 <div className="px-4">
-                  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 340 }}>
+                  <div className="isolate rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 340 }}>
                     <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
                       <MapController โฟกัส={โฟกัสจุด} />
                       <TileLayer
