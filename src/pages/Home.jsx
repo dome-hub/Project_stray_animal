@@ -8,6 +8,7 @@ import {
   BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen, Phone, Megaphone,
   LogOut,
 } from 'lucide-react'
+import UrgentLostPetsBanner from '../components/UrgentLostPetsBanner'
 
 // โทนสีหลักของแต่ละ role — ผู้ใช้ทั่วไป = ส้ม (อบอุ่น/ขอความช่วยเหลือ), เจ้าหน้าที่ = ทีล (มืออาชีพ/น่าเชื่อถือ), แอดมิน = ม่วง
 const โทนRole = {
@@ -205,6 +206,9 @@ function Home({ user, onLogout }) {
           </button>
         </div>
       </div>
+
+      {/* แถบแจ้งเตือนสัตว์หายด่วน — ซ่อนอัตโนมัติถ้าไม่มีประกาศ */}
+      <UrgentLostPetsBanner />
 
       {/* หัวข้อ */}
       <div className="px-4 pt-6 pb-4">
