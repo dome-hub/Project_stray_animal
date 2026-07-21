@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Siren, MapPin, Calendar, ChevronRight, Gift } from 'lucide-react'
+import { Siren, MapPin, Calendar, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react'
 import { supabase } from '../supabase'
 import AnimalIcon from './AnimalIcon'
 
@@ -31,6 +31,7 @@ async function โหลดสัตว์หายด่วน() {
 function UrgentLostPetsBanner() {
   const navigate = useNavigate()
   const [รายการ, setรายการ] = useState([])
+  const [กางอยู่, setกางอยู่] = useState(true)   // พับ/กาง เนื้อหาแบนเนอร์
 
   useEffect(function () {
     let ยกเลิก = false
@@ -46,13 +47,19 @@ function UrgentLostPetsBanner() {
   return (
     <div className="mt-4">
 
-      {/* หัวข้อกะทัดรัด บอกว่านี่คือประกาศอะไร */}
-      <div className="flex items-center gap-1.5 px-4 mb-1.5">
+      {/* หัวข้อกะทัดรัด — กดพับ/กางได้ทั้งแถบ */}
+      <button onClick={() => setกางอยู่(function (v) { return !v })}
+        className="w-full flex items-center gap-1.5 px-4 mb-1.5">
         <Siren size={14} className="text-orange-500 shrink-0" />
         <p className="text-xs font-bold text-orange-700">ประกาศสัตว์หายใกล้คุณ</p>
         <span className="ml-auto text-[11px] font-semibold text-orange-400">{รายการ.length} รายการ</span>
-      </div>
+        {กางอยู่
+          ? <ChevronUp size={16} className="text-orange-400 shrink-0" />
+          : <ChevronDown size={16} className="text-orange-400 shrink-0" />}
+      </button>
 
+      {/* เนื้อหา — พับเก็บด้วย transition นุ่มๆ */}
+      <div className={`overflow-hidden transition-all duration-300 ${กางอยู่ ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0'}`}>
       {/* Carousel เลื่อนปัดซ้าย-ขวา — ถ้ามีหลายตัว การ์ดถัดไปจะโผล่ให้เห็นเล็กน้อย */}
       <div className="flex gap-2.5 overflow-x-auto pb-1 px-4 snap-x snap-mandatory">
       {รายการ.map(function (p) {
@@ -103,6 +110,7 @@ function UrgentLostPetsBanner() {
           </button>
         )
       })}
+      </div>
       </div>
     </div>
   )
