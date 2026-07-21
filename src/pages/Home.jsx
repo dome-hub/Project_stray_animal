@@ -6,6 +6,7 @@ import { supabase } from '../supabase'
 import {
   Camera, Search, ClipboardList, RefreshCw, PawPrint,
   BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen, Phone, Megaphone,
+  LogOut,
 } from 'lucide-react'
 
 // โทนสีหลักของแต่ละ role — ผู้ใช้ทั่วไป = ส้ม (อบอุ่น/ขอความช่วยเหลือ), เจ้าหน้าที่ = ทีล (มืออาชีพ/น่าเชื่อถือ), แอดมิน = ม่วง
@@ -67,6 +68,9 @@ function Home({ user, onLogout }) {
   const [เมนูหลัก, ...เมนูรอง] = เมนู
   const roleInfo = ข้อมูลRole[role]
   const โทน = โทนRole[role]
+
+  // ยืนยันก่อนออกจากระบบ กันกดพลาด
+  const [แสดงยืนยันออก, setแสดงยืนยันออก] = useState(false)
 
   // ดึง avatar_url ใหม่ทุกครั้งที่กลับมาหน้า Home
   const [avatarUrl, setAvatarUrl] = useState(null)
@@ -196,7 +200,7 @@ function Home({ user, onLogout }) {
             )}
           </button>
 
-          <button onClick={onLogout} className="text-gray-500 text-sm hover:text-red-500">
+          <button onClick={() => setแสดงยืนยันออก(true)} className="text-gray-500 text-sm hover:text-red-500">
             ออก
           </button>
         </div>
@@ -258,6 +262,40 @@ function Home({ user, onLogout }) {
           ))}
         </div>
       </div>
+
+      {/* Modal ยืนยันออกจากระบบ — กันกดพลาด */}
+      {แสดงยืนยันออก && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-6"
+          onClick={() => setแสดงยืนยันออก(false)}
+        >
+          <div
+            className="bg-white w-full max-w-xs rounded-3xl shadow-xl p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4">
+              <LogOut size={22} strokeWidth={1.75} />
+            </div>
+            <h3 className="font-bold text-gray-800 text-base">ออกจากระบบ</h3>
+            <p className="text-gray-500 text-sm mt-1.5">คุณต้องการออกจากระบบใช่หรือไม่?</p>
+
+            <div className="flex items-center gap-3 mt-6">
+              <button
+                onClick={() => setแสดงยืนยันออก(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 active:scale-95 transition-all"
+              >
+                ออกจากระบบ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
