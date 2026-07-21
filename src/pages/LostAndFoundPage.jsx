@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Megaphone, Search, MapPin, Calendar, Loader2, X, Camera,
   PawPrint, Home, HeartCrack, CheckCircle2, Phone, Building2, Info,
-  Eye, Hospital, ExternalLink, Gift,
+  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban,
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
@@ -605,6 +605,379 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
 }
 
 // ================================================================
+// Modal รายละเอียดโพสต์ตามหาสัตว์เลี้ยง — ใช้ทั้งเจ้าของโพสต์และคนอื่นที่กดเข้ามาดู
+// รูปแบบเดียวกับ bottom sheet รายละเอียดรายงานใน TrackReport.jsx: header เดียว
+// มีปุ่มแก้ไข/ลบ (เฉพาะเจ้าของ) สลับเนื้อหาโหมดดู ↔ โหมดแก้ไข ภายใน sheet เดียวกัน
+// ไม่ใช่การเปิด modal ซ้อน modal
+// ================================================================
+function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted }) {
+  const inputรูป = useRef(null)
+  const เป็นเจ้าของ = !!user?.id && โพสต์.owner_id === user.id
+  const มีรางวัล = โพสต์.reward_amount > 0
+
+  const [โหมดแก้ไข, setโหมดแก้ไข] = useState(false)
+
+  // ฟิลด์ฟอร์มแก้ไข — เติมค่าตอนกด "แก้ไขข้อมูล" ผ่าน เปิดโหมดแก้ไข()
+  const [ชื่อสัตว์,   setชื่อสัตว์]   = useState('')
+  const [ชนิด,       setชนิด]       = useState('')
+  const [สายพันธุ์,  setSายพันธุ์]  = useState('')
+  const [ลักษณะ,     setลักษณะ]     = useState('')
+  const [สถานที่หาย, setSถานที่หาย] = useState('')
+  const [วันที่หาย,  setวันที่หาย]  = useState('')
+  const [เบอร์ติดต่อ, setเบอร์ติดต่อ] = useState('')
+  const [เงินรางวัล, setเงินรางวัล] = useState('')
+  const [ไฟล์รูป,    setไฟล์รูป]    = useState(null)
+  const [พรีวิว,     setพรีวิว]     = useState(null)
+  const [กำลังบันทึก, setกำลังบันทึก] = useState(false)
+  const [error,       setError]       = useState('')
+
+  const [แสดงยืนยันลบ, setแสดงยืนยันลบ] = useState(false)
+  const [กำลังลบ,      setกำลังลบ]      = useState(false)
+
+  function เปิดโหมดแก้ไข() {
+    setชื่อสัตว์(โพสต์.pet_name || '')
+    setชนิด(โพสต์.species || '')
+    setSายพันธุ์(โพสต์.breed || '')
+    setลักษณะ(โพสต์.traits || '')
+    setSถานที่หาย(โพสต์.lost_location || '')
+    setวันที่หาย(โพสต์.lost_date || '')
+    setเบอร์ติดต่อ(โพสต์.contact_phone || '')
+    setเงินรางวัล(โพสต์.reward_amount != null ? String(โพสต์.reward_amount) : '')
+    setไฟล์รูป(null)
+    setพรีวิว(null)
+    setError('')
+    setโหมดแก้ไข(true)
+  }
+
+  function ปิดโหมดแก้ไข() {
+    if (พรีวิว) URL.revokeObjectURL(พรีวิว)
+    setไฟล์รูป(null)
+    setพรีวิว(null)
+    setError('')
+    setโหมดแก้ไข(false)
+  }
+
+  async function เลือกรูป(event) {
+    const ไฟล์ = event.target.files[0]
+    event.target.value = ''
+    if (!ไฟล์) return
+    const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
+    if (!ผลตรวจ.ok) { setError(ผลตรวจ.error); return }
+    if (พรีวิว) URL.revokeObjectURL(พรีวิว)
+    setError('')
+    setไฟล์รูป(ไฟล์)
+    setพรีวิว(URL.createObjectURL(ไฟล์))
+  }
+
+  async function บันทึกแก้ไข() {
+    if (กำลังบันทึก) return
+    if (!ชื่อสัตว์.trim())   { setError('กรุณากรอกชื่อสัตว์เลี้ยง'); return }
+    if (!ชนิด)               { setError('กรุณาเลือกประเภทสัตว์'); return }
+    if (!สถานที่หาย.trim())  { setError('กรุณากรอกสถานที่ที่หาย'); return }
+    if (!เบอร์ติดต่อ.trim()) { setError('กรุณากรอกเบอร์ติดต่อกลับ'); return }
+    if (เงินรางวัล && (isNaN(Number(เงินรางวัล)) || Number(เงินรางวัล) < 0)) {
+      setError('กรุณากรอกเงินรางวัลเป็นตัวเลขที่ถูกต้อง'); return
+    }
+    setError('')
+    setกำลังบันทึก(true)
+
+    // ถ้าไม่ได้เลือกรูปใหม่ ให้คงรูปเดิมไว้
+    let photo_url = โพสต์.photo_url || null
+    if (ไฟล์รูป) {
+      const ชื่อไฟล์ = `lost_${Date.now()}_${ไฟล์รูป.name.replace(/\s/g, '_')}`
+      const { data, error: upErr } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์รูป)
+      if (upErr) { setError('อัปโหลดรูปไม่สำเร็จ: ' + upErr.message); setกำลังบันทึก(false); return }
+      photo_url = supabase.storage.from('report-images').getPublicUrl(data.path).data.publicUrl
+    }
+
+    const ข้อมูล = {
+      pet_name:      ชื่อสัตว์.trim(),
+      species:       ชนิด,
+      breed:         สายพันธุ์.trim() || null,
+      traits:        ลักษณะ.trim() || null,
+      lost_location: สถานที่หาย.trim(),
+      lost_date:     วันที่หาย || null,
+      contact_phone: เบอร์ติดต่อ.trim(),
+      reward_amount: เงินรางวัล ? Number(เงินรางวัล) : null,
+      photo_url,
+    }
+
+    const { error: updErr } = await supabase.from('lost_pets').update(ข้อมูล).eq('id', โพสต์.id)
+
+    setกำลังบันทึก(false)
+    if (updErr) { setError('บันทึกไม่สำเร็จ: ' + updErr.message); return }
+
+    setโหมดแก้ไข(false)
+    onSaved({ ...โพสต์, ...ข้อมูล })
+  }
+
+  async function ลบโพสต์() {
+    if (กำลังลบ) return
+    setกำลังลบ(true)
+    const { error: delErr } = await supabase.from('lost_pets').delete().eq('id', โพสต์.id)
+    setกำลังลบ(false)
+    if (delErr) { setError('ลบไม่สำเร็จ: ' + delErr.message); return }
+    setแสดงยืนยันลบ(false)
+    onDeleted(โพสต์.id)
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={onClose}>
+        <div className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
+             onClick={function (e) { e.stopPropagation() }}>
+
+          {/* Handle */}
+          <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+
+          {/* Title + Action menu (แก้ไข/ลบ เฉพาะเจ้าของโพสต์) + ปิด */}
+          <div className="flex items-center justify-between px-5 py-3">
+            <p className="font-bold text-gray-800 truncate pr-2">{โพสต์.pet_name}</p>
+            <div className="flex items-center gap-1 shrink-0">
+              {เป็นเจ้าของ && !โหมดแก้ไข && (
+                <>
+                  <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200">
+                    <Pencil size={18} strokeWidth={2} />
+                  </button>
+                  <button onClick={() => setแสดงยืนยันลบ(true)} title="ลบประกาศ"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-red-300 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors duration-200">
+                    <Trash2 size={18} strokeWidth={2} />
+                  </button>
+                  <div className="w-px h-5 bg-gray-200 mx-1" />
+                </>
+              )}
+              <button onClick={โหมดแก้ไข ? ปิดโหมดแก้ไข : onClose} title={โหมดแก้ไข ? 'ยกเลิกแก้ไข' : 'ปิด'}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors duration-200">
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+
+          {โหมดแก้ไข ? (
+            // ============================================================
+            // โหมดแก้ไข — สลับมาจากโหมดดูรายละเอียด
+            // ============================================================
+            <div className="px-5 pb-8 space-y-4">
+
+              {/* รูปสัตว์ */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">รูปสัตว์เลี้ยง</p>
+                <div className="w-full h-36 rounded-2xl overflow-hidden bg-rose-50 flex items-center justify-center">
+                  {พรีวิว ? (
+                    <img src={พรีวิว} alt="รูปใหม่ (พรีวิว)" className="w-full h-full object-contain" />
+                  ) : โพสต์.photo_url ? (
+                    <img src={โพสต์.photo_url} alt={โพสต์.pet_name} className="w-full h-full object-contain" />
+                  ) : (
+                    <AnimalIcon ชนิด={ชนิด} size={56} className="text-rose-300" />
+                  )}
+                </div>
+                <input ref={inputรูป} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูป} />
+                <button onClick={() => inputรูป.current.click()}
+                  className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-rose-300 rounded-xl py-2.5 text-sm font-medium text-rose-600 bg-rose-50/50">
+                  <Camera size={16} className="shrink-0" /> {พรีวิว || โพสต์.photo_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
+                </button>
+              </div>
+
+              {/* ชื่อสัตว์ */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">ชื่อสัตว์เลี้ยง <span className="text-red-400">*</span></p>
+                <input value={ชื่อสัตว์} onChange={(e) => setชื่อสัตว์(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
+              </div>
+
+              {/* ประเภท */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">ประเภทสัตว์ <span className="text-red-400">*</span></p>
+                <div className="flex gap-2">
+                  {['สุนัข', 'แมว'].map(function (v) {
+                    return (
+                      <button key={v} onClick={() => setชนิด(v)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 flex items-center justify-center gap-1.5 ${
+                          ชนิด === v ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-gray-200 text-gray-600'
+                        }`}>
+                        <AnimalIcon ชนิด={v} size={18} className="shrink-0" /> {v}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* สายพันธุ์ + ลักษณะ */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">สายพันธุ์</p>
+                <input value={สายพันธุ์} onChange={(e) => setSายพันธุ์(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">ลักษณะเด่น</p>
+                <textarea value={ลักษณะ} onChange={(e) => setลักษณะ(e.target.value)}
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400 resize-none" />
+              </div>
+
+              {/* สถานที่ + วันที่ */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">สถานที่ที่หาย <span className="text-red-400">*</span></p>
+                <input value={สถานที่หาย} onChange={(e) => setSถานที่หาย(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">วันที่หาย</p>
+                <input type="date" value={วันที่หาย} onChange={(e) => setวันที่หาย(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-rose-400" />
+              </div>
+
+              {/* เบอร์ติดต่อ */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">เบอร์ติดต่อกลับ <span className="text-red-400">*</span></p>
+                <input type="tel" inputMode="numeric" value={เบอร์ติดต่อ} onChange={(e) => setเบอร์ติดต่อ(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
+              </div>
+
+              {/* เงินรางวัล */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                  <Gift size={14} className="text-amber-500" /> เงินรางวัลสำหรับผู้พบเบาะแส (ถ้ามี)
+                </p>
+                <div className="relative">
+                  <input type="number" min="0" inputMode="numeric" value={เงินรางวัล}
+                    onChange={(e) => setเงินรางวัล(e.target.value)}
+                    placeholder="เช่น 1000"
+                    className="w-full border border-gray-200 rounded-xl pl-4 pr-12 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">บาท</span>
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-red-500 text-xs bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              )}
+
+              {/* ปุ่มบันทึก/ยกเลิกการแก้ไข */}
+              <div className="flex gap-2 pt-1">
+                <button onClick={ปิดโหมดแก้ไข} disabled={กำลังบันทึก}
+                  className="flex-1 border-2 border-gray-200 text-gray-600 rounded-xl py-3 text-sm font-medium disabled:opacity-50">
+                  ยกเลิก
+                </button>
+                <button onClick={บันทึกแก้ไข} disabled={กำลังบันทึก}
+                  className="flex-[2] bg-rose-500 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                  {กำลังบันทึก
+                    ? <><Loader2 size={15} className="animate-spin shrink-0" /> กำลังบันทึก...</>
+                    : <><Save size={15} className="shrink-0" /> บันทึกการแก้ไข</>}
+                </button>
+              </div>
+            </div>
+          ) : (
+            // ============================================================
+            // โหมดดูรายละเอียด
+            // ============================================================
+            <div className="px-5 pb-8 space-y-4">
+
+              {/* รูปสัตว์ */}
+              <div className="w-full h-36 rounded-2xl overflow-hidden bg-rose-50 flex items-center justify-center">
+                {โพสต์.photo_url
+                  ? <img src={โพสต์.photo_url} alt={โพสต์.pet_name} className="w-full h-full object-contain" />
+                  : <AnimalIcon ชนิด={โพสต์.species || โพสต์.breed} size={56} className="text-rose-300" />}
+              </div>
+
+              {/* ชื่อ + สถานะ */}
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-gray-800 text-lg truncate min-w-0">{โพสต์.pet_name}</p>
+                <span className="text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap shrink-0 bg-rose-100 text-rose-700">
+                  สัตว์สูญหาย
+                </span>
+              </div>
+
+              {/* ข้อมูลพื้นฐาน — แยกทุกฟิลด์ให้เห็นชัด ไม่รวมกันเป็นบรรทัดเดียว */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-gray-50 rounded-xl px-3 py-2">
+                  <p className="text-[11px] text-gray-400">ประเภทสัตว์</p>
+                  <p className="text-sm font-medium text-gray-800">{โพสต์.species || 'ไม่ระบุ'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl px-3 py-2">
+                  <p className="text-[11px] text-gray-400">สายพันธุ์</p>
+                  <p className="text-sm font-medium text-gray-800">{โพสต์.breed || 'ไม่ระบุ'}</p>
+                </div>
+              </div>
+
+              {/* เงินรางวัล */}
+              {มีรางวัล && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-2">
+                  <Gift size={16} className="shrink-0 mt-0.5 text-amber-500" />
+                  <p className="text-sm text-amber-700">
+                    เจ้าของเสนอเงินรางวัล <span className="font-bold">฿{Number(โพสต์.reward_amount).toLocaleString('th-TH')}</span> สำหรับผู้ที่ช่วยตามหาจนเจอ
+                  </p>
+                </div>
+              )}
+
+              {/* ลักษณะเด่น */}
+              {โพสต์.traits && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 mb-1">ลักษณะเด่น</p>
+                  <p className="text-sm text-gray-700">{โพสต์.traits}</p>
+                </div>
+              )}
+
+              {/* สถานที่ + วันที่หาย + เบอร์ติดต่อ */}
+              <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-2">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><MapPin size={12} className="shrink-0" /> สถานที่ที่หาย</p>
+                  <p className="text-sm font-semibold text-gray-800">{โพสต์.lost_location || 'ไม่ระบุ'}</p>
+                </div>
+                <p className="text-xs text-gray-400 flex items-center gap-1.5"><Calendar size={12} className="shrink-0" /> หายเมื่อ {วันที่สั้น(โพสต์.lost_date || โพสต์.created_at)}</p>
+                {โพสต์.contact_phone && (
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5"><Phone size={12} className="shrink-0" /> เบอร์ติดต่อกลับ {โพสต์.contact_phone}</p>
+                )}
+              </div>
+
+              {/* ปุ่มติดต่อ — เฉพาะคนอื่นที่ไม่ใช่เจ้าของโพสต์ */}
+              {!เป็นเจ้าของ && (
+                <a href={`tel:${โพสต์.contact_phone}`}
+                  className="w-full bg-rose-500 text-white rounded-2xl py-3.5 font-bold text-base flex items-center justify-center gap-2 active:scale-95 transition-all">
+                  <Phone size={18} className="shrink-0" /> โทรติดต่อเจ้าของ
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal ยืนยันลบ */}
+      {แสดงยืนยันลบ && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-end" onClick={() => setแสดงยืนยันลบ(false)}>
+          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8" onClick={function (e) { e.stopPropagation() }}>
+            <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+
+            <div className="text-center mb-5">
+              <Ban size={40} strokeWidth={1.5} className="text-red-400 mx-auto mb-2" />
+              <h2 className="text-lg font-bold text-gray-800">ลบประกาศนี้?</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                ประกาศตามหา "{โพสต์.pet_name}" จะถูกลบออกจากระบบถาวร และคนอื่นจะไม่เห็นประกาศนี้อีก
+              </p>
+            </div>
+
+            {error && (
+              <p className="text-red-500 text-xs bg-red-50 rounded-lg px-3 py-2 mb-3">{error}</p>
+            )}
+
+            <button onClick={ลบโพสต์} disabled={กำลังลบ}
+              className="w-full bg-red-500 text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2">
+              {กำลังลบ
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> กำลังลบ...</>
+                : <><Trash2 size={18} className="shrink-0" /> ยืนยัน ลบประกาศ</>}
+            </button>
+            <button onClick={() => setแสดงยืนยันลบ(false)} disabled={กำลังลบ}
+              className="w-full mt-2 border-2 border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm disabled:opacity-50">
+              ไม่ ขอคิดดูก่อน
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ================================================================
 // หน้าหลัก
 // ================================================================
 function LostAndFoundPage({ user }) {
@@ -616,6 +989,7 @@ function LostAndFoundPage({ user }) {
   const [กำลังโหลด,      setกำลังโหลด]      = useState(true)
   const [แสดงฟอร์ม,      setแสดงฟอร์ม]      = useState(false)
   const [สัตว์ที่เลือก,   setSัตว์ที่เลือก]   = useState(null)  // การ์ดที่กดในแท็บศูนย์พบ → เปิด modal
+  const [โพสต์ที่ดู,      setโพสต์ที่ดู]      = useState(null)  // การ์ดที่กดในแท็บตามหา → เปิดดูรายละเอียด (แก้ไข/ลบได้ถ้าเป็นเจ้าของ)
   const [toast,           setToast]           = useState('')
 
   // โหลดครั้งแรกตอนเข้าหน้า — ใส่ธงยกเลิกกัน setState หลัง component ถูก unmount ไปแล้ว
@@ -645,6 +1019,21 @@ function LostAndFoundPage({ user }) {
     setToast('โพสต์ประกาศตามหาเรียบร้อยแล้ว')
     setTimeout(() => setToast(''), 3000)
     รีเฟรช()
+  }
+
+  // แก้ไขในโหมด view/edit เดียวกัน — อัปเดตทั้ง list และ modal ที่เปิดอยู่ ไม่ต้อง refetch ใหม่ทั้งหมด
+  function โพสต์แก้ไขสำเร็จ(อัปเดตแล้ว) {
+    setโพสต์ตามหา(function (prev) { return prev.map((p) => (p.id === อัปเดตแล้ว.id ? อัปเดตแล้ว : p)) })
+    setโพสต์ที่ดู(อัปเดตแล้ว)
+    setToast('บันทึกการแก้ไขเรียบร้อยแล้ว')
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  function โพสต์ลบสำเร็จ(id) {
+    setโพสต์ตามหา(function (prev) { return prev.filter((p) => p.id !== id) })
+    setโพสต์ที่ดู(null)
+    setToast('ลบประกาศแล้ว')
+    setTimeout(() => setToast(''), 3000)
   }
 
   const รายการที่แสดง = แท็บ === 'found' ? สัตว์ที่ศูนย์พบ : โพสต์ตามหา
@@ -748,6 +1137,7 @@ function LostAndFoundPage({ user }) {
                 )
               })
             : โพสต์ตามหา.map(function (p) {
+                const เป็นเจ้าของโพสต์ = !!user?.id && p.owner_id === user.id
                 return (
                   <การ์ดประกาศ
                     key={p.id}
@@ -756,12 +1146,12 @@ function LostAndFoundPage({ user }) {
                     ชื่อ={p.pet_name}
                     สถานที่={p.lost_location}
                     วันที่={p.lost_date || p.created_at}
-                    ป้าย="สัตว์สูญหาย"
-                    สีป้าย="bg-rose-500 text-white"
-                    PIcon={Search}
+                    ป้าย={เป็นเจ้าของโพสต์ ? 'ประกาศของคุณ' : 'สัตว์สูญหาย'}
+                    สีป้าย={เป็นเจ้าของโพสต์ ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}
+                    PIcon={เป็นเจ้าของโพสต์ ? Pencil : Search}
                     ข้อมูลรอง={[p.species, p.breed].filter(Boolean).join(' · ')}
                     รางวัล={p.reward_amount}
-                    onClick={() => { if (p.contact_phone) window.location.href = `tel:${p.contact_phone}` }}
+                    onClick={() => setโพสต์ที่ดู(p)}
                   />
                 )
               })}
@@ -776,7 +1166,7 @@ function LostAndFoundPage({ user }) {
         <Megaphone size={18} className="shrink-0" /> แจ้งสัตว์เลี้ยงสูญหาย
       </button>
 
-      {/* Modal ฟอร์ม */}
+      {/* Modal ฟอร์มโพสต์ใหม่ */}
       {แสดงฟอร์ม && (
         <Modalแจ้งสัตว์หาย
           user={user}
@@ -790,6 +1180,17 @@ function LostAndFoundPage({ user }) {
         <FoundPetDetailModal
           สัตว์={สัตว์ที่เลือก}
           onClose={() => setSัตว์ที่เลือก(null)}
+        />
+      )}
+
+      {/* Modal รายละเอียดโพสต์ตามหา — แก้ไข/ลบได้ถ้าเป็นเจ้าของ, ปุ่มโทรถ้าเป็นคนอื่น */}
+      {โพสต์ที่ดู && (
+        <LostPetDetailModal
+          โพสต์={โพสต์ที่ดู}
+          user={user}
+          onClose={() => setโพสต์ที่ดู(null)}
+          onSaved={โพสต์แก้ไขสำเร็จ}
+          onDeleted={โพสต์ลบสำเร็จ}
         />
       )}
     </div>
