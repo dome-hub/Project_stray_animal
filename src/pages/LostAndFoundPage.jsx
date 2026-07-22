@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Megaphone, Search, MapPin, Calendar, Loader2, X, Camera,
   PawPrint, Home, HeartCrack, CheckCircle2, Phone, Building2, Info,
-  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban, LocateFixed,
+  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban, LocateFixed, ArrowLeft
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -1267,7 +1267,10 @@ function LostAndFoundPage({ user }) {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <div>
           <h1 className="font-bold text-gray-800">ประกาศสัตว์หาย / พลัดหลง</h1>
           <p className="text-gray-500 text-xs">ตามหาเจ้าของ และตามหาสัตว์เลี้ยงที่หายไป</p>
@@ -1378,7 +1381,7 @@ function LostAndFoundPage({ user }) {
       {/* ปุ่มลอยแจ้งสัตว์หาย */}
       <button
         onClick={() => setแสดงฟอร์ม(true)}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 bg-rose-500 text-white rounded-full pl-5 pr-6 py-3.5 shadow-lg flex items-center gap-2 font-bold text-sm active:scale-95 transition-all"
+        className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30 bg-rose-500 text-white rounded-full pl-5 pr-6 py-3.5 shadow-lg flex items-center gap-2 font-bold text-sm active:scale-95 transition-all"
       >
         <Megaphone size={18} className="shrink-0" /> แจ้งสัตว์เลี้ยงสูญหาย
       </button>

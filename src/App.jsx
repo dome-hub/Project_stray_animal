@@ -1,9 +1,11 @@
 // App.jsx — ใช้ Supabase Auth จริง
 // ฟัง onAuthStateChange แทนการ mock login
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
+import BottomNav from './components/BottomNav'
+import { แสดงแถบนำทาง, ความสูงแถบนำทาง } from './utils/navVisibility'
 
 import Login            from './pages/Login'
 import SuspendedPage    from './pages/SuspendedPage'
@@ -20,6 +22,19 @@ import ContactPage      from './pages/ContactPage'
 import NotificationPage from './pages/NotificationPage'
 import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
+
+// เว้นที่ว่างด้านล่างเท่าความสูงแถบนำทาง กันเนื้อหาบรรทัดสุดท้ายถูกแถบทับ
+// ต้องแยกเป็น component เพราะ useLocation ใช้ได้เฉพาะข้างใน BrowserRouter
+// (ชื่อขึ้นต้นด้วยตัวอักษรอังกฤษตัวใหญ่ ไม่งั้น ESLint จะไม่ถือว่าเป็น React component แล้วฟ้อง rules-of-hooks)
+function Layoutเนื้อหา({ user, children }) {
+  const location = useLocation()
+  const มีแถบ = แสดงแถบนำทาง(user, location.pathname)
+  return (
+    <div style={{ paddingBottom: มีแถบ ? `calc(${ความสูงแถบนำทาง}px + env(safe-area-inset-bottom))` : 0 }}>
+      {children}
+    </div>
+  )
+}
 
 function App() {
   const [user, setUser]           = useState(null)
@@ -170,6 +185,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Layoutเนื้อหา user={user}>
       <Routes>
 
         {/* หน้า Login — ไม่ส่ง onLogin แล้ว Supabase Auth จัดการเอง */}
@@ -205,6 +221,10 @@ function App() {
         <Route path="/admin/settings"  element={ต้องLogin(<AdminPage หน้า="settings"  user={user} />)} />
 
       </Routes>
+      </Layoutเนื้อหา>
+
+      {/* แถบนำทางล่าง — ซ่อนเองเมื่ออยู่หน้า login / ฝั่ง admin */}
+      <BottomNav user={user} />
     </BrowserRouter>
   )
 }

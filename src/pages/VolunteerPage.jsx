@@ -12,7 +12,7 @@ import {
   PawPrint, HelpCircle, HardHat, PartyPopper, ClipboardList, MapPin,
   AlertTriangle, Settings, Search, FileText, Map, MessageSquare, User, Trash2,
   Phone, Loader2, CheckCircle2, XCircle, Save, Zap, Link2, Lock, Megaphone, Home,
-  Hourglass, Heart, ExternalLink,
+  Hourglass, Heart, ExternalLink, ArrowLeft, ChevronRight, Check, Calendar
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -378,14 +378,14 @@ function ProgressBar({ status }) {
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                 done
                   ? current
-                    ? 'bg-orange-500 text-white ring-2 ring-orange-300'
+                    ? 'bg-teal-600 text-white ring-2 ring-teal-200'
                     : 'bg-green-500 text-white'
                   : 'bg-gray-200 text-gray-400'
               }`}>
-                {done && !current ? '✓' : idx + 1}
+                {done && !current ? <Check size={14} strokeWidth={3} /> : idx + 1}
               </div>
               <p className={`text-center mt-1 leading-tight ${
-                done ? (current ? 'text-orange-600' : 'text-green-600') : 'text-gray-400'
+                done ? (current ? 'text-teal-700' : 'text-green-600') : 'text-gray-400'
               }`} style={{ fontSize: '8px', maxWidth: 44 }}>
                 {ขั้น}
               </p>
@@ -404,10 +404,10 @@ function ProgressBar({ status }) {
 function AnimalThumb({ imageUrl, type, size = 'md' }) {
   const dim = size === 'lg' ? 'w-full h-52' : 'w-16 h-16 shrink-0'
   return (
-    <div className={`${dim} rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center`}>
+    <div className={`${dim} rounded-xl overflow-hidden bg-teal-50 flex items-center justify-center`}>
       {imageUrl
         ? <img src={imageUrl} alt="สัตว์" className="w-full h-full object-cover" />
-        : <AnimalIcon ชนิด={type} size={size === 'lg' ? 64 : 28} className="text-orange-300" />
+        : <AnimalIcon ชนิด={type} size={size === 'lg' ? 64 : 28} className="text-teal-300" />
       }
     </div>
   )
@@ -1030,7 +1030,10 @@ function VolunteerPage({ หน้า }) {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <div>
           <h1 className="font-bold text-gray-800">{titleMap[หน้า]}</h1>
           <p className="text-xs text-teal-600 flex items-center gap-1"><HardHat size={12} className="shrink-0" /> เจ้าหน้าที่ / อาสาสมัคร</p>
@@ -1076,7 +1079,8 @@ function VolunteerPage({ หน้า }) {
                       active ? p.activeChip : 'border-gray-200 bg-white text-gray-600'
                     }`}
                   >
-                    {p.emoji} {p.short} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
+                    {!active && <span className={`w-2 h-2 rounded-full shrink-0 ${p.dot}`} />}
+                    {p.short} <span className={active ? 'text-white/80' : 'text-gray-400'}>({p.count})</span>
                   </button>
                 )
               })}
@@ -1086,7 +1090,7 @@ function VolunteerPage({ หน้า }) {
           {/* Loading */}
           {โหลดรายงาน && (
             <div className="text-center py-12">
-              <div className="w-8 h-8 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-400">กำลังโหลด...</p>
             </div>
           )}
@@ -1123,7 +1127,7 @@ function VolunteerPage({ หน้า }) {
                             <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
                             <div className="flex-1 min-w-0">
                               <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
-                                {ประเภท.emoji} {ประเภท.short}
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภท.dot}`} /> {ประเภท.short}
                               </span>
                               <div className="flex items-start justify-between gap-2 mb-0.5">
                                 {รอสายพันธุ์ ? (
@@ -1144,11 +1148,11 @@ function VolunteerPage({ หน้า }) {
                                   href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
                                   target="_blank" rel="noreferrer"
                                   onClick={function (e) { e.stopPropagation() }}
-                                  className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                                  className="inline-flex items-center gap-1 text-xs text-teal-700 font-semibold max-w-full"
                                 >
                                   <MapPin size={13} className="shrink-0" />
                                   <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
-                                  <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-0.5">Maps <ExternalLink size={9} className="shrink-0" /></span>
+                                  <span className="shrink-0 bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-0.5">Maps <ExternalLink size={9} className="shrink-0" /></span>
                                 </a>
                               ) : (
                                 <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {ร.location_text || '-'}</p>
@@ -1170,7 +1174,7 @@ function VolunteerPage({ หน้า }) {
                                 </button>
                               )}
                             </div>
-                            <span className="text-gray-300 text-xl shrink-0">›</span>
+                            <ChevronRight size={20} className="text-gray-300 shrink-0" />
                           </div>
                         </div>
                       )
@@ -1268,11 +1272,11 @@ function VolunteerPage({ หน้า }) {
                             href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
                             target="_blank" rel="noreferrer"
                             onClick={function (e) { e.stopPropagation() }}
-                            className="inline-flex items-center gap-1 text-xs text-green-600 font-semibold max-w-full"
+                            className="inline-flex items-center gap-1 text-xs text-teal-700 font-semibold max-w-full"
                           >
                             <MapPin size={13} className="shrink-0" />
                             <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
-                            <span className="shrink-0 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-0.5">Maps <ExternalLink size={9} className="shrink-0" /></span>
+                            <span className="shrink-0 bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-0.5">Maps <ExternalLink size={9} className="shrink-0" /></span>
                           </a>
                         ) : (
                           <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {ร.location_text}</p>
@@ -1283,7 +1287,7 @@ function VolunteerPage({ หน้า }) {
                           {ร.status}
                         </span>
                       </div>
-                      <span className="text-gray-300 text-xl shrink-0">›</span>
+                      <ChevronRight size={20} className="text-gray-300 shrink-0" />
                     </div>
                   </div>
                 )
@@ -1302,7 +1306,7 @@ function VolunteerPage({ หน้า }) {
 
           {/* FAB — เพิ่มสัตว์ใหม่ */}
           <button onClick={() => setแสดงฟอร์มเพิ่ม(!แสดงฟอร์มเพิ่ม)}
-            className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-all"
+            className="fixed bottom-20 right-5 z-30 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-all"
             title={แสดงฟอร์มเพิ่ม ? 'ปิดฟอร์ม' : 'เพิ่มสัตว์ใหม่'}
           >
             {แสดงฟอร์มเพิ่ม ? <X size={24} /> : <Plus size={24} />}
@@ -1446,7 +1450,7 @@ function VolunteerPage({ หน้า }) {
                               <p className="font-bold text-gray-800 text-sm truncate">{แสดงชื่อสัตว์(สัตว์)}</p>
                               {ประเภทแจ้ง ? (
                                 <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${ประเภทแจ้ง.badge}`}>
-                                  {ประเภทแจ้ง.emoji} {ประเภทแจ้ง.short}
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภทแจ้ง.dot}`} /> {ประเภทแจ้ง.short}
                                 </span>
                               ) : สัตว์.report_id ? (
                                 <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 inline-flex items-center gap-1"><ClipboardList size={10} className="shrink-0" /> จากรายงาน</span>
@@ -1466,7 +1470,7 @@ function VolunteerPage({ หน้า }) {
                             <p className="text-xs text-gray-500 mt-1 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {สัตว์.location || 'รอระบุ'}</p>
 
                             {/* Row 4: วันที่รับเข้า */}
-                            <p className="text-xs text-gray-500 mt-0.5">📅 รับเข้า {วันที่รับเข้า(สัตว์.created_at)}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar size={12} className="shrink-0" /> รับเข้า {วันที่รับเข้า(สัตว์.created_at)}</p>
 
                             {/* Row 5: ป้ายสถานะ + สถานะเผยแพร่ */}
                             <div className="flex items-center gap-1 mt-1.5 flex-wrap">
@@ -1493,7 +1497,7 @@ function VolunteerPage({ หน้า }) {
                               })()}
                             </div>
                           </div>
-                          <span className="text-gray-300 text-xl shrink-0 self-center">›</span>
+                          <ChevronRight size={20} className="text-gray-300 shrink-0 self-center" />
                         </div>
                       </button>
                     )
@@ -1512,10 +1516,12 @@ function VolunteerPage({ หน้า }) {
         <div className="px-4 pt-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             {[
-              { ชื่อ: 'รายงานทั้งหมด',  ค่า: สถิติ.รายงาน,       Icon: ClipboardList, bg: 'bg-orange-50', text: 'text-orange-600' },
-              { ชื่อ: 'รอดำเนินการ',    ค่า: สถิติ.รอดำเนินการ,  Icon: Hourglass,     bg: 'bg-yellow-50', text: 'text-yellow-600' },
-              { ชื่อ: 'สัตว์ในดูแล',    ค่า: สถิติ.สัตว์,         Icon: PawPrint,      bg: 'bg-green-50',  text: 'text-green-600' },
-              { ชื่อ: 'รับเลี้ยงแล้ว',   ค่า: สถิติ.รับเลี้ยงแล้ว, Icon: Heart,         bg: 'bg-red-50',   text: 'text-red-600' },
+              // ใช้โทน teal/เทาเท่านั้น — แดง/ส้ม/เหลือง สงวนไว้สื่อ "ความเร่งด่วนของการแจ้ง" อย่างเดียว
+              // (ดู ประเภทแจ้งเรียง) ถ้าเอามาใช้กับตัวเลขสถิติด้วย จะอ่านผิดว่าตัวเลขไหนเร่งด่วน
+              { ชื่อ: 'รายงานทั้งหมด',  ค่า: สถิติ.รายงาน,       Icon: ClipboardList, bg: 'bg-teal-50',   text: 'text-teal-700' },
+              { ชื่อ: 'รอดำเนินการ',    ค่า: สถิติ.รอดำเนินการ,  Icon: Hourglass,     bg: 'bg-slate-100', text: 'text-slate-600' },
+              { ชื่อ: 'สัตว์ในดูแล',    ค่า: สถิติ.สัตว์,         Icon: PawPrint,      bg: 'bg-teal-50',   text: 'text-teal-700' },
+              { ชื่อ: 'รับเลี้ยงแล้ว',   ค่า: สถิติ.รับเลี้ยงแล้ว, Icon: Heart,         bg: 'bg-slate-100', text: 'text-slate-600' },
             ].map(function (stat) {
               return (
                 <div key={stat.ชื่อ} className={`rounded-2xl p-4 shadow-sm ${stat.bg}`}>
@@ -1554,7 +1560,9 @@ function VolunteerPage({ หน้า }) {
             </div>
             {(วันที่เริ่ม || วันที่สิ้นสุด) && (
               <button onClick={() => { setวันที่เริ่ม(''); setวันที่สิ้นสุด('') }}
-                className="text-xs text-teal-600 font-medium">✕ ล้างช่วงวันที่ (ดึงข้อมูลทั้งหมด)</button>
+                className="inline-flex items-center gap-1.5 text-xs text-teal-600 font-medium py-2 px-3 -ml-3 rounded-lg hover:bg-teal-50 transition-colors">
+                <X size={13} className="shrink-0" /> ล้างช่วงวันที่ (ดึงข้อมูลทั้งหมด)
+              </button>
             )}
           </div>
 
@@ -1713,7 +1721,10 @@ function VolunteerPage({ หน้า }) {
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
             <div className="flex items-center justify-between px-5 py-3">
               <p className="font-bold text-gray-800">รายงาน #{String(รายงานที่เปิด.id).padStart(6, '0')}</p>
-              <button onClick={ปิดรายละเอียด} className="text-gray-400 text-2xl leading-none">✕</button>
+              <button onClick={ปิดรายละเอียด} aria-label="ปิด"
+                className="w-10 h-10 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="px-5 pb-8 space-y-4">
@@ -1744,7 +1755,7 @@ function VolunteerPage({ หน้า }) {
                     <a
                       href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
                       target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                      className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-teal-600 px-3 py-1.5 rounded-full font-medium"
                     >
                       <Map size={14} className="shrink-0" /> เปิดใน Google Maps →
                     </a>
@@ -1820,14 +1831,14 @@ function VolunteerPage({ หน้า }) {
               {/* ปุ่มหลัก */}
               {รายงานที่เปิด.status === 'รอดำเนินการ' ? (
                 <button onClick={รับเรื่อง} disabled={กำลังรับเรื่อง}
-                  className="w-full bg-orange-500 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-60 active:scale-95 transition-all">
+                  className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-2">
                   {กำลังรับเรื่อง ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังรับเรื่อง...</> : <><CheckCircle2 size={16} className="shrink-0" /> รับเรื่อง (แจ้งเตือนผู้แจ้งอัตโนมัติ)</>}
                 </button>
               ) : (
                 <div className="bg-gray-50 rounded-2xl p-4 text-center">
                   <p className="text-sm text-gray-500 mb-2">รับเรื่องแล้ว — ไปอัปเดตความคืบหน้า</p>
                   <button onClick={function () { ปิดรายละเอียด(); navigate('/volunteer/update') }}
-                    className="text-orange-600 font-semibold text-sm underline">
+                    className="text-teal-700 font-semibold text-sm underline">
                     → ไปหน้าอัปเดตสถานะ
                   </button>
                 </div>
@@ -1847,7 +1858,10 @@ function VolunteerPage({ หน้า }) {
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
             <div className="flex items-center justify-between px-5 py-3">
               <p className="font-bold text-gray-800">อัปเดต #{String(รายงานที่เปิด.id).padStart(6, '0')}</p>
-              <button onClick={ปิดรายละเอียด} className="text-gray-400 text-2xl leading-none">✕</button>
+              <button onClick={ปิดรายละเอียด} aria-label="ปิด"
+                className="w-10 h-10 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="px-5 pb-8 space-y-4">
@@ -1862,7 +1876,7 @@ function VolunteerPage({ หน้า }) {
                     <a
                       href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
                       target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-white bg-teal-600 px-3 py-1.5 rounded-full font-medium"
                     >
                       <Map size={13} className="shrink-0" /> Google Maps →
                     </a>
@@ -1898,7 +1912,7 @@ function VolunteerPage({ หน้า }) {
                     </div>
                     {ข้อมูลผู้แจ้ง.phone && (
                       <a href={`tel:${ข้อมูลผู้แจ้ง.phone}`}
-                         className="bg-blue-500 text-white text-xs px-3 py-2 rounded-xl font-semibold shrink-0">
+                         className="bg-blue-500 text-white text-xs px-3 py-2 rounded-xl font-semibold shrink-0 flex items-center gap-1.5">
                         <Phone size={13} className="shrink-0" /> {ข้อมูลผู้แจ้ง.phone}
                       </a>
                     )}
@@ -1936,7 +1950,7 @@ function VolunteerPage({ หน้า }) {
                         ? <CircleDot size={16} className="shrink-0 text-teal-500" />
                         : <Circle size={16} className="shrink-0 text-gray-300" />}
                       <span className="flex-1">{opt.label}</span>
-                      {isCurrent && <span className="text-xs">← ปัจจุบัน</span>}
+                      {isCurrent && <span className="text-[11px] font-semibold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full shrink-0">ปัจจุบัน</span>}
                       {opt.value === 'อยู่ศูนย์พักพิง' && !isCurrent && !isSelected && (
                         <span className="text-xs text-teal-500">→ เพิ่มเข้าจัดการสัตว์</span>
                       )}
@@ -1993,7 +2007,7 @@ function VolunteerPage({ หน้า }) {
 
               {/* ปุ่มบันทึก */}
               <button onClick={บันทึกการอัปเดต} disabled={!สถานะใหม่ || กำลังบันทึก}
-                className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all">
+                className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2">
                 {กำลังบันทึก ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังบันทึก...</> : <><Save size={16} className="shrink-0" /> บันทึกการอัปเดต</>}
               </button>
 
@@ -2031,7 +2045,10 @@ function VolunteerPage({ หน้า }) {
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
               <div className="flex items-center justify-between px-5 py-3">
                 <p className="font-bold text-gray-800 flex items-center gap-2"><Link2 size={18} className="shrink-0" /> รวมเคสซ้ำซ้อน</p>
-                <button onClick={ปิดรวมเคส} className="text-gray-400 text-2xl leading-none">✕</button>
+                <button onClick={ปิดรวมเคส} aria-label="ปิด"
+                  className="w-10 h-10 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  <X size={20} />
+                </button>
               </div>
 
               <div className="px-5 pb-8 space-y-4">
@@ -2084,7 +2101,7 @@ function VolunteerPage({ หน้า }) {
                                 {r.ระยะ != null && <span className="text-teal-600 font-medium"> · ห่าง {Math.round(r.ระยะ)} ม.</span>}
                               </p>
                             </div>
-                            {เลือกอยู่ && <span className="text-teal-600 text-lg shrink-0">✓</span>}
+                            {เลือกอยู่ && <Check size={18} className="text-teal-600 shrink-0" />}
                           </button>
                         )
                       })}
@@ -2099,7 +2116,7 @@ function VolunteerPage({ หน้า }) {
                 <button
                   onClick={รวมเคสซ้ำซ้อน}
                   disabled={!เคสหลักที่เลือก || กำลังรวมเคส}
-                  className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all"
+                  className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   {กำลังรวมเคส ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังรวมเคส...</> : <><Link2 size={16} className="shrink-0" /> ยืนยันรวมเคส</>}
                 </button>
@@ -2123,7 +2140,10 @@ function VolunteerPage({ หน้า }) {
             <div className="max-w-4xl mx-auto w-full">
               <div className="flex items-center justify-between px-5 md:px-6 py-3">
                 <p className="font-bold text-gray-800">แก้ไขข้อมูลสัตว์</p>
-                <button onClick={ปิดแก้ไขสัตว์} className="text-gray-400 text-2xl leading-none">✕</button>
+                <button onClick={ปิดแก้ไขสัตว์} aria-label="ปิด"
+                  className="w-10 h-10 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  <X size={20} />
+                </button>
               </div>
 
               <div className="px-5 md:px-6 pb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2165,8 +2185,10 @@ function VolunteerPage({ หน้า }) {
                                 <button type="button" onClick={() => ตั้งเป็นรูปหลัก(url)} title="ตั้งเป็นรูปหลัก"
                                   className="absolute bottom-0.5 left-0.5 bg-white/90 text-teal-600 rounded-md w-5 h-5 flex items-center justify-center shadow-sm"><Star size={11} className="fill-teal-600" /></button>
                               )}
-                              <button type="button" onClick={() => ลบรูปสัตว์(url)} title="ลบรูปนี้"
-                                className="absolute top-0.5 right-0.5 bg-black/55 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none">✕</button>
+                              <button type="button" onClick={() => ลบรูปสัตว์(url)} title="ลบรูปนี้" aria-label="ลบรูปนี้"
+                                className="absolute top-0.5 right-0.5 bg-black/55 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                                <X size={12} />
+                              </button>
                             </div>
                           )
                         })}
@@ -2188,7 +2210,7 @@ function VolunteerPage({ หน้า }) {
               </div>
 
               {สัตว์ที่แก้ไข.report_id && (
-                <div className="md:col-span-2 bg-orange-50 rounded-xl px-4 py-2.5 text-xs text-orange-600 font-medium">
+                <div className="md:col-span-2 bg-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-600 font-medium">
                   <span className="inline-flex items-center gap-1.5"><ClipboardList size={12} className="shrink-0" /> มาจากรายงาน #{String(สัตว์ที่แก้ไข.report_id).padStart(6, '0')}</span>
                 </div>
               )}
@@ -2215,7 +2237,7 @@ function VolunteerPage({ หน้า }) {
                               <a
                                 href={`https://www.google.com/maps?q=${ข้อมูลรายงานสัตว์.latitude},${ข้อมูลรายงานสัตว์.longitude}`}
                                 target="_blank" rel="noreferrer"
-                                className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-green-500 px-3 py-1.5 rounded-full font-medium"
+                                className="inline-flex items-center gap-1 mt-2 text-xs text-white bg-teal-600 px-3 py-1.5 rounded-full font-medium"
                               >
                                 <Map size={14} className="shrink-0" /> เปิดใน Google Maps →
                               </a>

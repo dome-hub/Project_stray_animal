@@ -1,13 +1,18 @@
 // FindPet.jsx — หน้าค้นหาสัตว์เลี้ยง
 // แสดงเฉพาะสัตว์ที่เจ้าหน้าที่เลือกโหมดประกาศ "หาบ้านใหม่" (publish_mode = 'adoption')
-// "และ" สถานะเป็น "รอการรับเลี้ยง" เท่านั้น — กันสัตว์ที่รับเลี้ยงแล้ว/ยังไม่พร้อม หลุดมาโชว์ (double-check)
+// ไม่ผูกกับ status เพราะ status บอกแค่ว่าน้องอยู่ไหน (ศูนย์พักพิง/รักษา) ส่วนจะประกาศอะไรอยู่ที่ publish_mode
+// แต่กันไว้อีกชั้น: สัตว์ที่ออกจากความดูแลไปแล้วต้องไม่หลุดมาโชว์ ถึงข้อมูลเก่าจะยังค้าง publish_mode ไว้
 // ตัวกรองเป็นการกรองข้อมูลจริงจากฟิลด์ที่เจ้าหน้าที่กรอกไว้ ไม่ใช่คะแนนสุ่ม
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, PawPrint, MapPin } from 'lucide-react'
+import { Search, PawPrint, MapPin, ArrowLeft } from 'lucide-react'
 import { supabase } from '../supabase'   // นำเข้า supabase client
 import AnimalIcon from '../components/AnimalIcon'
+
+// สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว — ต้องไม่โผล่ในหน้าหาบ้านไม่ว่ากรณีใด
+// (ตรงกับ สถานะสัตว์ออกไปแล้ว ใน VolunteerPage ที่บังคับ publish_mode = 'none' ให้อยู่แล้ว)
+const สถานะออกไปแล้ว = ['มีผู้รับเลี้ยง', 'ส่งคืนเจ้าของสำเร็จ']
 
 // ช่วงอายุที่เจ้าหน้าที่เลือกได้ตอนกรอกข้อมูลสัตว์ (VolunteerPage) — ใช้ map เป็นกลุ่ม "เด็ก/โต" ตอนกรอง
 const อายุกลุ่มเด็ก = ['น้อยกว่า 1 ปี', '1–2 ปี']
@@ -46,6 +51,7 @@ function FindPet() {
         .from('animals')
         .select('*')
         .eq('publish_mode', 'adoption')
+        .not('status', 'in', `(${สถานะออกไปแล้ว.map(function (s) { return `"${s}"` }).join(',')})`)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -117,7 +123,10 @@ function FindPet() {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <div>
           <h1 className="font-bold text-gray-800">ค้นหาสัตว์เลี้ยง</h1>
           <p className="text-gray-500 text-xs">ค้นหาเพื่อนที่เหมาะกับคุณ</p>

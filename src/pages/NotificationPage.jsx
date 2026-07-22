@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Siren, HardHat, Car, Home, CheckCircle2, ClipboardList, Bell, User, Shield,
-  Clock, Trash2,
+  Clock, Trash2, ArrowLeft
 } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -348,7 +348,10 @@ function NotificationPage({ user }) {
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+          <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
           <div>
             <h1 className="font-bold text-gray-800">{หัวข้อตามRole[role]}</h1>
             {ยังไม่อ่าน > 0 && (

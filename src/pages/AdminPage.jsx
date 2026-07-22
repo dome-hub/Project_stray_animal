@@ -12,7 +12,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
   Shield, Users, FileText, PawPrint, Heart, User, HardHat, MapPin, Map,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
-  CheckCircle2, Home, Lock,
+  CheckCircle2, Home, Lock, ArrowLeft
 } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -260,7 +260,10 @@ function AdminPage({ หน้า, user }) {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <div>
           <h1 className="font-bold text-gray-800">{titleMap[หน้า]}</h1>
           <p className="text-xs text-purple-600 flex items-center gap-1"><Shield size={12} className="shrink-0" /> ผู้ดูแลระบบ</p>

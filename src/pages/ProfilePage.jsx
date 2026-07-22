@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Trash2, ShieldAlert, X, Shield, HardHat, User, Camera, Home, Save, Loader2,
-  ClipboardList, PawPrint, CheckCircle2, MapPin, Users, FileText, Heart,
+  ClipboardList, PawPrint, CheckCircle2, MapPin, Users, FileText, Heart, ArrowLeft
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
@@ -295,7 +295,10 @@ function ProfilePage({ user }) {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <h1 className="font-bold text-gray-800">โปรไฟล์ของฉัน</h1>
       </div>
 

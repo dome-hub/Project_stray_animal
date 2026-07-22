@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Pencil, Trash2, X, ClipboardList, Clock, FolderClosed, MapPin,
   MessageSquare, FileText, Camera, Save, Ban, HardHat, User, Home,
-  Map, Phone, CheckCircle2, Hourglass,
+  Map, Phone, CheckCircle2, Hourglass, ArrowLeft, ChevronRight, Check
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
@@ -20,7 +20,7 @@ const สีสถานะTR = {
   'เข้าควบคุมแล้ว':      'text-indigo-600 bg-indigo-50',
   'ส่งรักษาสถานพยาบาล':  'text-indigo-600 bg-indigo-50',
   'ประกาศตามหาเจ้าของ':  'text-indigo-600 bg-indigo-50',
-  'อยู่ศูนย์พักพิง':      'text-purple-600 bg-purple-50',
+  'อยู่ศูนย์พักพิง':      'text-blue-600 bg-blue-50',
   'ส่งคืนเจ้าของสำเร็จ':  'text-green-600 bg-green-50',
   'ปล่อยกลับถิ่นเดิม':    'text-green-600 bg-green-50',
   'มีผู้รับเลี้ยง':       'text-green-600 bg-green-50',
@@ -155,7 +155,7 @@ function TimelineStepper({ reportType, currentStatus, size = 'sm' }) {
               <div className={`${dot} rounded-full flex items-center justify-center text-xs font-bold ${
                 done ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
               }`}>
-                {done ? '✓' : (size === 'lg' ? step : '')}
+                {done ? <Check size={size === 'lg' ? 14 : 11} strokeWidth={3} /> : (size === 'lg' ? step : '')}
               </div>
               <p className={`text-center mt-1 leading-tight ${done ? 'text-green-600' : 'text-gray-400'}`}
                 style={{ fontSize: '9px', maxWidth: maxW }}>
@@ -186,11 +186,11 @@ function TabsNav({ active, onChange, countInProgress, countHistory }) {
           return (
             <button key={tab.key} onClick={() => onChange(tab.key)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-                isActive ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500'
+                isActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'
               }`}
             >
               {tab.label}
-              <span className={`text-xs font-bold ${isActive ? 'text-purple-500' : 'text-gray-400'}`}>
+              <span className={`text-xs font-bold ${isActive ? 'text-indigo-500' : 'text-gray-400'}`}>
                 ({tab.count})
               </span>
             </button>
@@ -375,15 +375,15 @@ function TrackReport({ user }) {
   // ---- Loading ----
   if (กำลังโหลด) {
     return (
-      <div className="min-h-screen bg-purple-50 flex flex-col items-center justify-center">
-        <div className="w-10 h-10 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mb-3" />
+      <div className="min-h-screen bg-indigo-50 flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-gray-500 text-sm">กำลังโหลดรายงาน...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-purple-50 pb-8">
+    <div className="min-h-screen bg-indigo-50 pb-8">
 
       {/* Toast */}
       {ข้อความสำเร็จ && (
@@ -394,7 +394,10 @@ function TrackReport({ user }) {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <div>
           <h1 className="font-bold text-gray-800">ติดตามรายงาน</h1>
           <p className="text-gray-500 text-xs">ตรวจสอบสถานะการช่วยเหลือสัตว์</p>
@@ -481,7 +484,9 @@ function TrackReport({ user }) {
                             {รายงาน.status}
                           </span>
                           {รับเรื่องแล้ว && (
-                            <span className="text-[10px] text-purple-500 font-medium whitespace-nowrap">กดดูข้อมูลเจ้าหน้าที่ ›</span>
+                            <span className="text-[10px] text-indigo-500 font-medium whitespace-nowrap inline-flex items-center gap-0.5">
+                              กดดูข้อมูลเจ้าหน้าที่ <ChevronRight size={11} className="shrink-0" />
+                            </span>
                           )}
                         </div>
                       </div>

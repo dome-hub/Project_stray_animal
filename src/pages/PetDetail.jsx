@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Syringe, Scissors, PawPrint, FileText, Home, MapPin, Map,
-  Phone, User, CheckCircle2, XCircle, HelpCircle, ClipboardList,
+  Phone, User, CheckCircle2, XCircle, HelpCircle, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import AnimalIcon from '../components/AnimalIcon'
@@ -44,9 +44,13 @@ function ImageCarousel({ รูป, ชนิด, ชื่อ }) {
         <>
           {/* ปุ่มลูกศร ซ้าย/ขวา */}
           <button onClick={() => เลื่อน(-1)} aria-label="รูปก่อนหน้า"
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 text-white text-xl flex items-center justify-center active:bg-black/60">‹</button>
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center active:bg-black/60">
+            <ChevronLeft size={20} />
+          </button>
           <button onClick={() => เลื่อน(1)} aria-label="รูปถัดไป"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 text-white text-xl flex items-center justify-center active:bg-black/60">›</button>
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center active:bg-black/60">
+            <ChevronRight size={20} />
+          </button>
 
           {/* ตัวนับรูป มุมขวาบน */}
           <span className="absolute top-2 right-2 bg-black/50 text-white text-xs font-medium px-2 py-0.5 rounded-full">
@@ -110,7 +114,10 @@ function PetDetail() {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate(-1)} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <h1 className="font-bold text-gray-800">ข้อมูลสัตว์</h1>
       </div>
 

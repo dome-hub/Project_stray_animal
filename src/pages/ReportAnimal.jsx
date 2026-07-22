@@ -7,7 +7,7 @@ import {
   Footprints, HeartPulse, ShieldAlert, Circle, CircleDot,
   MapPin, LocateFixed, Loader2, Map, X,
   CheckCircle2, XCircle, Smartphone, AlertTriangle,
-  PawPrint, Clock, Bot,
+  PawPrint, Clock, Bot, ArrowLeft
 } from 'lucide-react'
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -604,8 +604,8 @@ function ReportAnimal({ user }) {
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 bg-black/60">
-            <button onClick={ปิดกล้อง} className="text-white text-sm px-3 py-1 bg-white/20 rounded-full">
-              ✕ ยกเลิก
+            <button onClick={ปิดกล้อง} className="inline-flex items-center gap-1.5 text-white text-sm px-3 py-2 bg-white/20 rounded-full">
+              <X size={14} className="shrink-0" /> ยกเลิก
             </button>
             <p className="text-white font-medium text-sm">📷 ถ่ายรูปสัตว์</p>
             <div className="w-16" />
@@ -673,8 +673,9 @@ function ReportAnimal({ user }) {
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
               <button
                 onClick={() => setแสดงModalโทรศัพท์(false)}
-                className="w-7 h-7 flex items-center justify-center text-gray-400 text-lg"
-              >✕</button>
+                aria-label="ปิด"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              ><X size={20} /></button>
             </div>
 
             {/* icon + หัวข้อ */}
@@ -794,7 +795,10 @@ function ReportAnimal({ user }) {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
-        <button onClick={() => navigate('/home')} className="text-gray-700 text-xl">←</button>
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
         <div>
           <h1 className="font-bold text-gray-800">แจ้งพบสัตว์จร</h1>
           <p className="text-gray-500 text-xs">ถ่ายภาพและให้ AI วิเคราะห์ข้อมูล</p>
