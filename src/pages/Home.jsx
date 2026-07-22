@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import {
   Camera, Search, ClipboardList, RefreshCw, PawPrint,
-  BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Dog, Check, BookOpen, Phone, Megaphone,
+  BarChart3, Users, Map, FolderDown, Settings, User, HardHat, Shield, Bell, Check, BookOpen, Phone, Megaphone,
   LogOut,
 } from 'lucide-react'
 import UrgentLostPetsBanner from '../components/UrgentLostPetsBanner'
@@ -153,8 +153,8 @@ function Home({ user, onLogout }) {
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-full ${โทน.กล่อง} flex items-center justify-center ${โทน.สี}`}>
-            <Dog size={22} strokeWidth={2} />
+          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-white ring-1 ring-black/5">
+            <img src="/logo.png" alt="แจ้งจร" className="w-full h-full object-cover" />
           </div>
           <div>
             <p className="font-bold text-gray-800 text-sm">แจ้งจร</p>

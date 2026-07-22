@@ -3,7 +3,7 @@
 // role มาจาก public.users table เท่านั้น ไม่ให้ผู้ใช้เลือกเอง
 
 import { useState } from 'react'
-import { Mail, MailOpen, CheckCircle2, Dog, Eye, EyeOff, Loader2, Info } from 'lucide-react'
+import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info } from 'lucide-react'
 import { supabase } from '../supabase'
 
 function Login() {
@@ -173,7 +173,7 @@ function Login() {
 
         {/* โลโก้ */}
         <div className="flex flex-col items-center mb-6">
-          <Dog size={56} strokeWidth={1.5} className="text-blue-500 mb-3" />
+          <img src="/logo.png" alt="แจ้งจร" className="w-16 h-16 rounded-2xl mb-3" />
           <h1 className="text-2xl font-bold text-gray-800 text-center">ระบบจัดการสัตว์จร</h1>
           <p className="text-gray-500 text-sm text-center mt-1">
             ช่วยเหลือสัตว์จรและค้นหาเพื่อนใหม่ของคุณ
