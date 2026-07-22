@@ -12,7 +12,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
   Shield, Users, FileText, PawPrint, Heart, User, HardHat, MapPin, Map,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
-  CheckCircle2, Home, Lock, ArrowLeft
+  CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2,
 } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -34,6 +34,13 @@ const สีRole = {
   admin:     'bg-purple-50 text-purple-700',
 }
 
+// ป้ายชื่อ Role ภาษาไทย — ใช้ทั้งใน dropdown และข้อความยืนยัน
+const เลเบลRole = {
+  user:      'ผู้ใช้งานทั่วไป',
+  volunteer: 'เจ้าหน้าที่ / อาสาสมัคร',
+  admin:     'ผู้ดูแลระบบ (Admin)',
+}
+
 function AdminPage({ หน้า, user }) {
   const navigate = useNavigate()
 
@@ -51,6 +58,11 @@ function AdminPage({ หน้า, user }) {
   const [userที่เลือก,   setUserที่เลือก]   = useState(null)
   const [userDetail,     setUserDetail]     = useState(null)
   const [โหลดDetail,    setโหลดDetail]    = useState(false)
+
+  // ---- State: ยืนยันก่อนเปลี่ยน role / ระงับบัญชี ----
+  // { type: 'role', newRole } | { type: 'suspend' } | { type: 'unsuspend' } — ผูกกับ userที่เลือก เสมอ
+  const [actionรอยืนยัน, setActionรอยืนยัน] = useState(null)
+  const [กำลังยืนยัน,    setกำลังยืนยัน]    = useState(false)
 
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
@@ -145,10 +157,30 @@ function AdminPage({ หน้า, user }) {
     }
   }
 
+  // ---- ยืนยัน action ที่เลือกจาก dropdown จัดการบัญชี (เปลี่ยน role หรือ ระงับ/ยกเลิกระงับ) ----
+  async function ยืนยันActionบัญชี() {
+    if (!actionรอยืนยัน || !userที่เลือก || กำลังยืนยัน) return
+    setกำลังยืนยัน(true)
+
+    if (actionรอยืนยัน.type === 'role') {
+      await เปลี่ยนRole(userที่เลือก.id, actionรอยืนยัน.newRole)
+      setUserที่เลือก(function (p) { return p ? { ...p, role: actionรอยืนยัน.newRole } : p })
+    } else {
+      await สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
+      setUserที่เลือก(function (p) {
+        return p ? { ...p, status: actionรอยืนยัน.type === 'suspend' ? 'suspended' : 'active' } : p
+      })
+    }
+
+    setกำลังยืนยัน(false)
+    setActionรอยืนยัน(null)
+  }
+
   // ---- เปิด User Detail Sheet ----
   async function เปิดUserDetail(u) {
     setUserที่เลือก(u)
     setUserDetail(null)
+    setActionรอยืนยัน(null)
     setโหลดDetail(true)
 
     // ดึงข้อมูลเพิ่มเติม: นับรายงาน + ข้อมูลศูนย์พักพิง
@@ -546,7 +578,7 @@ function AdminPage({ หน้า, user }) {
       {userที่เลือก && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           {/* Overlay */}
-          <div className="absolute inset-0 bg-black/40" onClick={() => setUserที่เลือก(null)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => { setUserที่เลือก(null); setActionรอยืนยัน(null) }} />
 
           {/* Sheet */}
           <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
@@ -647,44 +679,35 @@ function AdminPage({ หน้า, user }) {
               {userที่เลือก.id !== user?.id && (
                 <div className="space-y-2 pt-1">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">จัดการบัญชี</p>
-                  {/* เปลี่ยน Role */}
+                  {/* เปลี่ยน Role หรือ ระงับ/ยกเลิกระงับ — รวมไว้ที่เดียว เลือกแล้วต้องกดยืนยันก่อนถึงจะมีผลจริง */}
                   <select
-                    value={userที่เลือก.role || 'user'}
+                    value={userที่เลือก.status === 'suspended' ? 'suspend-action' : (userที่เลือก.role || 'user')}
                     onChange={function (e) {
-                      เปลี่ยนRole(userที่เลือก.id, e.target.value)
-                      setUserที่เลือก(function (p) { return { ...p, role: e.target.value } })
-                      setรายการผู้ใช้(function (prev) {
-                        return prev.map(function (u) { return u.id === userที่เลือก.id ? { ...u, role: e.target.value } : u })
-                      })
+                      const v = e.target.value
+                      if (v === 'suspend-action') {
+                        setActionรอยืนยัน({ type: userที่เลือก.status === 'suspended' ? 'unsuspend' : 'suspend' })
+                      } else {
+                        setActionรอยืนยัน({ type: 'role', newRole: v })
+                      }
                     }}
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
                   >
                     <option value="user">ผู้ใช้งานทั่วไป</option>
                     <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
                     <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+                    {/* แอดมินระงับแอดมินด้วยกันไม่ได้ — ต้องเปลี่ยน role ออกจาก admin ก่อน */}
+                    {userที่เลือก.role !== 'admin' && (
+                      userที่เลือก.status === 'suspended'
+                        ? <option value="suspend-action">ยกเลิกการระงับบัญชี (ปัจจุบันถูกระงับอยู่)</option>
+                        : <option value="suspend-action">ระงับบัญชีนี้</option>
+                    )}
                   </select>
 
-                  {/* ระงับ / ยกเลิกระงับ — แอดมินระงับแอดมินด้วยกันไม่ได้ */}
-                  {userที่เลือก.role === 'admin' ? (
+                  {userที่เลือก.role === 'admin' && (
                     <div className="bg-gray-50 rounded-xl p-3 text-center">
                       <p className="text-xs text-gray-500 flex items-center gap-1.5"><Lock size={11} className="shrink-0" /> ไม่สามารถระงับบัญชีผู้ดูแลระบบ (Admin) ได้</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">หากต้องการระงับ ให้เปลี่ยน Role เป็นระดับอื่นก่อน</p>
                     </div>
-                  ) : (
-                    <button
-                      onClick={function () {
-                        const สถานะใหม่ = userที่เลือก.status === 'suspended' ? 'active' : 'suspended'
-                        สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
-                        setUserที่เลือก(function (p) { return { ...p, status: สถานะใหม่ } })
-                      }}
-                      className={`w-full py-3 rounded-xl text-sm font-bold ${
-                        userที่เลือก.status === 'suspended'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-red-500 text-white'
-                      }`}
-                    >
-                      {userที่เลือก.status === 'suspended' ? <><CheckCircle2 size={16} className="shrink-0" /> ยกเลิกการระงับบัญชี</> : <><Ban size={16} className="shrink-0" /> ระงับบัญชีนี้</>}
-                    </button>
                   )}
                 </div>
               )}
@@ -698,6 +721,58 @@ function AdminPage({ หน้า, user }) {
           </div>
         </div>
       )}
+
+      {/* ======== Modal ยืนยันก่อนเปลี่ยน role / ระงับบัญชี ======== */}
+      {actionรอยืนยัน && userที่เลือก && (function () {
+        const ชื่อแสดง = userที่เลือก.name || userที่เลือก.email
+        const config = {
+          role: {
+            Icon: UserCog, iconColor: 'text-purple-500',
+            title: 'เปลี่ยนสิทธิ์ผู้ใช้?',
+            desc: `คุณต้องการเปลี่ยนสิทธิ์ของ "${ชื่อแสดง}" เป็น "${เลเบลRole[actionรอยืนยัน.newRole]}" ใช่หรือไม่?`,
+            confirmLabel: 'ยืนยันเปลี่ยนสิทธิ์', confirmClass: 'bg-purple-600',
+          },
+          suspend: {
+            Icon: Ban, iconColor: 'text-red-400',
+            title: 'ระงับบัญชีนี้?',
+            desc: `คุณต้องการระงับบัญชีของ "${ชื่อแสดง}" ใช่หรือไม่? ผู้ใช้จะไม่สามารถเข้าใช้งานระบบได้จนกว่าจะยกเลิกการระงับ`,
+            confirmLabel: 'ยืนยันระงับบัญชี', confirmClass: 'bg-red-500',
+          },
+          unsuspend: {
+            Icon: CheckCircle2, iconColor: 'text-green-500',
+            title: 'ยกเลิกการระงับบัญชี?',
+            desc: `คุณต้องการยกเลิกการระงับบัญชีของ "${ชื่อแสดง}" ใช่หรือไม่? ผู้ใช้จะกลับมาเข้าใช้งานระบบได้ตามปกติ`,
+            confirmLabel: 'ยืนยันยกเลิกการระงับ', confirmClass: 'bg-green-500',
+          },
+        }[actionรอยืนยัน.type]
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-end"
+               onClick={() => !กำลังยืนยัน && setActionรอยืนยัน(null)}>
+            <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
+                 onClick={function (e) { e.stopPropagation() }}>
+              <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+
+              <div className="text-center mb-5">
+                <config.Icon size={40} strokeWidth={1.5} className={`${config.iconColor} mx-auto mb-2`} />
+                <h2 className="text-lg font-bold text-gray-800">{config.title}</h2>
+                <p className="text-sm text-gray-500 mt-1">{config.desc}</p>
+              </div>
+
+              <button onClick={ยืนยันActionบัญชี} disabled={กำลังยืนยัน}
+                className={`w-full ${config.confirmClass} text-white rounded-xl py-3.5 font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2`}>
+                {กำลังยืนยัน
+                  ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังบันทึก...</>
+                  : config.confirmLabel}
+              </button>
+              <button onClick={() => setActionรอยืนยัน(null)} disabled={กำลังยืนยัน}
+                className="w-full mt-2 border-2 border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm disabled:opacity-50">
+                ไม่ ขอคิดดูก่อน
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
     </div>
   )
