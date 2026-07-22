@@ -2,6 +2,7 @@
 // เชื่อม Supabase จริง ไม่มี mock data
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
@@ -12,7 +13,8 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
   Shield, Users, FileText, PawPrint, Heart, User, HardHat, MapPin, Map,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
-  CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2,
+  CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2, MoreVertical,
+  ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -53,6 +55,16 @@ function AdminPage({ หน้า, user }) {
   const [รายการผู้ใช้, setรายการผู้ใช้] = useState([])
   const [ค้นหาผู้ใช้, setค้นหาผู้ใช้] = useState('')
   const [โหลดผู้ใช้, setโหลดผู้ใช้] = useState(true)
+
+  // ---- State: ตัวกรอง + แบ่งหน้า + เลือกหลายรายการ (รองรับผู้ใช้จำนวนมาก) ----
+  const [กรองRole,     setกรองRole]     = useState('')       // '' = ทั้งหมด
+  const [กรองสถานะ,    setกรองสถานะ]    = useState('')       // '' = ทั้งหมด
+  const [หน้าปัจจุบัน, setหน้าปัจจุบัน] = useState(1)
+  const [ต่อหน้า,      setต่อหน้า]      = useState(20)
+  const [เลือกไว้,     setเลือกไว้]     = useState(function () { return new Set() })
+  // { id, top, left } ของแถวที่เปิด kebab menu อยู่ — เรนเดอร์เมนูผ่าน Portal (ดูหมายเหตุตรงปุ่ม)
+  // เก็บพิกัดไว้ด้วยเพราะเมนูจะถูกวาดแยกออกจาก DOM ของตาราง เลยอ้างอิงตำแหน่งจากแถวไม่ได้แล้ว
+  const [เมนูที่เปิด,  setเมนูที่เปิด]  = useState(null)
 
   // ---- State: User Detail Sheet ----
   const [userที่เลือก,   setUserที่เลือก]   = useState(null)
@@ -157,19 +169,56 @@ function AdminPage({ หน้า, user }) {
     }
   }
 
-  // ---- ยืนยัน action ที่เลือกจาก dropdown จัดการบัญชี (เปลี่ยน role หรือ ระงับ/ยกเลิกระงับ) ----
+  // เปลี่ยน Role หลายคนพร้อมกัน (Bulk) → อัปเดตใน Supabase จริง
+  async function เปลี่ยนRoleหลายคน(ids, roleใหม่) {
+    const { error } = await supabase.from('users').update({ role: roleใหม่ }).in('id', ids)
+    if (!error) {
+      setรายการผู้ใช้(function (prev) {
+        return prev.map(function (u) { return ids.includes(u.id) ? { ...u, role: roleใหม่ } : u })
+      })
+    } else {
+      alert('เปลี่ยนสิทธิ์ไม่สำเร็จ: ' + error.message)
+    }
+  }
+
+  // ระงับ / ยกเลิกระงับบัญชีหลายคนพร้อมกัน (Bulk) → อัปเดตใน Supabase จริง
+  async function เปลี่ยนสถานะหลายคน(ids, สถานะใหม่) {
+    const { error } = await supabase.from('users').update({ status: สถานะใหม่ }).in('id', ids)
+    if (!error) {
+      setรายการผู้ใช้(function (prev) {
+        return prev.map(function (u) { return ids.includes(u.id) ? { ...u, status: สถานะใหม่ } : u })
+      })
+    } else {
+      alert('เปลี่ยนสถานะไม่สำเร็จ: ' + error.message)
+    }
+  }
+
+  // ---- ยืนยัน action ที่เลือก (เปลี่ยน role / ระงับ-ยกเลิกระงับ ทั้งแบบทีละคนและแบบเลือกหลายคน) ----
   async function ยืนยันActionบัญชี() {
-    if (!actionรอยืนยัน || !userที่เลือก || กำลังยืนยัน) return
+    if (!actionรอยืนยัน || กำลังยืนยัน) return
+    const { type } = actionรอยืนยัน
+    const เป็นbulk = type.startsWith('bulk-')
+    if (!เป็นbulk && !userที่เลือก) return
+
     setกำลังยืนยัน(true)
 
-    if (actionรอยืนยัน.type === 'role') {
+    if (type === 'role') {
       await เปลี่ยนRole(userที่เลือก.id, actionรอยืนยัน.newRole)
       setUserที่เลือก(function (p) { return p ? { ...p, role: actionรอยืนยัน.newRole } : p })
-    } else {
+    } else if (type === 'suspend' || type === 'unsuspend') {
       await สลับสถานะ(userที่เลือก.id, userที่เลือก.status || 'active')
       setUserที่เลือก(function (p) {
-        return p ? { ...p, status: actionรอยืนยัน.type === 'suspend' ? 'suspended' : 'active' } : p
+        return p ? { ...p, status: type === 'suspend' ? 'suspended' : 'active' } : p
       })
+    } else if (type === 'bulk-role') {
+      await เปลี่ยนRoleหลายคน(actionรอยืนยัน.ids, actionรอยืนยัน.newRole)
+      setเลือกไว้(new Set())
+    } else if (type === 'bulk-suspend') {
+      await เปลี่ยนสถานะหลายคน(actionรอยืนยัน.ids, 'suspended')
+      setเลือกไว้(new Set())
+    } else if (type === 'bulk-unsuspend') {
+      await เปลี่ยนสถานะหลายคน(actionรอยืนยัน.ids, 'active')
+      setเลือกไว้(new Set())
     }
 
     setกำลังยืนยัน(false)
@@ -268,11 +317,61 @@ function AdminPage({ หน้า, user }) {
     })
   }
 
-  // กรองผู้ใช้ตามคำค้นหา
-  const ผู้ใช้กรอง = รายการผู้ใช้.filter((u) =>
-    (u.name  || '').toLowerCase().includes(ค้นหาผู้ใช้.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(ค้นหาผู้ใช้.toLowerCase())
-  )
+  // กรองผู้ใช้ตามคำค้นหา + Role + สถานะ
+  const ผู้ใช้กรอง = รายการผู้ใช้.filter((u) => {
+    const ตรงคำค้น = (u.name  || '').toLowerCase().includes(ค้นหาผู้ใช้.toLowerCase()) ||
+                     (u.email || '').toLowerCase().includes(ค้นหาผู้ใช้.toLowerCase())
+    const ตรงRole   = !กรองRole || (u.role || 'user') === กรองRole
+    const ตรงสถานะ  = !กรองสถานะ || (u.status || 'active') === กรองสถานะ
+    return ตรงคำค้น && ตรงRole && ตรงสถานะ
+  })
+
+  // แบ่งหน้า — คำนวณจากผลลัพธ์ที่กรองแล้ว
+  const จำนวนหน้าทั้งหมด = Math.max(1, Math.ceil(ผู้ใช้กรอง.length / ต่อหน้า))
+  const หน้าที่ใช้ได้จริง = Math.min(หน้าปัจจุบัน, จำนวนหน้าทั้งหมด)
+  const ผู้ใช้หน้านี้ = ผู้ใช้กรอง.slice((หน้าที่ใช้ได้จริง - 1) * ต่อหน้า, หน้าที่ใช้ได้จริง * ต่อหน้า)
+
+  // เลขหน้าที่จะแสดงในแถบ pagination — ย่อด้วย "..." เมื่อมีหลายสิบหน้า
+  function เลขหน้าที่แสดง() {
+    const ผล = []
+    const เพิ่ม = (n) => { if (!ผล.includes(n)) ผล.push(n) }
+    เพิ่ม(1)
+    for (let i = หน้าที่ใช้ได้จริง - 1; i <= หน้าที่ใช้ได้จริง + 1; i++) {
+      if (i > 1 && i < จำนวนหน้าทั้งหมด) เพิ่ม(i)
+    }
+    เพิ่ม(จำนวนหน้าทั้งหมด)
+    ผล.sort((a, b) => a - b)
+    const withEllipsis = []
+    let ก่อนหน้า = null
+    for (const n of ผล) {
+      if (ก่อนหน้า !== null && n - ก่อนหน้า > 1) withEllipsis.push('...')
+      withEllipsis.push(n)
+      ก่อนหน้า = n
+    }
+    return withEllipsis
+  }
+
+  // ---- สลับ checkbox เลือกทีละแถว / เลือกทั้งหมดในหน้านี้ ----
+  function สลับเลือก(id) {
+    setเลือกไว้(function (prev) {
+      const ใหม่ = new Set(prev)
+      if (ใหม่.has(id)) ใหม่.delete(id); else ใหม่.add(id)
+      return ใหม่
+    })
+  }
+  const เลือกได้ในหน้านี้ = ผู้ใช้หน้านี้.filter((u) => u.id !== user?.id)
+  const เลือกครบหน้านี้ = เลือกได้ในหน้านี้.length > 0 && เลือกได้ในหน้านี้.every((u) => เลือกไว้.has(u.id))
+  function สลับเลือกทั้งหน้า() {
+    setเลือกไว้(function (prev) {
+      const ใหม่ = new Set(prev)
+      if (เลือกครบหน้านี้) {
+        เลือกได้ในหน้านี้.forEach((u) => ใหม่.delete(u.id))
+      } else {
+        เลือกได้ในหน้านี้.forEach((u) => ใหม่.add(u.id))
+      }
+      return ใหม่
+    })
+  }
 
   // อัตราการรับเลี้ยง
   const อัตรา = สถิติ.สัตว์ > 0
@@ -369,70 +468,273 @@ function AdminPage({ หน้า, user }) {
 
       {/* ======== จัดการผู้ใช้ ======== */}
       {หน้า === 'users' && (
-        <div className="px-4 pt-4 space-y-4">
+        <div className="px-4 pt-4 space-y-3">
 
+          <p className="text-sm text-gray-500">ทั้งหมด {ผู้ใช้กรอง.length.toLocaleString('th-TH')} คน</p>
+
+          {/* ค้นหา */}
           <input
             value={ค้นหาผู้ใช้}
-            onChange={(e) => setค้นหาผู้ใช้(e.target.value)}
+            onChange={(e) => { setค้นหาผู้ใช้(e.target.value); setหน้าปัจจุบัน(1) }}
             placeholder="ค้นหาชื่อหรืออีเมล..."
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
           />
+
+          {/* ตัวกรอง: สิทธิ์ + สถานะ — เปลี่ยนตัวกรองแล้วรีเซ็ตไปหน้า 1 เสมอ กันเผลอค้างอยู่หน้าที่ไม่มีข้อมูลแล้ว */}
+          <div className="flex gap-2">
+            <select value={กรองRole} onChange={(e) => { setกรองRole(e.target.value); setหน้าปัจจุบัน(1) }}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400">
+              <option value="">ทุกสิทธิ์</option>
+              <option value="user">ผู้ใช้งานทั่วไป</option>
+              <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
+              <option value="admin">ผู้ดูแลระบบ</option>
+            </select>
+            <select value={กรองสถานะ} onChange={(e) => { setกรองสถานะ(e.target.value); setหน้าปัจจุบัน(1) }}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400">
+              <option value="">ทุกสถานะ</option>
+              <option value="active">ใช้งานปกติ</option>
+              <option value="suspended">ถูกระงับ</option>
+            </select>
+          </div>
+
+          {/* Bulk actions — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 รายการ (checkbox มีเฉพาะตาราง desktop) */}
+          {เลือกไว้.size > 0 && (
+            <div className="bg-purple-600 text-white rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium shrink-0">เลือกอยู่ {เลือกไว้.size} คน</span>
+              <select
+                value=""
+                onChange={function (e) {
+                  if (!e.target.value) return
+                  setActionรอยืนยัน({ type: 'bulk-role', ids: [...เลือกไว้], newRole: e.target.value })
+                }}
+                className="text-sm text-gray-700 rounded-lg px-2 py-1.5 border-0 focus:outline-none"
+              >
+                <option value="">เปลี่ยนสิทธิ์เป็น...</option>
+                <option value="user">ผู้ใช้งานทั่วไป</option>
+                <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
+                <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+              </select>
+              <button
+                onClick={function () {
+                  const ids = [...เลือกไว้].filter(function (id) {
+                    const u = รายการผู้ใช้.find(function (x) { return x.id === id })
+                    return u && u.role !== 'admin'
+                  })
+                  if (ids.length === 0) { alert('ไม่มีบัญชีที่ระงับได้ในรายการที่เลือก (ผู้ดูแลระบบระงับไม่ได้)'); return }
+                  setActionรอยืนยัน({ type: 'bulk-suspend', ids })
+                }}
+                className="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                ระงับที่เลือก
+              </button>
+              <button
+                onClick={() => setActionรอยืนยัน({ type: 'bulk-unsuspend', ids: [...เลือกไว้] })}
+                className="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                ยกเลิกระงับที่เลือก
+              </button>
+              <button onClick={() => setเลือกไว้(new Set())} aria-label="ยกเลิกการเลือก"
+                className="ml-auto w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors shrink-0">
+                <X size={16} />
+              </button>
+            </div>
+          )}
 
           {โหลดผู้ใช้ ? (
             <div className="text-center py-10">
               <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-400">กำลังโหลด...</p>
             </div>
+          ) : ผู้ใช้กรอง.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Users size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
+              <p className="font-medium text-gray-500">
+                {รายการผู้ใช้.length === 0 ? 'ยังไม่มีผู้ใช้ในระบบ' : 'ไม่พบผู้ใช้ที่ตรงกับตัวกรอง'}
+              </p>
+              <p className="text-xs mt-1">
+                {รายการผู้ใช้.length === 0 ? 'ผู้ใช้จะปรากฏหลังจาก Login ด้วย Auth จริง' : 'ลองเปลี่ยนคำค้นหาหรือตัวกรอง'}
+              </p>
+            </div>
           ) : (
             <>
-              <p className="text-sm text-gray-500">ทั้งหมด {ผู้ใช้กรอง.length} คน</p>
+              {/* ===== Desktop: Data Table ===== */}
+              <div className="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="w-10 px-4 py-3">
+                        <input type="checkbox" aria-label="เลือกทั้งหมดในหน้านี้"
+                          checked={เลือกครบหน้านี้} onChange={สลับเลือกทั้งหน้า}
+                          className="rounded border-gray-300" />
+                      </th>
+                      <th className="text-left px-2 py-3 font-semibold">ผู้ใช้งาน</th>
+                      <th className="text-left px-2 py-3 font-semibold">วันที่สมัคร</th>
+                      <th className="text-left px-2 py-3 font-semibold">บทบาท</th>
+                      <th className="text-left px-2 py-3 font-semibold">สถานะ</th>
+                      <th className="w-12 px-2 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {ผู้ใช้หน้านี้.map((u) => {
+                      const คือตัวเอง = u.id === user?.id
+                      return (
+                        <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${คือตัวเอง ? 'bg-purple-50/40' : ''}`}>
+                          <td className="px-4 py-3">
+                            <input type="checkbox" aria-label={`เลือก ${u.name || u.email}`}
+                              disabled={คือตัวเอง} checked={เลือกไว้.has(u.id)} onChange={() => สลับเลือก(u.id)}
+                              className="rounded border-gray-300 disabled:opacity-30" />
+                          </td>
+                          <td className="px-2 py-3">
+                            <button onClick={() => เปิดUserDetail(u)} className="flex items-center gap-3 text-left">
+                              <div className="w-9 h-9 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                                {u.avatar_url
+                                  ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                                  : <User size={16} className="text-gray-400" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-gray-800 truncate flex items-center gap-1.5">
+                                  {u.name || '(ไม่ระบุชื่อ)'}
+                                  {คือตัวเอง && <span className="text-[10px] font-normal bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>}
+                                </p>
+                                <p className="text-xs text-gray-400 truncate font-normal">{u.email}</p>
+                              </div>
+                            </button>
+                          </td>
+                          <td className="px-2 py-3 text-gray-500 whitespace-nowrap">{แปลงวันที่(u.created_at)}</td>
+                          <td className="px-2 py-3">
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${สีRole[u.role] || สีRole.user}`}>
+                              {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                              {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3 relative">
+                            <button
+                              onClick={function (e) {
+                                if (เมนูที่เปิด?.id === u.id) { setเมนูที่เปิด(null); return }
+                                const r = e.currentTarget.getBoundingClientRect()
+                                setเมนูที่เปิด({ id: u.id, top: r.bottom + 4, left: r.right - 208 })
+                              }}
+                              aria-label="เมนูจัดการ"
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
 
-              {ผู้ใช้กรอง.length === 0 && (
-                <div className="text-center py-12 text-gray-400">
-                  <Users size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
-                  <p className="font-medium text-gray-500">ยังไม่มีผู้ใช้ในระบบ</p>
-                  <p className="text-xs mt-1">ผู้ใช้จะปรากฏหลังจาก Login ด้วย Auth จริง</p>
-                </div>
-              )}
+                            {/* เมนูวาดผ่าน Portal ไปที่ document.body — กัน overflow-x-auto ของตารางตัดเมนูทิ้ง
+                                (ตารางต้อง overflow-x-auto ไว้เพื่อเลื่อนดูคอลัมน์ แต่นั่นจะครอบตัดลูกที่เป็น absolute ด้วย) */}
+                            {เมนูที่เปิด?.id === u.id && createPortal(
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setเมนูที่เปิด(null)} />
+                                <div
+                                  className="fixed z-50 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-52"
+                                  style={{ top: เมนูที่เปิด.top, left: เมนูที่เปิด.left }}
+                                >
+                                  <button onClick={() => { เปิดUserDetail(u); setเมนูที่เปิด(null) }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                    <User size={14} className="shrink-0" /> ดูรายละเอียด / แก้ไขสิทธิ์
+                                  </button>
+                                  {!คือตัวเอง && u.role !== 'admin' && (
+                                    <button
+                                      onClick={function () {
+                                        setUserที่เลือก(u)
+                                        setActionรอยืนยัน({ type: u.status === 'suspended' ? 'unsuspend' : 'suspend' })
+                                        setเมนูที่เปิด(null)
+                                      }}
+                                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 hover:bg-gray-50 ${u.status === 'suspended' ? 'text-green-600' : 'text-red-500'}`}
+                                    >
+                                      {u.status === 'suspended' ? <><CheckCircle2 size={14} className="shrink-0" /> ยกเลิกการระงับ</> : <><Ban size={14} className="shrink-0" /> ระงับการใช้งาน</>}
+                                    </button>
+                                  )}
+                                </div>
+                              </>,
+                              document.body
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-              {ผู้ใช้กรอง.map((u) => {
-                const คือตัวเอง = u.id === user?.id
-                return (
-                  <div
-                    key={u.id}
-                    onClick={() => เปิดUserDetail(u)}
-                    className={`bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all cursor-pointer ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Avatar */}
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
-                        {u.avatar_url
-                          ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
-                          : <User size={20} className="text-gray-400" />
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-800 text-sm truncate">{u.name || '(ไม่ระบุชื่อ)'}</p>
-                          {คือตัวเอง && (
-                            <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>
-                          )}
+              {/* ===== Mobile: List Card กะทัดรัด ===== */}
+              <div className="md:hidden space-y-3">
+                {ผู้ใช้หน้านี้.map((u) => {
+                  const คือตัวเอง = u.id === user?.id
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => เปิดUserDetail(u)}
+                      className={`bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all cursor-pointer ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                          {u.avatar_url
+                            ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                            : <User size={20} className="text-gray-400" />
+                          }
                         </div>
-                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                        <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                          {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
-                          {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-gray-800 text-sm truncate">{u.name || '(ไม่ระบุชื่อ)'}</p>
+                            {คือตัวเอง && (
+                              <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                          <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                            {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
+                            {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+
+              {/* ===== Pagination ===== */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>แสดงต่อหน้า</span>
+                  <select value={ต่อหน้า} onChange={(e) => { setต่อหน้า(Number(e.target.value)); setหน้าปัจจุบัน(1) }}
+                    className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none">
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setหน้าปัจจุบัน((p) => Math.max(1, p - 1))} disabled={หน้าที่ใช้ได้จริง === 1} aria-label="หน้าก่อนหน้า"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                    <ChevronLeft size={16} />
+                  </button>
+                  {เลขหน้าที่แสดง().map((n, i) => n === '...' ? (
+                    <span key={`e${i}`} className="w-8 text-center text-gray-300 text-sm select-none">...</span>
+                  ) : (
+                    <button key={n} onClick={() => setหน้าปัจจุบัน(n)}
+                      className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                        n === หน้าที่ใช้ได้จริง ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                      }`}>
+                      {n}
+                    </button>
+                  ))}
+                  <button onClick={() => setหน้าปัจจุบัน((p) => Math.min(จำนวนหน้าทั้งหมด, p + 1))} disabled={หน้าที่ใช้ได้จริง === จำนวนหน้าทั้งหมด} aria-label="หน้าถัดไป"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -722,9 +1024,14 @@ function AdminPage({ หน้า, user }) {
         </div>
       )}
 
-      {/* ======== Modal ยืนยันก่อนเปลี่ยน role / ระงับบัญชี ======== */}
-      {actionรอยืนยัน && userที่เลือก && (function () {
-        const ชื่อแสดง = userที่เลือก.name || userที่เลือก.email
+      {/* ======== Modal ยืนยันก่อนเปลี่ยน role / ระงับบัญชี (ทั้งทีละคนและเลือกหลายคน) ======== */}
+      {actionรอยืนยัน && (function () {
+        const เป็นbulk = actionรอยืนยัน.type.startsWith('bulk-')
+        if (!เป็นbulk && !userที่เลือก) return null
+
+        const ชื่อแสดง = !เป็นbulk ? (userที่เลือก.name || userที่เลือก.email) : null
+        const จำนวน   = เป็นbulk ? actionรอยืนยัน.ids.length : null
+
         const config = {
           role: {
             Icon: UserCog, iconColor: 'text-purple-500',
@@ -743,6 +1050,24 @@ function AdminPage({ หน้า, user }) {
             title: 'ยกเลิกการระงับบัญชี?',
             desc: `คุณต้องการยกเลิกการระงับบัญชีของ "${ชื่อแสดง}" ใช่หรือไม่? ผู้ใช้จะกลับมาเข้าใช้งานระบบได้ตามปกติ`,
             confirmLabel: 'ยืนยันยกเลิกการระงับ', confirmClass: 'bg-green-500',
+          },
+          'bulk-role': {
+            Icon: UserCog, iconColor: 'text-purple-500',
+            title: 'เปลี่ยนสิทธิ์ผู้ใช้ที่เลือก?',
+            desc: `คุณต้องการเปลี่ยนสิทธิ์ผู้ใช้ที่เลือกไว้ ${จำนวน} คน เป็น "${เลเบลRole[actionรอยืนยัน.newRole]}" ใช่หรือไม่?`,
+            confirmLabel: `ยืนยันเปลี่ยนสิทธิ์ (${จำนวน} คน)`, confirmClass: 'bg-purple-600',
+          },
+          'bulk-suspend': {
+            Icon: Ban, iconColor: 'text-red-400',
+            title: 'ระงับบัญชีที่เลือก?',
+            desc: `คุณต้องการระงับบัญชีผู้ใช้ที่เลือกไว้ ${จำนวน} คน ใช่หรือไม่? ผู้ใช้เหล่านี้จะไม่สามารถเข้าใช้งานระบบได้จนกว่าจะยกเลิกการระงับ`,
+            confirmLabel: `ยืนยันระงับบัญชี (${จำนวน} คน)`, confirmClass: 'bg-red-500',
+          },
+          'bulk-unsuspend': {
+            Icon: CheckCircle2, iconColor: 'text-green-500',
+            title: 'ยกเลิกการระงับที่เลือก?',
+            desc: `คุณต้องการยกเลิกการระงับบัญชีผู้ใช้ที่เลือกไว้ ${จำนวน} คน ใช่หรือไม่?`,
+            confirmLabel: `ยืนยันยกเลิกการระงับ (${จำนวน} คน)`, confirmClass: 'bg-green-500',
           },
         }[actionรอยืนยัน.type]
 
