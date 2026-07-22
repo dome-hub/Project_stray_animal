@@ -9,6 +9,25 @@ import { Siren, MapPin, Calendar, ChevronRight, ChevronUp, ChevronDown, Gift } f
 import { supabase } from '../supabase'
 import AnimalIcon from './AnimalIcon'
 
+// จำสถานะพับ/กางไว้ ให้ค้างข้ามหน้าและข้ามการรีเฟรช จนกว่าผู้ใช้จะกดเปลี่ยนเอง
+const KEYพับแบนเนอร์ = 'urgent_banner_collapsed'
+
+function อ่านสถานะพับ() {
+  try {
+    return localStorage.getItem(KEYพับแบนเนอร์) === '1'
+  } catch {
+    return false   // localStorage ใช้ไม่ได้ (private mode) → ถือว่ากางไว้
+  }
+}
+
+function จำสถานะพับ(พับอยู่) {
+  try {
+    localStorage.setItem(KEYพับแบนเนอร์, พับอยู่ ? '1' : '0')
+  } catch {
+    // เขียนไม่ได้ก็ข้ามไป ไม่ให้กระทบการใช้งาน
+  }
+}
+
 // วันที่แบบสั้น มีปี พ.ศ. เช่น "21 ก.ค. 2569"
 function วันที่สั้น(str) {
   if (!str) return 'ไม่ระบุ'
@@ -31,7 +50,8 @@ async function โหลดสัตว์หายด่วน() {
 function UrgentLostPetsBanner() {
   const navigate = useNavigate()
   const [รายการ, setรายการ] = useState([])
-  const [กางอยู่, setกางอยู่] = useState(true)   // พับ/กาง เนื้อหาแบนเนอร์
+  // พับ/กาง เนื้อหาแบนเนอร์ — อ่านค่าที่ผู้ใช้เลือกไว้ล่าสุดตอน mount
+  const [กางอยู่, setกางอยู่] = useState(function () { return !อ่านสถานะพับ() })
 
   useEffect(function () {
     let ยกเลิก = false
@@ -48,7 +68,12 @@ function UrgentLostPetsBanner() {
     <div className="mt-4">
 
       {/* หัวข้อกะทัดรัด — กดพับ/กางได้ทั้งแถบ */}
-      <button onClick={() => setกางอยู่(function (v) { return !v })}
+      <button
+        onClick={function () {
+          const กางใหม่ = !กางอยู่
+          setกางอยู่(กางใหม่)
+          จำสถานะพับ(!กางใหม่)
+        }}
         className="w-full flex items-center gap-1.5 px-4 mb-1.5">
         <Siren size={14} className="text-orange-500 shrink-0" />
         <p className="text-xs font-bold text-orange-700">ประกาศสัตว์หายใกล้คุณ</p>
