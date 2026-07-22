@@ -205,7 +205,7 @@ function Modalเลือกพิกัด({ ตำแหน่งเริ่
   return (
     <div className="fixed inset-0 z-[60] bg-white flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
-        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-500">
+        <button onClick={onClose} aria-label="ปิด" className="w-8 h-8 flex items-center justify-center text-gray-500">
           <X size={20} />
         </button>
         <p className="font-semibold text-gray-800 text-sm">เลื่อนแผนที่ไปยังจุดที่หาย</p>
@@ -233,7 +233,7 @@ function Modalเลือกพิกัด({ ตำแหน่งเริ่
               <MapPin size={40} className="text-rose-500 drop-shadow-lg" fill="#fecdd3" strokeWidth={2} />
             </div>
 
-            <button onClick={กลับตำแหน่งฉัน}
+            <button onClick={กลับตำแหน่งฉัน} aria-label="ไปที่ตำแหน่งปัจจุบัน"
               className="absolute bottom-4 right-4 z-[1100] w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center text-rose-500">
               <LocateFixed size={20} />
             </button>
@@ -407,7 +407,7 @@ function FoundPetDetailModal({ สัตว์, onClose }) {
           )}
 
           {/* ปุ่มปิด ลอยมุมขวาบน */}
-          <button onClick={onClose}
+          <button onClick={onClose} aria-label="ปิด"
             className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/45 text-white flex items-center justify-center backdrop-blur-sm active:scale-90 transition-transform">
             <X size={18} />
           </button>
@@ -637,7 +637,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
         <div className="flex items-center justify-between px-5 py-3">
           <p className="font-bold text-gray-800">แจ้งสัตว์เลี้ยงสูญหาย</p>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
+          <button onClick={onClose} aria-label="ปิด" className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -899,11 +899,11 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
             <div className="flex items-center gap-1 shrink-0">
               {เป็นเจ้าของ && !โหมดแก้ไข && (
                 <>
-                  <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล"
+                  <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล" aria-label="แก้ไขข้อมูล"
                     className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200">
                     <Pencil size={18} strokeWidth={2} />
                   </button>
-                  <button onClick={() => setแสดงยืนยันลบ(true)} title="ลบประกาศ"
+                  <button onClick={() => setแสดงยืนยันลบ(true)} title="ลบประกาศ" aria-label="ลบประกาศ"
                     className="w-8 h-8 rounded-full flex items-center justify-center text-red-300 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors duration-200">
                     <Trash2 size={18} strokeWidth={2} />
                   </button>

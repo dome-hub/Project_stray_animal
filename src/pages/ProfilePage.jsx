@@ -577,6 +577,7 @@ function ProfilePage({ user }) {
               <button
                 onClick={() => setแสดงยืนยันลบบัญชี(false)}
                 disabled={กำลังลบบัญชี}
+                aria-label="ปิด"
                 className="w-7 h-7 flex items-center justify-center text-gray-400"
               ><X size={18} /></button>
             </div>

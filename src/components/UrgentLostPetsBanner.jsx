@@ -102,8 +102,8 @@ function UrgentLostPetsBanner() {
               {p.photo_url
                 ? <img src={p.photo_url} alt={p.pet_name} className="w-full h-full object-cover" />
                 : <AnimalIcon ชนิด={p.species || p.breed} size={26} className="text-orange-300" />}
-              <span className="absolute top-0 left-0 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-br-lg flex items-center gap-0.5">
-                <Siren size={8} className="shrink-0" /> ด่วน
+              <span className="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-br-lg flex items-center gap-0.5">
+                <Siren size={9} className="shrink-0" /> ด่วน
               </span>
             </div>
 

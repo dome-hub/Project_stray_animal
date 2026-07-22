@@ -126,7 +126,7 @@ function PetGuide() {
 
             {/* รูป/ไอคอนหัว */}
             <div className={`relative h-40 flex items-center justify-center ${ที่เปิดอยู่.ประเภท === 'สุนัข' ? 'bg-gradient-to-br from-orange-400 to-orange-500' : 'bg-gradient-to-br from-purple-400 to-purple-500'}`}>
-              <button onClick={() => setที่เปิดอยู่(null)}
+              <button onClick={() => setที่เปิดอยู่(null)} aria-label="ปิด"
                 className="absolute top-3 right-3 w-8 h-8 bg-black/20 rounded-full flex items-center justify-center text-white">
                 <X size={16} />
               </button>

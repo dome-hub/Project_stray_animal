@@ -386,7 +386,7 @@ function ProgressBar({ status }) {
               </div>
               <p className={`text-center mt-1 leading-tight ${
                 done ? (current ? 'text-teal-700' : 'text-green-600') : 'text-gray-400'
-              }`} style={{ fontSize: '8px', maxWidth: 44 }}>
+              }`} style={{ fontSize: '10px', maxWidth: 52 }}>
                 {ขั้น}
               </p>
             </div>
@@ -1308,6 +1308,7 @@ function VolunteerPage({ หน้า }) {
           <button onClick={() => setแสดงฟอร์มเพิ่ม(!แสดงฟอร์มเพิ่ม)}
             className="fixed bottom-20 right-5 z-30 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-all"
             title={แสดงฟอร์มเพิ่ม ? 'ปิดฟอร์ม' : 'เพิ่มสัตว์ใหม่'}
+            aria-label={แสดงฟอร์มเพิ่ม ? 'ปิดฟอร์ม' : 'เพิ่มสัตว์ใหม่'}
           >
             {แสดงฟอร์มเพิ่ม ? <X size={24} /> : <Plus size={24} />}
           </button>
@@ -2182,7 +2183,7 @@ function VolunteerPage({ หน้า }) {
                               {i === 0 ? (
                                 <span className="absolute bottom-0 inset-x-0 bg-teal-600/90 text-white text-[9px] text-center py-0.5 font-bold">หลัก</span>
                               ) : (
-                                <button type="button" onClick={() => ตั้งเป็นรูปหลัก(url)} title="ตั้งเป็นรูปหลัก"
+                                <button type="button" onClick={() => ตั้งเป็นรูปหลัก(url)} title="ตั้งเป็นรูปหลัก" aria-label="ตั้งเป็นรูปหลัก"
                                   className="absolute bottom-0.5 left-0.5 bg-white/90 text-teal-600 rounded-md w-5 h-5 flex items-center justify-center shadow-sm"><Star size={11} className="fill-teal-600" /></button>
                               )}
                               <button type="button" onClick={() => ลบรูปสัตว์(url)} title="ลบรูปนี้" aria-label="ลบรูปนี้"
@@ -2443,6 +2444,7 @@ function VolunteerPage({ หน้า }) {
                               return { ...prev, traits: เหลือ.join(', ') }
                             })
                           }}
+                          aria-label={`ลบแท็ก ${tag}`}
                           className="text-teal-400 hover:text-teal-700"
                         ><X size={12} /></button>
                       </span>

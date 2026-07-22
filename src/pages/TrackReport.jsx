@@ -529,18 +529,18 @@ function TrackReport({ user }) {
               <div className="flex items-center gap-1">
                 {รายงานที่เปิด.status === 'รอดำเนินการ' && !โหมดแก้ไข && (
                   <>
-                    <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล"
+                    <button onClick={เปิดโหมดแก้ไข} title="แก้ไขข้อมูล" aria-label="แก้ไขข้อมูล"
                       className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200">
                       <Pencil size={18} strokeWidth={2} />
                     </button>
-                    <button onClick={() => setแสดงModalยกเลิก(true)} title="ยกเลิกรายงาน"
+                    <button onClick={() => setแสดงModalยกเลิก(true)} title="ยกเลิกรายงาน" aria-label="ยกเลิกรายงาน"
                       className="w-8 h-8 rounded-full flex items-center justify-center text-red-300 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors duration-200">
                       <Trash2 size={18} strokeWidth={2} />
                     </button>
                     <div className="w-px h-5 bg-gray-200 mx-1" />
                   </>
                 )}
-                <button onClick={ปิดรายละเอียด} title="ปิด"
+                <button onClick={ปิดรายละเอียด} title="ปิด" aria-label="ปิด"
                   className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors duration-200">
                   <X size={20} strokeWidth={2} />
                 </button>

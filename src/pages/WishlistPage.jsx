@@ -76,6 +76,7 @@ function WishlistPage() {
                       onClick={() => ลบออก(สัตว์.id)}
                       className="w-9 h-9 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors shrink-0"
                       title="นำออกจากรายการที่บันทึก"
+                      aria-label="นำออกจากรายการที่บันทึก"
                     >
                       <Heart size={18} className="text-red-500 fill-red-500" />
                     </button>

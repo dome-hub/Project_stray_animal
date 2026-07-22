@@ -172,6 +172,7 @@ function Home({ user, onLogout }) {
             onClick={() => navigate('/notifications')}
             className={`relative w-9 h-9 ${โทน.กล่อง} rounded-full flex items-center justify-center ${โทน.สี} hover:opacity-80 transition-opacity`}
             title="การแจ้งเตือน"
+            aria-label="การแจ้งเตือน"
           >
             <Bell size={18} strokeWidth={2} />
             {ยังไม่อ่าน > 0 && (
@@ -193,6 +194,7 @@ function Home({ user, onLogout }) {
             onClick={() => navigate('/profile')}
             className="w-9 h-9 bg-gray-100 rounded-full overflow-hidden flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors border-2 border-white shadow-sm"
             title="โปรไฟล์ของฉัน"
+            aria-label="โปรไฟล์ของฉัน"
           >
             {avatarUrl ? (
               <img src={avatarUrl} alt="โปรไฟล์" className="w-full h-full object-cover" />
