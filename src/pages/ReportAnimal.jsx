@@ -415,7 +415,15 @@ function ReportAnimal({ user }) {
       const ชื่อไฟล์ = `${Date.now()}_${ไฟล์รูปภาพ.name.replace(/\s/g, '_')}`
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
-      if (!uploadError) {
+      if (uploadError) {
+        // อัปโหลดรูปไม่สำเร็จ — ต้องแจ้งผู้ใช้ทันที ไม่งั้นรายงานจะถูกส่งแบบไม่มีรูปโดยไม่มีใครรู้ตัว
+        setกำลังส่ง(false)
+        const ส่งต่อไม่มีรูป = confirm(
+          `อัปโหลดรูปภาพไม่สำเร็จ (${uploadError.message})\nต้องการส่งรายงานต่อโดยไม่มีรูปหรือไม่?`
+        )
+        if (!ส่งต่อไม่มีรูป) return
+        setกำลังส่ง(true)
+      } else {
         const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
         imageUrl = urlData.publicUrl
       }
