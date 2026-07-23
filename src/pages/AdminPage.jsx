@@ -2,7 +2,7 @@
 // เชื่อม Supabase จริง ไม่มี mock data
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -44,10 +44,13 @@ const เลเบลRole = {
 
 function AdminPage({ หน้า, user }) {
   const navigate = useNavigate()
+  const location = useLocation()
 
   // ---- State: Dashboard ----
   const [สถิติ, setSถิติ] = useState({ ผู้ใช้: 0, รายงาน: 0, สัตว์: 0, รับเลี้ยง: 0 })
   const [สถิติเดือน, setSถิติเดือน] = useState({ รายงาน: 0, รับเลี้ยง: 0, ผู้ใช้ใหม่: 0 })
+  const [สถิติเดือนก่อน, setSถิติเดือนก่อน] = useState({ รายงาน: 0, รับเลี้ยง: 0, ผู้ใช้ใหม่: 0 })
+  const [รายงานรอดำเนินการ, setรายงานรอดำเนินการ] = useState(0)
   const [โหลดDashboard, setโหลดDashboard] = useState(true)
 
   // ---- State: Users ----
@@ -57,7 +60,9 @@ function AdminPage({ หน้า, user }) {
 
   // ---- State: ตัวกรอง + แบ่งหน้า + เลือกหลายรายการ (รองรับผู้ใช้จำนวนมาก) ----
   const [กรองRole,     setกรองRole]     = useState('')       // '' = ทั้งหมด
-  const [กรองสถานะ,    setกรองสถานะ]    = useState('')       // '' = ทั้งหมด
+  // ค่าเริ่มต้นรับมาจากทางลัดในหน้า Dashboard ได้ (เช่น "ดูผู้ใช้ที่ถูกระงับ" ส่ง presetStatus มาทาง location.state)
+  // แต่ละ route ของ admin (/admin/users ฯลฯ) mount AdminPage ใหม่เสมอ จึงอ่านครั้งเดียวตอนสร้าง state ได้เลย ไม่ต้องใช้ effect
+  const [กรองสถานะ,    setกรองสถานะ]    = useState(() => location.state?.presetStatus || '')
   const [หน้าปัจจุบัน, setหน้าปัจจุบัน] = useState(1)
   const [ต่อหน้า,      setต่อหน้า]      = useState(20)
   const [เลือกไว้,     setเลือกไว้]     = useState(function () { return new Set() })
@@ -86,12 +91,14 @@ function AdminPage({ หน้า, user }) {
     async function ดึงDashboard() {
       setโหลดDashboard(true)
 
-      // วันแรกของเดือนนี้
+      // วันแรกของเดือนนี้ + เดือนก่อน (ไว้เทียบแนวโน้ม)
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
+      const startOfLastMonth = new Date(startOfMonth)
+      startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1)
 
-      const [ร1, ร2, ร3, ร4, ร5, ร6, ร7] = await Promise.all([
+      const [ร1, ร2, ร3, ร4, ร5, ร6, ร7, ร8, ร9, ร10, ร11] = await Promise.all([
         supabase.from('users').select('id', { count: 'exact', head: true }),
         supabase.from('reports').select('id', { count: 'exact', head: true }),
         supabase.from('animals').select('id', { count: 'exact', head: true }),
@@ -100,6 +107,12 @@ function AdminPage({ หน้า, user }) {
         supabase.from('reports').select('id', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
         supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง').gte('created_at', startOfMonth.toISOString()),
         supabase.from('users').select('id', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
+        // งานค้าง — ไม่ผูกกับเดือน เป็นยอดค้างสะสม ต้องรู้ทันทีว่ามีกี่รายการ
+        supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'รอดำเนินการ'),
+        // เดือนก่อน — ไว้เทียบแนวโน้มกับเดือนนี้
+        supabase.from('reports').select('id', { count: 'exact', head: true }).gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
+        supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง').gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
+        supabase.from('users').select('id', { count: 'exact', head: true }).gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
       ])
 
       setSถิติ({
@@ -112,6 +125,12 @@ function AdminPage({ หน้า, user }) {
         รายงาน:    ร5.count || 0,
         รับเลี้ยง:  ร6.count || 0,
         ผู้ใช้ใหม่: ร7.count || 0,
+      })
+      setรายงานรอดำเนินการ(ร8.count || 0)
+      setSถิติเดือนก่อน({
+        รายงาน:    ร9.count || 0,
+        รับเลี้ยง:  ร10.count || 0,
+        ผู้ใช้ใหม่: ร11.count || 0,
       })
       setโหลดDashboard(false)
     }
@@ -419,44 +438,80 @@ function AdminPage({ หน้า, user }) {
             </div>
           ) : (
             <>
-              {/* สถิติหลัก 4 กล่อง */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* งานค้าง — ขึ้นก่อนสถิติย้อนหลังทั้งหมด เพราะเป็นสิ่งที่ต้องรีบดูตอนนี้ ไม่ใช่แค่ตัวเลขสะสม */}
+              {รายงานรอดำเนินการ > 0 ? (
+                <button
+                  onClick={() => navigate('/admin/areas')}
+                  className="w-full bg-purple-50 border border-purple-100 rounded-2xl p-4 flex items-center justify-between gap-3 text-left hover:bg-purple-100/60 active:bg-purple-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                      <FileText size={18} className="text-purple-600 shrink-0" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-purple-700">มีรายงานรอดำเนินการ {รายงานรอดำเนินการ} รายการ</p>
+                      <p className="text-xs text-purple-500">ดูตำแหน่งและรายละเอียดในแผนที่รายงาน</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-purple-400 shrink-0" />
+                </button>
+              ) : (
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-4 flex items-center gap-3">
+                  <CheckCircle2 size={20} className="text-green-500 shrink-0" />
+                  <p className="text-sm text-green-700 font-medium">ไม่มีรายงานค้างดำเนินการตอนนี้</p>
+                </div>
+              )}
+
+              {/* สถิติหลัก 4 ตัว — กล่องเดียว แบ่งช่องด้วยเส้น แทนกล่องคนละสีทีละอัน
+                  (เดิมสีไม่ได้สื่อความหมายอะไรเลย แถม "รับเลี้ยงแล้ว" ซึ่งเป็นผลลัพธ์ที่ดีกลับใช้สีแดงซึ่งสื่อถึงปัญหา/แจ้งเตือน) */}
+              <div className="bg-white rounded-2xl shadow-sm grid grid-cols-2">
                 {[
-                  { ชื่อ: 'ผู้ใช้งานทั้งหมด', ค่า: สถิติ.ผู้ใช้,    Icon: Users,    สี: 'bg-blue-50 text-blue-600' },
-                  { ชื่อ: 'รายงานทั้งหมด',    ค่า: สถิติ.รายงาน,   Icon: FileText, สี: 'bg-orange-50 text-orange-600' },
-                  { ชื่อ: 'สัตว์ในระบบ',       ค่า: สถิติ.สัตว์,    Icon: PawPrint, สี: 'bg-green-50 text-green-600' },
-                  { ชื่อ: 'รับเลี้ยงแล้ว',     ค่า: สถิติ.รับเลี้ยง, Icon: Heart,    สี: 'bg-red-50 text-red-600' },
-                ].map((stat) => (
-                  <div key={stat.ชื่อ} className={`rounded-2xl p-4 shadow-sm ${stat.สี.split(' ')[0]}`}>
-                    <stat.Icon size={26} strokeWidth={1.5} className={`mb-1 ${stat.สี.split(" ")[1]}`} />
-                    <p className={`text-3xl font-bold ${stat.สี.split(' ')[1]}`}>{stat.ค่า}</p>
-                    <p className="text-xs text-gray-500 mt-1">{stat.ชื่อ}</p>
+                  { ชื่อ: 'ผู้ใช้งานทั้งหมด', ค่า: สถิติ.ผู้ใช้,    Icon: Users },
+                  { ชื่อ: 'รายงานทั้งหมด',    ค่า: สถิติ.รายงาน,   Icon: FileText },
+                  { ชื่อ: 'สัตว์ในระบบ',       ค่า: สถิติ.สัตว์,    Icon: PawPrint },
+                  { ชื่อ: 'รับเลี้ยงแล้ว',     ค่า: สถิติ.รับเลี้ยง, Icon: Heart },
+                ].map((stat, i) => (
+                  <div key={stat.ชื่อ} className={`p-4 border-gray-100 ${i % 2 === 0 ? 'border-r' : ''} ${i < 2 ? 'border-b' : ''}`}>
+                    <stat.Icon size={20} strokeWidth={1.75} className="text-purple-400 mb-2" />
+                    <p className="text-2xl font-bold text-gray-800">{stat.ค่า.toLocaleString('th-TH')}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{stat.ชื่อ}</p>
                   </div>
                 ))}
               </div>
 
-              {/* สรุปเดือนนี้ */}
+              {/* สรุปเดือนนี้ — แถบเทียบสัดส่วนกันเองจริง (เดิมคูณ 5 แล้วตัดที่ 100% ซึ่งเป็นค่าที่ตั้งขึ้นเอง ไม่ได้แปลว่าอะไร) สีเดียวพอเพราะแต่ละแถวมีป้ายกำกับอยู่แล้ว */}
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <p className="font-bold text-gray-800 mb-3">สรุปเดือนนี้</p>
                 <div className="space-y-3">
-                  {[
-                    { ชื่อ: 'รายงานใหม่',   ค่า: สถิติเดือน.รายงาน,    สี: 'bg-orange-400' },
-                    { ชื่อ: 'การรับเลี้ยง', ค่า: สถิติเดือน.รับเลี้ยง,  สี: 'bg-green-400' },
-                    { ชื่อ: 'ผู้ใช้ใหม่',   ค่า: สถิติเดือน.ผู้ใช้ใหม่, สี: 'bg-blue-400' },
-                  ].map((item) => (
-                    <div key={item.ชื่อ}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">{item.ชื่อ}</span>
-                        <span className="font-semibold">{item.ค่า} รายการ</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-2 rounded-full transition-all ${item.สี}`}
-                          style={{ width: item.ค่า > 0 ? `${Math.min(item.ค่า * 5, 100)}%` : '4px' }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                  {(function () {
+                    const รายการ = [
+                      { ชื่อ: 'รายงานใหม่',   ค่า: สถิติเดือน.รายงาน,    ค่าเดือนก่อน: สถิติเดือนก่อน.รายงาน },
+                      { ชื่อ: 'การรับเลี้ยง', ค่า: สถิติเดือน.รับเลี้ยง,  ค่าเดือนก่อน: สถิติเดือนก่อน.รับเลี้ยง },
+                      { ชื่อ: 'ผู้ใช้ใหม่',   ค่า: สถิติเดือน.ผู้ใช้ใหม่, ค่าเดือนก่อน: สถิติเดือนก่อน.ผู้ใช้ใหม่ },
+                    ]
+                    const ค่าสูงสุด = Math.max(...รายการ.map((i) => i.ค่า), 1)
+                    return รายการ.map((item) => {
+                      const ต่าง = item.ค่า - item.ค่าเดือนก่อน
+                      const ข้อความต่าง = ต่าง > 0 ? `+${ต่าง}` : ต่าง < 0 ? `${ต่าง}` : 'เท่าเดิม'
+                      return (
+                        <div key={item.ชื่อ}>
+                          <div className="flex justify-between items-baseline text-sm mb-1 gap-2">
+                            <span className="text-gray-600">{item.ชื่อ}</span>
+                            <span className="text-right">
+                              <span className="font-semibold text-gray-800">{item.ค่า} รายการ</span>
+                              <span className="text-xs text-gray-400 ml-1.5">({ข้อความต่าง}{ต่าง !== 0 ? ' จากเดือนก่อน' : ''})</span>
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-1.5 rounded-full bg-purple-400 transition-all"
+                              style={{ width: item.ค่า > 0 ? `${Math.max((item.ค่า / ค่าสูงสุด) * 100, 4)}%` : '0%' }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
 
@@ -467,6 +522,29 @@ function AdminPage({ หน้า, user }) {
                 <p className="text-xs text-gray-400 mt-1">
                   {สถิติ.รับเลี้ยง} จาก {สถิติ.สัตว์} ตัวในระบบ
                 </p>
+              </div>
+
+              {/* ทางลัด — งานที่เจ้าหน้าที่เข้ามาทำบ่อย ลดจำนวนคลิกจากที่ต้องไปเปิดเมนูเอง */}
+              <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100 overflow-hidden">
+                <p className="font-bold text-gray-800 px-4 pt-4 pb-3">ทางลัด</p>
+                <button
+                  onClick={() => navigate('/admin/users', { state: { presetStatus: 'suspended' } })}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  <span className="flex items-center gap-3 text-sm font-medium text-gray-800">
+                    <Ban size={16} className="text-gray-500 shrink-0" /> ดูผู้ใช้ที่ถูกระงับ
+                  </span>
+                  <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                </button>
+                <button
+                  onClick={() => navigate('/admin/export')}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  <span className="flex items-center gap-3 text-sm font-medium text-gray-800">
+                    <Download size={16} className="text-gray-500 shrink-0" /> ไปหน้า Export รายงาน
+                  </span>
+                  <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                </button>
               </div>
             </>
           )}
@@ -479,8 +557,6 @@ function AdminPage({ หน้า, user }) {
 
           {/* แผงค้นหา + กรอง — จัดเป็นกลุ่มเดียวแยกจากรายชื่อด้านล่างด้วยกรอบและระยะห่างที่มากกว่า */}
           <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-            <p className="text-sm text-gray-500">ทั้งหมด {ผู้ใช้กรอง.length.toLocaleString('th-TH')} คน</p>
-
             {/* ค้นหา */}
             <input
               value={ค้นหาผู้ใช้}
@@ -517,7 +593,7 @@ function AdminPage({ หน้า, user }) {
                   if (!e.target.value) return
                   setActionรอยืนยัน({ type: 'bulk-role', ids: [...เลือกไว้], newRole: e.target.value })
                 }}
-                className="text-sm text-gray-700 rounded-lg px-2 py-1.5 border-0 focus:outline-none"
+                className="text-sm font-medium text-purple-700 bg-white rounded-lg px-2.5 py-1.5 border-0 shadow-sm focus:outline-none focus:ring-2 focus:ring-white/60"
               >
                 <option value="">เปลี่ยนสิทธิ์เป็น...</option>
                 <option value="user">ผู้ใช้งานทั่วไป</option>
@@ -565,58 +641,66 @@ function AdminPage({ หน้า, user }) {
             </div>
           ) : (
             <>
-              {/* เลือกทั้งหมดในหน้านี้ */}
-              {เลือกได้ในหน้านี้.length > 0 && (
-                <label className="flex items-center gap-2 px-1 text-sm text-gray-500 select-none">
-                  <input type="checkbox" aria-label="เลือกทั้งหมดในหน้านี้"
-                    checked={เลือกครบหน้านี้} onChange={สลับเลือกทั้งหน้า}
-                    className="w-4 h-4 rounded border-gray-300 accent-purple-600" />
-                  เลือกทั้งหมดในหน้านี้
-                </label>
-              )}
+              {/* แถบสรุปรายการ — เลือกทั้งหมด (ซ้าย) + จำนวนผลลัพธ์ (ขวา) รวมไว้แถวเดียวกันแทนการลอยแยกกัน */}
+              <div className="flex items-center justify-between px-1 min-h-[20px]">
+                <div>
+                  {เลือกได้ในหน้านี้.length > 0 && (
+                    <label className="flex items-center gap-2 text-sm text-gray-500 select-none">
+                      <input type="checkbox" aria-label="เลือกทั้งหมดในหน้านี้"
+                        checked={เลือกครบหน้านี้} onChange={สลับเลือกทั้งหน้า}
+                        className="w-4 h-4 rounded border-gray-300 accent-purple-600" />
+                      เลือกทั้งหมดในหน้านี้
+                    </label>
+                  )}
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">ทั้งหมด {ผู้ใช้กรอง.length.toLocaleString('th-TH')} คน</span>
+              </div>
 
-              {/* ===== รายชื่อผู้ใช้ ===== */}
-              <div className="space-y-3">
+              {/* ===== รายชื่อผู้ใช้ — คอนเทนเนอร์เดียว คั่นด้วยเส้นบาง แทนการ์ดซ้อนการ์ดทีละแถว ===== */}
+              <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100 overflow-hidden">
                 {ผู้ใช้หน้านี้.map((u) => {
                   const คือตัวเอง = u.id === user?.id
                   return (
                     <div
                       key={u.id}
                       onClick={() => เปิดUserDetail(u)}
-                      className={`bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all cursor-pointer ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}
+                      className={`flex items-center gap-3 p-4 cursor-pointer transition-colors ${
+                        คือตัวเอง ? 'bg-purple-50/60 hover:bg-purple-50 active:bg-purple-100' : 'hover:bg-gray-50 active:bg-gray-100'
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
+                      {/* ช่องติ๊กเลือก — เว้นความกว้างไว้เสมอแม้แถวตัวเองไม่มี ไม่งั้นคอลัมน์อวาตาร์จะเยื้องไม่ตรงแถวอื่น */}
+                      <div className="w-4 shrink-0">
                         {!คือตัวเอง && (
                           <input type="checkbox" aria-label={`เลือก ${u.name || u.email}`}
                             checked={เลือกไว้.has(u.id)}
                             onClick={(e) => e.stopPropagation()}
                             onChange={() => สลับเลือก(u.id)}
-                            className="w-4 h-4 rounded border-gray-300 accent-purple-600 shrink-0" />
+                            className="w-4 h-4 rounded border-gray-300 accent-purple-600" />
                         )}
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
-                          {u.avatar_url
-                            ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
-                            : <User size={20} className="text-gray-400" />
-                          }
+                      </div>
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
+                        {u.avatar_url
+                          ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                          : <User size={20} className="text-gray-400" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-800 text-sm truncate">{u.name || '(ไม่ระบุชื่อ)'}</p>
+                          {คือตัวเอง && (
+                            <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>
+                          )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-gray-800 text-sm truncate">{u.name || '(ไม่ระบุชื่อ)'}</p>
-                            {คือตัวเอง && (
-                              <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                          <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                            {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
-                            {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
-                          </span>
-                        </div>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                        <p className="text-xs text-gray-400">สมัคร {แปลงวันที่(u.created_at)}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${สีRole[u.role] || สีRole.user}`}>
+                          {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
+                        </span>
                       </div>
                     </div>
                   )
@@ -665,20 +749,15 @@ function AdminPage({ หน้า, user }) {
       {หน้า === 'areas' && (
         <div className="px-4 pt-4 space-y-4">
 
-          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-            <p className="text-xs font-bold text-indigo-600 mb-1 flex items-center gap-1.5"><MapPin size={12} className="shrink-0" /> ขอบเขตพื้นที่ของระบบ</p>
-            <p className="text-sm font-semibold text-gray-800">จังหวัดนครปฐม</p>
-            <p className="text-sm text-gray-600">ตำบลกำแพงแสน</p>
-          </div>
-
-          {/* แผนที่ภาพรวมรายงาน */}
+          {/* แผนที่ภาพรวมรายงาน — ขอบเขตพื้นที่ย้ายมารวมเป็นบรรทัดรองใต้หัวข้อ แทนกล่องสีแยกต่างหาก (เดิมใช้ indigo ซึ่งไม่ตรงกับโทนม่วงที่ใช้ทั้งฝั่ง admin) */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-0.5">
               <p className="font-bold text-gray-800 flex items-center gap-2"><Map size={18} className="text-gray-500 shrink-0" /> แผนที่รายงานทั้งหมด</p>
               {!โหลดแผนที่ && (
                 <span className="text-xs text-gray-400">{รายงานพิกัด.length} จุด</span>
               )}
             </div>
+            <p className="text-xs text-gray-400 mb-3">จังหวัดนครปฐม • ตำบลกำแพงแสน</p>
 
             {โหลดแผนที่ ? (
               <div className="text-center py-10">
@@ -710,24 +789,30 @@ function AdminPage({ หน้า, user }) {
             )}
           </div>
 
-          {[
-            'หมู่ 1 — บ้านกำแพงแสน',
-            'หมู่ 2 — บ้านดอนข่อย',
-            'หมู่ 3 — บ้านหนองกระทุ่ม',
-            'หมู่ 4 — บ้านโคกพระเจดีย์',
-          ].map((พื้นที่, i) => (
-            <div key={i} className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5"><Map size={14} className="text-gray-500 shrink-0" /> {พื้นที่}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5"><HardHat size={11} className="shrink-0" /> ยังไม่ได้กำหนดเจ้าหน้าที่</p>
+          {/* รายชื่อหมู่บ้าน — คอนเทนเนอร์เดียว คั่นด้วยเส้นบาง แทนการ์ดเงาแยกทีละหมู่ */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <p className="font-bold text-gray-800 flex items-center gap-2 px-4 pt-4 pb-3">
+              <MapPin size={18} className="text-gray-500 shrink-0" /> หมู่บ้านในพื้นที่
+            </p>
+            <div className="divide-y divide-gray-100">
+              {[
+                'หมู่ 1 — บ้านกำแพงแสน',
+                'หมู่ 2 — บ้านดอนข่อย',
+                'หมู่ 3 — บ้านหนองกระทุ่ม',
+                'หมู่ 4 — บ้านโคกพระเจดีย์',
+              ].map((พื้นที่, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 text-sm truncate">{พื้นที่}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5"><HardHat size={11} className="shrink-0" /> ยังไม่ได้กำหนดเจ้าหน้าที่</p>
+                  </div>
+                  <button className="text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium shrink-0">
+                    แก้ไข
+                  </button>
                 </div>
-                <button className="text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium">
-                  แก้ไข
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
 
@@ -743,27 +828,35 @@ function AdminPage({ หน้า, user }) {
             </div>
           ) : (
             <>
-              {[
-                { ชื่อ: 'รายงานสัตว์จรทั้งหมด', จำนวน: `${จำนวนExport.รายงาน} รายการ`, Icon: FileText, สี: 'bg-orange-50', ตาราง: 'reports',  ชื่อไฟล์: 'รายงาน' },
-                { ชื่อ: 'ข้อมูลสัตว์ในระบบ',    จำนวน: `${จำนวนExport.สัตว์} ตัว`,    Icon: PawPrint, สี: 'bg-green-50',  ตาราง: 'animals',  ชื่อไฟล์: 'สัตว์' },
-                { ชื่อ: 'ข้อมูลผู้ใช้งาน',      จำนวน: `${จำนวนExport.ผู้ใช้} คน`,   Icon: Users,    สี: 'bg-blue-50',   ตาราง: 'users',    ชื่อไฟล์: 'ผู้ใช้งาน' },
-              ].map((item, i) => (
-                <div key={i} className={`${item.สี} rounded-2xl p-4 shadow-sm flex items-center justify-between`}>
-                  <div className="flex items-center gap-3">
-                    <item.Icon size={22} className="text-gray-600 shrink-0" />
-                    <div>
-                      <p className="font-medium text-gray-800 text-sm">{item.ชื่อ}</p>
-                      <p className="text-xs text-gray-500">{item.จำนวน}</p>
+              {/* รายการที่ Export ได้ — คอนเทนเนอร์เดียว คั่นด้วยเส้นบาง แทนการ์ดคนละสีทีละรายการ (เดิมสุ่มสีพื้นหลังต่อแถวโดยไม่มีความหมายเชิงสถานะ) */}
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <p className="font-bold text-gray-800 flex items-center gap-2 px-4 pt-4 pb-3">
+                  <Download size={18} className="text-gray-500 shrink-0" /> ข้อมูลที่ Export ได้
+                </p>
+                <div className="divide-y divide-gray-100">
+                  {[
+                    { ชื่อ: 'รายงานสัตว์จรทั้งหมด', จำนวน: `${จำนวนExport.รายงาน} รายการ`, Icon: FileText, ตาราง: 'reports',  ชื่อไฟล์: 'รายงาน' },
+                    { ชื่อ: 'ข้อมูลสัตว์ในระบบ',    จำนวน: `${จำนวนExport.สัตว์} ตัว`,    Icon: PawPrint, ตาราง: 'animals',  ชื่อไฟล์: 'สัตว์' },
+                    { ชื่อ: 'ข้อมูลผู้ใช้งาน',      จำนวน: `${จำนวนExport.ผู้ใช้} คน`,   Icon: Users,    ตาราง: 'users',    ชื่อไฟล์: 'ผู้ใช้งาน' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <item.Icon size={20} className="text-gray-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 text-sm truncate">{item.ชื่อ}</p>
+                          <p className="text-xs text-gray-500">{item.จำนวน}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => exportCSV(item.ตาราง, item.ชื่อไฟล์)}
+                        className="text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 shrink-0"
+                      >
+                        <Download size={14} className="shrink-0" /> CSV
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => exportCSV(item.ตาราง, item.ชื่อไฟล์)}
-                    className="text-xs bg-white text-gray-700 px-3 py-1.5 rounded-lg shadow-sm font-medium flex items-center gap-1"
-                  >
-                    <Download size={14} className="shrink-0" /> CSV
-                  </button>
+                  ))}
                 </div>
-              ))}
+              </div>
 
               <div className="bg-gray-50 rounded-2xl p-4 text-xs text-gray-500 space-y-1">
                 <p className="font-medium text-gray-700 flex items-center gap-1.5"><Lightbulb size={14} className="shrink-0" /> เกี่ยวกับไฟล์ CSV</p>
@@ -779,21 +872,24 @@ function AdminPage({ หน้า, user }) {
       {/* ======== ตั้งค่าระบบ ======== */}
       {หน้า === 'settings' && (
         <div className="px-4 pt-4 space-y-4">
-          {[
-            { ชื่อ: 'การแจ้งเตือน', ค่า: 'เปิดใช้งาน',         Icon: Bell },
-            { ชื่อ: 'ภาษาระบบ',     ค่า: 'ภาษาไทย',            Icon: Globe },
-            { ชื่อ: 'เวอร์ชันระบบ', ค่า: 'v1.0.0',              Icon: Settings },
-            { ชื่อ: 'ฐานข้อมูล',    ค่า: 'Supabase (PostgreSQL)', Icon: Database },
-            { ชื่อ: 'สำรองข้อมูล',  ค่า: 'Supabase Auto Backup', Icon: Save },
-          ].map((item, i) => (
-            <div key={i} className="bg-white rounded-2xl px-4 py-3.5 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <item.Icon size={18} className="text-gray-500 shrink-0" />
-                <span className="text-sm font-medium text-gray-800">{item.ชื่อ}</span>
+          {/* คอนเทนเนอร์เดียว คั่นด้วยเส้นบาง แทนการ์ดเงาแยกทีละแถว — ทั้ง 5 แถวเป็นข้อมูลระดับเดียวกัน ไม่มีเหตุผลให้แยกกล่อง */}
+          <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100 overflow-hidden">
+            {[
+              { ชื่อ: 'การแจ้งเตือน', ค่า: 'เปิดใช้งาน',         Icon: Bell },
+              { ชื่อ: 'ภาษาระบบ',     ค่า: 'ภาษาไทย',            Icon: Globe },
+              { ชื่อ: 'เวอร์ชันระบบ', ค่า: 'v1.0.0',              Icon: Settings },
+              { ชื่อ: 'ฐานข้อมูล',    ค่า: 'Supabase (PostgreSQL)', Icon: Database },
+              { ชื่อ: 'สำรองข้อมูล',  ค่า: 'Supabase Auto Backup', Icon: Save },
+            ].map((item, i) => (
+              <div key={i} className="px-4 py-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <item.Icon size={18} className="text-gray-500 shrink-0" />
+                  <span className="text-sm font-medium text-gray-800 truncate">{item.ชื่อ}</span>
+                </div>
+                <span className="text-sm text-gray-500 text-right shrink-0">{item.ค่า}</span>
               </div>
-              <span className="text-sm text-gray-500">{item.ค่า}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
@@ -833,70 +929,66 @@ function AdminPage({ หน้า, user }) {
                 </div>
               </div>
 
-              {/* ข้อมูลส่วนตัว — อ่านอย่างเดียว แอดมินแก้ไขไม่ได้ (แก้ได้แค่ Role) */}
-              <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">ข้อมูลส่วนตัว</p>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">ชื่อ</span>
-                  <span className={`text-sm font-medium text-right break-all ${!userที่เลือก.name ? 'text-gray-400 italic' : 'text-gray-800'}`}>
-                    {userที่เลือก.name || '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">อีเมล</span>
-                  <span className="text-sm font-medium text-gray-800 text-right max-w-[60%] break-all">{userที่เลือก.email || '-'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">เบอร์ติดต่อ</span>
-                  <span className={`text-sm font-medium text-right ${!userที่เลือก.phone ? 'text-gray-400 italic' : 'text-gray-800'}`}>
-                    {userที่เลือก.phone || '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">วันที่สมัคร</span>
-                  <span className="text-sm font-medium text-gray-800">{แปลงวันที่(userที่เลือก.created_at)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">User ID</span>
-                  <span className="text-sm font-medium text-gray-800">{String(userที่เลือก.id).slice(0, 8)}...</span>
-                </div>
-              </div>
-
-              {/* สถิติ */}
-              {โหลดDetail ? (
-                <div className="bg-blue-50 rounded-2xl p-4 text-center">
-                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
-                </div>
-              ) : userDetail && (
-                <div className="bg-blue-50 rounded-2xl p-4 space-y-2">
-                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">สถิติการใช้งาน</p>
+              {/* ข้อมูลส่วนตัว + สถิติ + ศูนย์พักพิง — คอนเทนเนอร์เดียวกัน คั่นด้วยเส้นบางแทนกล่องสีซ้อนกันหลายกล่อง */}
+              <div className="bg-gray-50 rounded-2xl divide-y divide-gray-200/70">
+                {/* ข้อมูลส่วนตัว — อ่านอย่างเดียว แอดมินแก้ไขไม่ได้ (แก้ได้แค่ Role) */}
+                <div className="p-4 space-y-3">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">ข้อมูลส่วนตัว</p>
                   <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">ชื่อ</span>
+                    <span className={`text-sm font-medium text-right break-all ${!userที่เลือก.name ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                      {userที่เลือก.name || '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">อีเมล</span>
+                    <span className="text-sm font-medium text-gray-800 text-right max-w-[60%] break-all">{userที่เลือก.email || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">เบอร์ติดต่อ</span>
+                    <span className={`text-sm font-medium text-right ${!userที่เลือก.phone ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                      {userที่เลือก.phone || '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">วันที่สมัคร</span>
+                    <span className="text-sm font-medium text-gray-800">{แปลงวันที่(userที่เลือก.created_at)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">User ID</span>
+                    <span className="text-sm font-medium text-gray-800">{String(userที่เลือก.id).slice(0, 8)}...</span>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500">รายงานที่แจ้ง</span>
-                    <span className="text-sm font-bold text-blue-700">{userDetail.รายงานทั้งหมด} รายการ</span>
+                    {โหลดDetail ? (
+                      <Loader2 size={14} className="animate-spin text-gray-300 shrink-0" />
+                    ) : (
+                      <span className="text-sm font-bold text-purple-600">{userDetail?.รายงานทั้งหมด ?? 0} รายการ</span>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) — อ่านอย่างเดียว */}
-              {userที่เลือก.role === 'volunteer' && (
-                <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
-                  <p className="text-xs font-bold text-orange-600 uppercase tracking-wide flex items-center gap-1.5"><Home size={12} className="shrink-0" /> ข้อมูลศูนย์พักพิง</p>
-                  {[
-                    { label: 'ชื่อศูนย์',       value: userที่เลือก.shelter_name },
-                    { label: 'ที่ตั้ง',           value: userที่เลือก.shelter_location },
-                    { label: 'พื้นที่รับผิดชอบ', value: userที่เลือก.service_area },
-                  ].map(function (row) {
-                    return (
-                      <div key={row.label} className="flex justify-between items-center gap-2">
-                        <span className="text-sm text-gray-500 shrink-0">{row.label}</span>
-                        <span className={`text-sm font-medium text-right max-w-[55%] ${!row.value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
-                          {row.value || '-'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                {/* ข้อมูลศูนย์พักพิง (volunteer เท่านั้น) — อ่านอย่างเดียว */}
+                {userที่เลือก.role === 'volunteer' && (
+                  <div className="p-4 space-y-3">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Home size={12} className="shrink-0" /> ข้อมูลศูนย์พักพิง</p>
+                    {[
+                      { label: 'ชื่อศูนย์',       value: userที่เลือก.shelter_name },
+                      { label: 'ที่ตั้ง',           value: userที่เลือก.shelter_location },
+                      { label: 'พื้นที่รับผิดชอบ', value: userที่เลือก.service_area },
+                    ].map(function (row) {
+                      return (
+                        <div key={row.label} className="flex justify-between items-center gap-2">
+                          <span className="text-sm text-gray-500 shrink-0">{row.label}</span>
+                          <span className={`text-sm font-medium text-right max-w-[55%] ${!row.value ? 'text-gray-400 italic' : 'text-gray-800'}`}>
+                            {row.value || '-'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Actions — ไม่แสดงถ้าเป็นตัวเอง */}
               {userที่เลือก.id !== user?.id && (
