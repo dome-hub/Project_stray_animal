@@ -33,7 +33,11 @@ korat/
 suphalak/
 konja/
 new_breeds/
+domestic_shorthair/
 *.zip
+
+# Impeccable design skill — ติดตั้งผ่าน `npx impeccable install`, เป็นเครื่องมือ dev เฉพาะเครื่อง ไม่ต้อง commit (ไฟล์เยอะมาก ~60k บรรทัด)
+.claude/skills/
 
 # Editor directories and files
 .vscode/*
