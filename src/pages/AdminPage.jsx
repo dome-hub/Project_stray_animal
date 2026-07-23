@@ -2,7 +2,6 @@
 // เชื่อม Supabase จริง ไม่มี mock data
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
@@ -13,7 +12,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
   Shield, Users, FileText, PawPrint, Heart, User, HardHat, MapPin, Map,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
-  CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2, MoreVertical,
+  CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2,
   ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -62,9 +61,6 @@ function AdminPage({ หน้า, user }) {
   const [หน้าปัจจุบัน, setหน้าปัจจุบัน] = useState(1)
   const [ต่อหน้า,      setต่อหน้า]      = useState(20)
   const [เลือกไว้,     setเลือกไว้]     = useState(function () { return new Set() })
-  // { id, top, left } ของแถวที่เปิด kebab menu อยู่ — เรนเดอร์เมนูผ่าน Portal (ดูหมายเหตุตรงปุ่ม)
-  // เก็บพิกัดไว้ด้วยเพราะเมนูจะถูกวาดแยกออกจาก DOM ของตาราง เลยอ้างอิงตำแหน่งจากแถวไม่ได้แล้ว
-  const [เมนูที่เปิด,  setเมนูที่เปิด]  = useState(null)
 
   // ---- State: User Detail Sheet ----
   const [userที่เลือก,   setUserที่เลือก]   = useState(null)
@@ -373,6 +369,17 @@ function AdminPage({ หน้า, user }) {
     })
   }
 
+  // ids ในรายการที่เลือกไว้ ที่ "ระงับได้จริง" (ยังไม่ถูกระงับ + ไม่ใช่ admin) / "ยกเลิกระงับได้จริง" (ถูกระงับอยู่)
+  // ใช้ตัดสินใจว่าจะโชว์ปุ่มไหนใน bulk toolbar — ไม่โชว์ปุ่มที่กดไปแล้วไม่มีผลอะไร
+  const idsระงับได้ = [...เลือกไว้].filter(function (id) {
+    const u = รายการผู้ใช้.find(function (x) { return x.id === id })
+    return u && u.role !== 'admin' && u.status !== 'suspended'
+  })
+  const idsยกเลิกระงับได้ = [...เลือกไว้].filter(function (id) {
+    const u = รายการผู้ใช้.find(function (x) { return x.id === id })
+    return u && u.status === 'suspended'
+  })
+
   // อัตราการรับเลี้ยง
   const อัตรา = สถิติ.สัตว์ > 0
     ? Math.round((สถิติ.รับเลี้ยง / สถิติ.สัตว์) * 100)
@@ -468,36 +475,39 @@ function AdminPage({ หน้า, user }) {
 
       {/* ======== จัดการผู้ใช้ ======== */}
       {หน้า === 'users' && (
-        <div className="px-4 pt-4 space-y-3">
+        <div className="px-4 pt-4 space-y-5">
 
-          <p className="text-sm text-gray-500">ทั้งหมด {ผู้ใช้กรอง.length.toLocaleString('th-TH')} คน</p>
+          {/* แผงค้นหา + กรอง — จัดเป็นกลุ่มเดียวแยกจากรายชื่อด้านล่างด้วยกรอบและระยะห่างที่มากกว่า */}
+          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+            <p className="text-sm text-gray-500">ทั้งหมด {ผู้ใช้กรอง.length.toLocaleString('th-TH')} คน</p>
 
-          {/* ค้นหา */}
-          <input
-            value={ค้นหาผู้ใช้}
-            onChange={(e) => { setค้นหาผู้ใช้(e.target.value); setหน้าปัจจุบัน(1) }}
-            placeholder="ค้นหาชื่อหรืออีเมล..."
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
-          />
+            {/* ค้นหา */}
+            <input
+              value={ค้นหาผู้ใช้}
+              onChange={(e) => { setค้นหาผู้ใช้(e.target.value); setหน้าปัจจุบัน(1) }}
+              placeholder="ค้นหาชื่อหรืออีเมล..."
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-purple-400"
+            />
 
-          {/* ตัวกรอง: สิทธิ์ + สถานะ — เปลี่ยนตัวกรองแล้วรีเซ็ตไปหน้า 1 เสมอ กันเผลอค้างอยู่หน้าที่ไม่มีข้อมูลแล้ว */}
-          <div className="flex gap-2">
-            <select value={กรองRole} onChange={(e) => { setกรองRole(e.target.value); setหน้าปัจจุบัน(1) }}
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400">
-              <option value="">ทุกสิทธิ์</option>
-              <option value="user">ผู้ใช้งานทั่วไป</option>
-              <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
-              <option value="admin">ผู้ดูแลระบบ</option>
-            </select>
-            <select value={กรองสถานะ} onChange={(e) => { setกรองสถานะ(e.target.value); setหน้าปัจจุบัน(1) }}
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400">
-              <option value="">ทุกสถานะ</option>
-              <option value="active">ใช้งานปกติ</option>
-              <option value="suspended">ถูกระงับ</option>
-            </select>
+            {/* ตัวกรอง: สิทธิ์ + สถานะ — เปลี่ยนตัวกรองแล้วรีเซ็ตไปหน้า 1 เสมอ กันเผลอค้างอยู่หน้าที่ไม่มีข้อมูลแล้ว */}
+            <div className="flex gap-2">
+              <select value={กรองRole} onChange={(e) => { setกรองRole(e.target.value); setหน้าปัจจุบัน(1) }}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400">
+                <option value="">ทุกสิทธิ์</option>
+                <option value="user">ผู้ใช้งานทั่วไป</option>
+                <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
+                <option value="admin">ผู้ดูแลระบบ</option>
+              </select>
+              <select value={กรองสถานะ} onChange={(e) => { setกรองสถานะ(e.target.value); setหน้าปัจจุบัน(1) }}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400">
+                <option value="">ทุกสถานะ</option>
+                <option value="active">ใช้งานปกติ</option>
+                <option value="suspended">ถูกระงับ</option>
+              </select>
+            </div>
           </div>
 
-          {/* Bulk actions — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 รายการ (checkbox มีเฉพาะตาราง desktop) */}
+          {/* Bulk actions — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 รายการ */}
           {เลือกไว้.size > 0 && (
             <div className="bg-purple-600 text-white rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium shrink-0">เลือกอยู่ {เลือกไว้.size} คน</span>
@@ -514,25 +524,23 @@ function AdminPage({ หน้า, user }) {
                 <option value="volunteer">เจ้าหน้าที่ / อาสาสมัคร</option>
                 <option value="admin">ผู้ดูแลระบบ (Admin)</option>
               </select>
-              <button
-                onClick={function () {
-                  const ids = [...เลือกไว้].filter(function (id) {
-                    const u = รายการผู้ใช้.find(function (x) { return x.id === id })
-                    return u && u.role !== 'admin'
-                  })
-                  if (ids.length === 0) { alert('ไม่มีบัญชีที่ระงับได้ในรายการที่เลือก (ผู้ดูแลระบบระงับไม่ได้)'); return }
-                  setActionรอยืนยัน({ type: 'bulk-suspend', ids })
-                }}
-                className="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
-              >
-                ระงับที่เลือก
-              </button>
-              <button
-                onClick={() => setActionรอยืนยัน({ type: 'bulk-unsuspend', ids: [...เลือกไว้] })}
-                className="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
-              >
-                ยกเลิกระงับที่เลือก
-              </button>
+              {/* โชว์เฉพาะปุ่มที่มีผลจริงกับคนที่เลือกไว้ — ถ้าทุกคนที่เลือกใช้งานปกติอยู่แล้ว ก็ไม่มีเหตุผลให้เห็นปุ่ม "ยกเลิกระงับ" */}
+              {idsระงับได้.length > 0 && (
+                <button
+                  onClick={() => setActionรอยืนยัน({ type: 'bulk-suspend', ids: idsระงับได้ })}
+                  className="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  ระงับที่เลือก
+                </button>
+              )}
+              {idsยกเลิกระงับได้.length > 0 && (
+                <button
+                  onClick={() => setActionรอยืนยัน({ type: 'bulk-unsuspend', ids: idsยกเลิกระงับได้ })}
+                  className="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  ยกเลิกระงับที่เลือก
+                </button>
+              )}
               <button onClick={() => setเลือกไว้(new Set())} aria-label="ยกเลิกการเลือก"
                 className="ml-auto w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors shrink-0">
                 <X size={16} />
@@ -557,112 +565,18 @@ function AdminPage({ หน้า, user }) {
             </div>
           ) : (
             <>
-              {/* ===== Desktop: Data Table ===== */}
-              <div className="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
-                    <tr>
-                      <th className="w-10 px-4 py-3">
-                        <input type="checkbox" aria-label="เลือกทั้งหมดในหน้านี้"
-                          checked={เลือกครบหน้านี้} onChange={สลับเลือกทั้งหน้า}
-                          className="rounded border-gray-300" />
-                      </th>
-                      <th className="text-left px-2 py-3 font-semibold">ผู้ใช้งาน</th>
-                      <th className="text-left px-2 py-3 font-semibold">วันที่สมัคร</th>
-                      <th className="text-left px-2 py-3 font-semibold">บทบาท</th>
-                      <th className="text-left px-2 py-3 font-semibold">สถานะ</th>
-                      <th className="w-12 px-2 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {ผู้ใช้หน้านี้.map((u) => {
-                      const คือตัวเอง = u.id === user?.id
-                      return (
-                        <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${คือตัวเอง ? 'bg-purple-50/40' : ''}`}>
-                          <td className="px-4 py-3">
-                            <input type="checkbox" aria-label={`เลือก ${u.name || u.email}`}
-                              disabled={คือตัวเอง} checked={เลือกไว้.has(u.id)} onChange={() => สลับเลือก(u.id)}
-                              className="rounded border-gray-300 disabled:opacity-30" />
-                          </td>
-                          <td className="px-2 py-3">
-                            <button onClick={() => เปิดUserDetail(u)} className="flex items-center gap-3 text-left">
-                              <div className="w-9 h-9 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
-                                {u.avatar_url
-                                  ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
-                                  : <User size={16} className="text-gray-400" />}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-bold text-gray-800 truncate flex items-center gap-1.5">
-                                  {u.name || '(ไม่ระบุชื่อ)'}
-                                  {คือตัวเอง && <span className="text-[10px] font-normal bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full shrink-0">คุณ</span>}
-                                </p>
-                                <p className="text-xs text-gray-400 truncate font-normal">{u.email}</p>
-                              </div>
-                            </button>
-                          </td>
-                          <td className="px-2 py-3 text-gray-500 whitespace-nowrap">{แปลงวันที่(u.created_at)}</td>
-                          <td className="px-2 py-3">
-                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${สีRole[u.role] || สีRole.user}`}>
-                              {u.role === 'admin' ? <><Shield size={11} className="shrink-0" /> Admin</> : u.role === 'volunteer' ? <><HardHat size={11} className="shrink-0" /> เจ้าหน้าที่</> : <><User size={11} className="shrink-0" /> ผู้ใช้</>}
-                            </span>
-                          </td>
-                          <td className="px-2 py-3">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${u.status === 'suspended' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                              {u.status === 'suspended' ? 'ระงับ' : 'ใช้งาน'}
-                            </span>
-                          </td>
-                          <td className="px-2 py-3 relative">
-                            <button
-                              onClick={function (e) {
-                                if (เมนูที่เปิด?.id === u.id) { setเมนูที่เปิด(null); return }
-                                const r = e.currentTarget.getBoundingClientRect()
-                                setเมนูที่เปิด({ id: u.id, top: r.bottom + 4, left: r.right - 208 })
-                              }}
-                              aria-label="เมนูจัดการ"
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                            >
-                              <MoreVertical size={16} />
-                            </button>
+              {/* เลือกทั้งหมดในหน้านี้ */}
+              {เลือกได้ในหน้านี้.length > 0 && (
+                <label className="flex items-center gap-2 px-1 text-sm text-gray-500 select-none">
+                  <input type="checkbox" aria-label="เลือกทั้งหมดในหน้านี้"
+                    checked={เลือกครบหน้านี้} onChange={สลับเลือกทั้งหน้า}
+                    className="w-4 h-4 rounded border-gray-300 accent-purple-600" />
+                  เลือกทั้งหมดในหน้านี้
+                </label>
+              )}
 
-                            {/* เมนูวาดผ่าน Portal ไปที่ document.body — กัน overflow-x-auto ของตารางตัดเมนูทิ้ง
-                                (ตารางต้อง overflow-x-auto ไว้เพื่อเลื่อนดูคอลัมน์ แต่นั่นจะครอบตัดลูกที่เป็น absolute ด้วย) */}
-                            {เมนูที่เปิด?.id === u.id && createPortal(
-                              <>
-                                <div className="fixed inset-0 z-40" onClick={() => setเมนูที่เปิด(null)} />
-                                <div
-                                  className="fixed z-50 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-52"
-                                  style={{ top: เมนูที่เปิด.top, left: เมนูที่เปิด.left }}
-                                >
-                                  <button onClick={() => { เปิดUserDetail(u); setเมนูที่เปิด(null) }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                                    <User size={14} className="shrink-0" /> ดูรายละเอียด / แก้ไขสิทธิ์
-                                  </button>
-                                  {!คือตัวเอง && u.role !== 'admin' && (
-                                    <button
-                                      onClick={function () {
-                                        setUserที่เลือก(u)
-                                        setActionรอยืนยัน({ type: u.status === 'suspended' ? 'unsuspend' : 'suspend' })
-                                        setเมนูที่เปิด(null)
-                                      }}
-                                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 hover:bg-gray-50 ${u.status === 'suspended' ? 'text-green-600' : 'text-red-500'}`}
-                                    >
-                                      {u.status === 'suspended' ? <><CheckCircle2 size={14} className="shrink-0" /> ยกเลิกการระงับ</> : <><Ban size={14} className="shrink-0" /> ระงับการใช้งาน</>}
-                                    </button>
-                                  )}
-                                </div>
-                              </>,
-                              document.body
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ===== Mobile: List Card กะทัดรัด ===== */}
-              <div className="md:hidden space-y-3">
+              {/* ===== รายชื่อผู้ใช้ ===== */}
+              <div className="space-y-3">
                 {ผู้ใช้หน้านี้.map((u) => {
                   const คือตัวเอง = u.id === user?.id
                   return (
@@ -672,6 +586,13 @@ function AdminPage({ หน้า, user }) {
                       className={`bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-all cursor-pointer ${คือตัวเอง ? 'ring-2 ring-purple-200' : ''}`}
                     >
                       <div className="flex items-center gap-3">
+                        {!คือตัวเอง && (
+                          <input type="checkbox" aria-label={`เลือก ${u.name || u.email}`}
+                            checked={เลือกไว้.has(u.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => สลับเลือก(u.id)}
+                            className="w-4 h-4 rounded border-gray-300 accent-purple-600 shrink-0" />
+                        )}
                         <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center shrink-0">
                           {u.avatar_url
                             ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
