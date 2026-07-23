@@ -22,6 +22,19 @@ ai_server/venv
 ai_server/__pycache__
 *.pyc
 
+# รูปสำหรับ train โมเดลเพิ่ม (ไฟล์เยอะ/หนัก ไม่ควร push ขึ้น GitHub)
+thai_ridgeback/
+siberian_husky/
+thai_bangkaew/
+labrador_retriever/
+golden_retriever/
+khao_manee/
+korat/
+suphalak/
+konja/
+new_breeds/
+*.zip
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
