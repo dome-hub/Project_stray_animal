@@ -177,6 +177,7 @@ function ReportAnimal({ user }) {
   const [เหตุผลแจ้ง,   setเหตุผลแจ้ง]   = useState(null)
   const [รายละเอียด,   setรายละเอียด]   = useState('')
   const [ผลAI,         setผลAI]         = useState(null)
+  const [สายพันธุ์สุดท้าย, setสายพันธุ์สุดท้าย] = useState('')   // ใช้ค่านี้ตอนส่งจริง แก้ไขทับผล AI ได้เสมอ
   const [กำลังวิเคราะห์, setกำลังวิเคราะห์] = useState(false)
   const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
   const [latitude,        setLatitude]        = useState(null)
@@ -217,6 +218,7 @@ function ReportAnimal({ user }) {
   async function วิเคราะห์AIจริง(imageFile) {
     setกำลังวิเคราะห์(true)
     setผลAI(null)
+    setสายพันธุ์สุดท้าย('')
 
     try {
       const formData = new FormData()
@@ -240,6 +242,8 @@ function ReportAnimal({ user }) {
           top3: data.result.top3,
           จากAI: true,
         })
+        // AI ระบุได้ → เติมให้อัตโนมัติ (แก้ไขทับได้) / ระบุไม่ได้ → เว้นว่างให้ผู้แจ้งกรอกเอง
+        setสายพันธุ์สุดท้าย(data.result.ระบุได้ ? data.result.สายพันธุ์ : '')
       }
 
     } catch (err) {
@@ -251,6 +255,7 @@ function ReportAnimal({ user }) {
         ความแม่นยำ: 0,
         จากAI: false,
       })
+      setสายพันธุ์สุดท้าย('')
     } finally {
       setกำลังวิเคราะห์(false)
     }
@@ -401,7 +406,7 @@ function ReportAnimal({ user }) {
     }
 
     const { data, error } = await supabase.from('reports').insert({
-      animal_type:   ผลAI?.สายพันธุ์ || 'ไม่ระบุ',
+      animal_type:   สายพันธุ์สุดท้าย.trim() || 'ไม่ระบุ',
       location_text: ตำแหน่ง,
       detail:        รายละเอียด,
       urgency:       เหตุผลแจ้ง?.urgency || 'ปานกลาง',
@@ -868,9 +873,26 @@ function ReportAnimal({ user }) {
         {ผลAI && !กำลังวิเคราะห์ && (
           <div className="bg-white border border-orange-200 rounded-2xl p-4 shadow-sm">
             <p className="text-xs font-bold text-orange-600 mb-3 flex items-center gap-1.5"><Bot size={14} className="shrink-0" /> ผลวิเคราะห์จาก AI</p>
+
+            {/* สายพันธุ์/ประเภทสัตว์ — แก้ไขทับผล AI ได้เสมอ เผื่อ AI ทายผิดหรือระบุไม่ได้ */}
+            <div className="mb-3">
+              <label className="text-xs text-gray-500 block mb-1">
+                สายพันธุ์ / ประเภทสัตว์
+                {สายพันธุ์สุดท้าย.trim() === '' && (
+                  <span className="text-orange-500 font-medium"> (กรุณาระบุเอง)</span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={สายพันธุ์สุดท้าย}
+                onChange={(e) => setสายพันธุ์สุดท้าย(e.target.value)}
+                placeholder="เช่น หมาพันธุ์ทาง, แมวไทย, ไม่ทราบพันธุ์"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-orange-400"
+              />
+            </div>
+
             <div className="space-y-2">
               {[
-                { label: 'สายพันธุ์', value: ผลAI.สายพันธุ์ },
                 { label: 'ขนาด',      value: ผลAI.ขนาด },
                 { label: 'นิสัย',     value: ผลAI.นิสัย },
                 { label: 'ความแม่นยำ', value: ผลAI.ความแม่นยำ + '%' },
