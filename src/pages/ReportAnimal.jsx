@@ -811,6 +811,9 @@ function ReportAnimal({ user }) {
         {/* ส่วนรูปภาพ */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">ภาพถ่ายสัตว์</p>
+          <p className="text-xs text-gray-400 mb-2">
+            📸 ถ่ายให้สัตว์อยู่กลางภาพและเต็มเฟรม จะช่วยให้ AI วิเคราะห์สายพันธุ์ได้แม่นยำขึ้น
+          </p>
 
           {รูปภาพPreview ? (
             /* ---- มีรูปแล้ว: preview + แถบถ่ายใหม่ / คลัง ---- */
