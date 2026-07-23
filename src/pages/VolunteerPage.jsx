@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Circle, CircleDot, Plus, X, FileSpreadsheet, Navigation, Camera, Star,
   PawPrint, HelpCircle, HardHat, PartyPopper, ClipboardList, MapPin,
-  AlertTriangle, Settings, Search, FileText, Map, MessageSquare, User, Trash2,
+  AlertTriangle, Search, FileText, Map, MessageSquare, User, Trash2,
   Phone, Loader2, CheckCircle2, XCircle, Save, Zap, Link2, Lock, Megaphone, Home,
   Hourglass, Heart, ExternalLink, ArrowLeft, ChevronRight, Check, Calendar
 } from 'lucide-react'
@@ -1215,10 +1215,8 @@ function VolunteerPage({ หน้า }) {
 
             return (
             <>
-              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-3">
-                <p className="text-xs text-teal-700 font-medium flex items-center gap-1.5"><Settings size={12} className="shrink-0" /> เลือกรายงานเพื่ออัปเดตสถานะ</p>
-                <p className="text-xs text-teal-600 mt-0.5">{รายงานActive.length} รายการรอดำเนินการ</p>
-              </div>
+              {/* บอกจำนวนงานค้างตรงๆ ไม่ต้องมีกล่องสีอธิบายวิธีใช้ — ชื่อหน้า "อัปเดตสถานะสัตว์" กับรายการด้านล่างสื่อสารพอแล้ว */}
+              <p className="text-sm text-gray-500 px-1">{รายงานActive.length.toLocaleString('th-TH')} รายการรอดำเนินการ</p>
 
               {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) แสดงเฉพาะประเภทที่มีข้อมูล — เลื่อนแนวนอน */}
               {ประเภทที่มีUpdate.length > 0 && (
@@ -1866,28 +1864,28 @@ function VolunteerPage({ หน้า }) {
             </div>
 
             <div className="px-5 pb-8 space-y-4">
-              {/* รูป + ข้อมูล */}
-              <div className="flex gap-3 items-start bg-gray-50 rounded-2xl p-3">
-                <AnimalThumb imageUrl={รายงานที่เปิด.image_url} type={รายงานที่เปิด.animal_type} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-800">{รายงานที่เปิด.animal_type || 'ไม่ระบุ'}</p>
-                  <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {รายงานที่เปิด.location_text}</p>
-                  <p className="text-xs text-gray-400">{แปลงวันที่เวลา(รายงานที่เปิด.created_at)}</p>
-                  {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
-                    <a
-                      href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
-                      target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-white bg-teal-600 px-3 py-1.5 rounded-full font-medium"
-                    >
-                      <Map size={13} className="shrink-0" /> Google Maps →
-                    </a>
-                  )}
+              {/* รูป + ข้อมูล + ความคืบหน้า — คอนเทนเนอร์เดียวกัน คั่นด้วยเส้นบาง แทนสองกล่องสีเทาติดกันที่แยกกันโดยไม่มีเหตุผล */}
+              <div className="bg-gray-50 rounded-2xl p-3 divide-y divide-gray-200/70">
+                <div className="flex gap-3 items-start pb-3">
+                  <AnimalThumb imageUrl={รายงานที่เปิด.image_url} type={รายงานที่เปิด.animal_type} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800">{รายงานที่เปิด.animal_type || 'ไม่ระบุ'}</p>
+                    <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {รายงานที่เปิด.location_text}</p>
+                    <p className="text-xs text-gray-400">{แปลงวันที่เวลา(รายงานที่เปิด.created_at)}</p>
+                    {รายงานที่เปิด.latitude && รายงานที่เปิด.longitude && (
+                      <a
+                        href={`https://www.google.com/maps?q=${รายงานที่เปิด.latitude},${รายงานที่เปิด.longitude}`}
+                        target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 mt-1.5 text-xs text-white bg-teal-600 px-3 py-1.5 rounded-full font-medium"
+                      >
+                        <Map size={13} className="shrink-0" /> Google Maps →
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="bg-gray-50 rounded-2xl p-3">
-                <ProgressBar status={รายงานที่เปิด.status} />
+                <div className="pt-3">
+                  <ProgressBar status={รายงานที่เปิด.status} />
+                </div>
               </div>
 
               {/* ข้อมูลผู้แจ้ง (compact) */}
