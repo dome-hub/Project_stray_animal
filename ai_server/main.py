@@ -52,6 +52,20 @@ def แปลงรูป(image_bytes: bytes) -> np.ndarray:
     # เดิมเป็นแค่ identity function) เลยส่ง pixel ดิบ [0-255] เข้าไปตรง ๆ ได้เลย
     return np.expand_dims(arr, axis=0)
 
+def แปลงรูป_เซ็นเตอร์ครอป(image_bytes: bytes) -> np.ndarray:
+    # ครอปสี่เหลี่ยมจัตุรัสตรงกลางภาพ (ตัดส่วนเกินด้านที่ยาวกว่าออก) แล้วซูมเข้า resize เต็มขนาด
+    # ช่วยกรณีตัวสัตว์อยู่กลางภาพแต่ไม่เต็มเฟรม จะเห็นรายละเอียดสัตว์ชัดขึ้นกว่าวิธี letterbox เพียงอย่างเดียว
+    img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+    w, h = img.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top  = (h - side) // 2
+    img_cropped = img.crop((left, top, left + side, top + side))
+    img_resized = img_cropped.resize((IMG_SIZE, IMG_SIZE))
+
+    arr = np.array(img_resized, dtype=np.float32)
+    return np.expand_dims(arr, axis=0)
+
 def ทำนาย(img_array: np.ndarray) -> np.ndarray:
     result = session.run(None, {INPUT_NAME: img_array})
     return result[0][0]
@@ -123,8 +137,15 @@ async def analyze(file: UploadFile = File(...)):
         raise HTTPException(400, "ไฟล์ใหญ่เกินไป (max 10MB)")
 
     try:
-        img_array   = แปลงรูป(contents)
-        predictions = ทำนาย(img_array)
+        # ── TTA (Test-Time Augmentation) ──
+        # วิเคราะห์ 2 มุมมองแล้วเฉลี่ยผลลัพธ์ กันกรณีตัวสัตว์อยู่มุม/เล็กในเฟรมทำให้แม่นน้อยลง
+        img_letterbox = แปลงรูป(contents)              # เห็นทั้งภาพ (รักษาสัดส่วน)
+        img_center    = แปลงรูป_เซ็นเตอร์ครอป(contents)  # ซูมตรงกลาง
+
+        pred_letterbox = ทำนาย(img_letterbox)
+        pred_center    = ทำนาย(img_center)
+
+        predictions = (pred_letterbox + pred_center) / 2
         result      = วิเคราะห์ผล(predictions)
         return {"success": True, "result": result}
     except Exception as e:
