@@ -12,7 +12,7 @@ import {
   PawPrint, HelpCircle, HardHat, PartyPopper, ClipboardList, MapPin,
   AlertTriangle, Search, FileText, Map, MessageSquare, User, Trash2,
   Phone, Loader2, CheckCircle2, XCircle, Save, Zap, Link2, Lock, Megaphone, Home,
-  Hourglass, Heart, ExternalLink, ArrowLeft, ChevronRight, Check, Calendar
+  Hourglass, Heart, ExternalLink, ArrowLeft, ChevronRight, Check, Calendar, LocateFixed
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -66,6 +66,14 @@ function หมุดสี(color) {
   _หมุดCache[color] = icon
   return icon
 }
+
+// หมุดตำแหน่งตัวเอง — จุดกลมทึบสีน้ำเงินมีวงแหวน แยกจากหมุดหยดน้ำสีเคสตั้งใจ กันสับสนว่าจุดไหนคือเจ้าหน้าที่เอง
+const หมุดตัวเอง = L.divIcon({
+  html: `<div style="width:18px;height:18px;border-radius:9999px;background:#2563eb;border:3px solid white;box-shadow:0 0 0 4px rgba(37,99,235,0.35)"></div>`,
+  className: '',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+})
 
 // ตัวคุมแผนที่ — บินไปที่จุดที่เลือกจาก List
 function MapController({ โฟกัส }) {
@@ -444,11 +452,15 @@ function VolunteerPage({ หน้า }) {
   // ---- Filter (reports) ----
   const [แท็บรายงาน, setแท็บรายงาน] = useState('active')  // active = กำลังดำเนินการ, history = ประวัติการทำงาน
   const [ประเภทเลือกReports, setประเภทเลือกReports] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
+  const [ค้นหาReports, setค้นหาReports] = useState('')
+  const [เรียงตามReports, setเรียงตามReports] = useState('date')  // date = ล่าสุดก่อน (จัดกลุ่มตามวัน), urgency = ดุร้าย→บาดเจ็บ→พลัดหลง
+  const [เรียงตามUpdate,  setเรียงตามUpdate]  = useState('date')  // เหมือนกันแต่แยก state เพราะเป็นคนละหน้า สลับอันหนึ่งไม่กระทบอีกอัน
 
   // ---- Animals ----
   const [สัตว์จากDB,        setSัตว์จากDB]        = useState([])
   const [โหลดสัตว์,         setโหลดสัตว์]         = useState(true)
   const [แท็บสัตว์,         setแท็บสัตว์]         = useState('shelter')  // shelter | waiting | adopted
+  const [ค้นหาสัตว์,       setค้นหาสัตว์]        = useState('')
   const [สัตว์ที่แก้ไข,      setSัตว์ที่แก้ไข]      = useState(null)
   const [inputนิสัย,        setinputนิสัย]        = useState('')      // ช่องพิมพ์ก่อนกลายเป็น chip
   const [ข้อมูลรายงานสัตว์,  setข้อมูลรายงานสัตว์]  = useState(null)   // { report + reporter }
@@ -464,6 +476,8 @@ function VolunteerPage({ หน้า }) {
 
   // ---- Stats ----
   const [สถิติ, setSถิติ] = useState({ รายงาน: 0, รอดำเนินการ: 0, สัตว์: 0, รับเลี้ยงแล้ว: 0 })
+  const [สถิติเดือนนี้, setSถิติเดือนนี้]   = useState({ รายงาน: 0, รับเลี้ยงแล้ว: 0 })
+  const [สถิติเดือนก่อน, setSถิติเดือนก่อน] = useState({ รายงาน: 0, รับเลี้ยงแล้ว: 0 })
   const [กำลังExport, setกำลังExport] = useState(false)
   const [วันที่เริ่ม,   setวันที่เริ่ม]   = useState('')  // ว่าง = ไม่กรอง
   const [วันที่สิ้นสุด, setวันที่สิ้นสุด] = useState('')
@@ -474,6 +488,8 @@ function VolunteerPage({ หน้า }) {
   const [filterMap, setFilterMap]   = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [ประเภทเลือกUpdate, setประเภทเลือกUpdate] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
+  const [ตำแหน่งฉัน, setตำแหน่งฉัน] = useState(null)   // { lat, lng } ของเจ้าหน้าที่ — ใช้เรียงเคสใกล้สุดก่อน
+  const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
 
   // ================================================================
   // FETCH
@@ -540,13 +556,51 @@ function VolunteerPage({ หน้า }) {
   }
 
   async function ดึงสถิติ() {
-    const [ร1, ร2, ร3, ร4] = await Promise.all([
+    // วันแรกของเดือนนี้ + เดือนก่อน (ไว้เทียบแนวโน้ม)
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+    const startOfLastMonth = new Date(startOfMonth)
+    startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1)
+
+    const [ร1, ร2, ร3, ร4, ร5, ร6, ร7, ร8] = await Promise.all([
       supabase.from('reports').select('id', { count: 'exact', head: true }),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'รอดำเนินการ'),
-      supabase.from('animals').select('id', { count: 'exact', head: true }),
+      // "สัตว์ในดูแล" ควรนับเฉพาะตัวที่ยังอยู่ในความรับผิดชอบจริง (เดิมนับสัตว์ทั้งหมดที่เคยเพิ่ม รวมตัวที่รับเลี้ยงไปแล้วด้วย ทำให้ตัวเลขไม่ตรงชื่อหัวข้อ)
+      supabase.from('animals').select('id', { count: 'exact', head: true }).in('status', ['อยู่ศูนย์พักพิง', 'อยู่ระหว่างรักษา', 'รอการรับเลี้ยง']),
       supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง'),
+      // เดือนนี้ — ไว้เทียบแนวโน้ม
+      supabase.from('reports').select('id', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
+      supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง').gte('created_at', startOfMonth.toISOString()),
+      // เดือนก่อน
+      supabase.from('reports').select('id', { count: 'exact', head: true }).gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
+      supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง').gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
     ])
     setSถิติ({ รายงาน: ร1.count || 0, รอดำเนินการ: ร2.count || 0, สัตว์: ร3.count || 0, รับเลี้ยงแล้ว: ร4.count || 0 })
+    setSถิติเดือนนี้({ รายงาน: ร5.count || 0, รับเลี้ยงแล้ว: ร6.count || 0 })
+    setSถิติเดือนก่อน({ รายงาน: ร7.count || 0, รับเลี้ยงแล้ว: ร8.count || 0 })
+  }
+
+  // ---- หาตำแหน่งปัจจุบันของเจ้าหน้าที่ (GPS เบราว์เซอร์) — ใช้เรียงเคสบนแผนที่ตามระยะใกล้สุด ----
+  function หาตำแหน่งฉัน() {
+    if (!navigator.geolocation) {
+      toast('เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง')
+      return
+    }
+    setกำลังหาตำแหน่ง(true)
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        const ตำแหน่ง = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setตำแหน่งฉัน(ตำแหน่ง)
+        setกำลังหาตำแหน่ง(false)
+        setโฟกัสจุด({ ...ตำแหน่ง, id: 'me', t: Date.now() })
+      },
+      function () {
+        setกำลังหาตำแหน่ง(false)
+        toast('ไม่สามารถระบุตำแหน่งได้ กรุณาอนุญาตการเข้าถึงตำแหน่งในเบราว์เซอร์')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   // ---- ดาวน์โหลดข้อมูลสัตว์เป็น CSV (เปิดได้ด้วย Excel) — กรองตามช่วงวันที่ได้ ----
@@ -995,7 +1049,21 @@ function VolunteerPage({ หน้า }) {
   const รายงานกรอง = ประเภทเลือกReports.length === 0
     ? รายงานตามสถานะ
     : รายงานตามสถานะ.filter((ร) => ประเภทเลือกReports.includes(ประเภทจาก(ร.urgency).key))
-  const รายงานกรองตามวันที่ = จัดกลุ่มตามวันที่(รายงานกรอง)
+  // ค้นหา — จับคู่ชนิดสัตว์ ที่อยู่ หรือเลขที่รายงาน
+  const รายงานกรองค้น = ค้นหาReports.trim()
+    ? รายงานกรอง.filter(function (ร) {
+        const q = ค้นหาReports.trim().toLowerCase()
+        return (ร.animal_type || '').toLowerCase().includes(q)
+          || (ร.location_text || '').toLowerCase().includes(q)
+          || String(ร.id).includes(q)
+      })
+    : รายงานกรอง
+  const รายงานกรองตามวันที่ = จัดกลุ่มตามวันที่(รายงานกรองค้น)
+  // เรียงตามความเร่งด่วน (ดุร้าย → บาดเจ็บ → พลัดหลง) — ใช้ตอนเลือก "เรียงตามความเร่งด่วน" แทนกลุ่มตามวันที่
+  const รายงานกรองเรียงเร่งด่วน = [...รายงานกรองค้น].sort(function (a, b) {
+    const ต่าง = ประเภทแจ้งเรียง.indexOf(ประเภทจาก(a.urgency)) - ประเภทแจ้งเรียง.indexOf(ประเภทจาก(b.urgency))
+    return ต่าง !== 0 ? ต่าง : new Date(b.created_at) - new Date(a.created_at)
+  })
 
   // เคสที่ยังทำงานอยู่ (แสดงในหน้าอัปเดตสถานะ = To-Do List ภาคสนาม) — เฉพาะสถานะระหว่างดำเนินการ
   // "อยู่ศูนย์พักพิง" ไม่อยู่ในลิสต์นี้แล้ว: พอถึงศูนย์ = เป็นเคสปิด() → หลุดจากหน้านี้ทันที (ไปต่อที่จัดการข้อมูลสัตว์)
@@ -1006,6 +1074,76 @@ function VolunteerPage({ หน้า }) {
 
   // แผนที่เคสที่อาจซ้ำ (id -> เคสใกล้สุด) — คำนวณสดจากรายงานที่โหลดมาแล้ว ใช้โชว์ป้าย "อาจซ้ำ" บนการ์ด
   const เคสซ้ำแผนที่ = สร้างแผนที่เคสซ้ำ(รายงานทั้งหมด)
+
+  // การ์ดรายงานหน้า "รายการแจ้งสัตว์จร" — แยกเป็นฟังก์ชันเดียวเพราะใช้ทั้งมุมมองจัดกลุ่มตามวันที่และมุมมองเรียงตามความเร่งด่วน
+  function การ์ดรายงาน(ร) {
+    const ประเภท = ประเภทจาก(ร.urgency)
+    const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
+    const ปิดเคสแล้ว = แท็บรายงาน === 'history'
+    return (
+      <div key={ร.id}
+        style={{ borderLeftColor: ปิดเคสแล้ว ? '#d1d5db' : ประเภท.hex }}
+        className={`w-full text-left rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${
+          ปิดเคสแล้ว ? 'bg-gray-50 opacity-75' : 'bg-white'
+        }`}
+        onClick={() => เปิดรายละเอียด(ร)}
+      >
+        <div className="p-4 flex items-center gap-3">
+          <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
+          <div className="flex-1 min-w-0">
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภท.dot}`} /> {ประเภท.short}
+            </span>
+            <div className="flex items-start justify-between gap-2 mb-0.5">
+              {รอสายพันธุ์ ? (
+                <p className="text-gray-400 text-sm">รอระบุสายพันธุ์</p>
+              ) : (
+                <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
+              )}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${
+                ปิดเคสแล้ว ? 'text-gray-500 bg-gray-100 border-gray-200' : (สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200')
+              }`}>
+                {ร.status}
+              </span>
+            </div>
+
+            {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
+            {ร.latitude && ร.longitude ? (
+              <a
+                href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
+                target="_blank" rel="noreferrer"
+                onClick={function (e) { e.stopPropagation() }}
+                className="inline-flex items-center gap-1 text-xs text-teal-700 font-semibold max-w-full"
+              >
+                <MapPin size={13} className="shrink-0" />
+                <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
+                <span className="shrink-0 bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-0.5">Maps <ExternalLink size={9} className="shrink-0" /></span>
+              </a>
+            ) : (
+              <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {ร.location_text || '-'}</p>
+            )}
+
+            <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
+            {ร.detail && (
+              <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
+            )}
+
+            {/* ป้ายเตือนเคสอาจซ้ำ — กดแล้วเปิด modal รวมเคสพร้อม pre-fill เคสหลักให้เลย */}
+            {!ปิดเคสแล้ว && เคสซ้ำแผนที่[ร.id] && (
+              <button
+                onClick={function (e) { e.stopPropagation(); เปิดรวมเคส(ร, เคสซ้ำแผนที่[ร.id].เคส) }}
+                className="mt-1.5 inline-flex items-center gap-1 bg-orange-100 text-orange-600 text-[11px] font-bold px-2 py-1 rounded-full active:bg-orange-200"
+              >
+                <AlertTriangle size={12} className="shrink-0" /> อาจซ้ำกับ #{String(เคสซ้ำแผนที่[ร.id].เคส.id).padStart(6, '0')}
+                <span className="font-normal text-orange-400">· ห่าง {Math.round(เคสซ้ำแผนที่[ร.id].ระยะ)} ม.</span>
+              </button>
+            )}
+          </div>
+          <ChevronRight size={20} className="text-gray-300 shrink-0" />
+        </div>
+      </div>
+    )
+  }
 
   const titleMap = {
     reports: 'รายการแจ้งสัตว์จร',
@@ -1068,9 +1206,22 @@ function VolunteerPage({ หน้า }) {
             </div>
           </div>
 
+          {/* ค้นหา — จับคู่ชนิดสัตว์ ที่อยู่ หรือเลขที่รายงาน */}
+          <div className="px-4 mb-3">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
+              <input
+                value={ค้นหาReports}
+                onChange={(e) => setค้นหาReports(e.target.value)}
+                placeholder="ค้นหาชนิดสัตว์ ที่อยู่ หรือเลขที่รายงาน..."
+                className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm bg-white focus:outline-none focus:border-teal-400"
+              />
+            </div>
+          </div>
+
           {/* Filter chips — แยกตามประเภทการแจ้ง (กดเลือกได้หลายประเภท) — เลื่อนแนวนอน */}
           {ประเภทที่มีReports.length > 0 && (
-            <div className="px-4 mb-4 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="px-4 mb-3 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {ประเภทที่มีReports.map(function (p) {
                 const active = ประเภทเลือกReports.includes(p.key)
                 return (
@@ -1087,6 +1238,28 @@ function VolunteerPage({ หน้า }) {
             </div>
           )}
 
+          {/* เรียงตาม — ล่าสุด (จัดกลุ่มตามวัน) หรือความเร่งด่วน (ดุร้าย → บาดเจ็บ → พลัดหลง) */}
+          <div className="px-4 mb-4 flex items-center gap-2">
+            <span className="text-xs text-gray-400 shrink-0">เรียงตาม</span>
+            <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+              {[
+                { key: 'date',    label: 'ล่าสุด' },
+                { key: 'urgency', label: 'ความเร่งด่วน' },
+              ].map(function (opt) {
+                const isActive = เรียงตามReports === opt.key
+                return (
+                  <button key={opt.key} onClick={() => setเรียงตามReports(opt.key)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      isActive ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Loading */}
           {โหลดรายงาน && (
             <div className="text-center py-12">
@@ -1095,95 +1268,40 @@ function VolunteerPage({ หน้า }) {
             </div>
           )}
 
-          {!โหลดรายงาน && รายงานกรอง.length === 0 && (
+          {!โหลดรายงาน && รายงานกรองค้น.length === 0 && (
             <div className="text-center py-16 text-gray-400">
-              {แท็บรายงาน === 'active' ? <PartyPopper size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" /> : <ClipboardList size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />}
+              {รายงานตามสถานะ.length === 0
+                ? (แท็บรายงาน === 'active' ? <PartyPopper size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" /> : <ClipboardList size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />)
+                : <Search size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
+              }
               <p className="font-medium">
-                {แท็บรายงาน === 'active' ? 'ไม่มีงานที่ต้องดำเนินการในขณะนี้' : 'ยังไม่มีประวัติการปฏิบัติงาน'}
+                {รายงานตามสถานะ.length === 0
+                  ? (แท็บรายงาน === 'active' ? 'ไม่มีงานที่ต้องดำเนินการในขณะนี้' : 'ยังไม่มีประวัติการปฏิบัติงาน')
+                  : 'ไม่พบรายงานที่ตรงกับตัวกรองหรือคำค้นหา'
+                }
               </p>
             </div>
           )}
 
-          {/* รายการการ์ด — จัดกลุ่มตามวันที่ */}
-          <div className="px-4 space-y-4">
-            {รายงานกรองตามวันที่.map(function (กลุ่ม) {
-              return (
-                <div key={กลุ่ม.label}>
-                  <p className="text-xs font-semibold text-gray-400 mb-2 px-1">📅 {กลุ่ม.label}</p>
-                  <div className="space-y-3">
-                    {กลุ่ม.items.map(function (ร) {
-                      const ประเภท = ประเภทจาก(ร.urgency)
-                      const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
-                      const ปิดเคสแล้ว = แท็บรายงาน === 'history'
-                      return (
-                        <div key={ร.id}
-                          style={{ borderLeftColor: ปิดเคสแล้ว ? '#d1d5db' : ประเภท.hex }}
-                          className={`w-full text-left rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${
-                            ปิดเคสแล้ว ? 'bg-gray-50 opacity-75' : 'bg-white'
-                          }`}
-                          onClick={() => เปิดรายละเอียด(ร)}
-                        >
-                          <div className="p-4 flex items-center gap-3">
-                            <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
-                            <div className="flex-1 min-w-0">
-                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภท.dot}`} /> {ประเภท.short}
-                              </span>
-                              <div className="flex items-start justify-between gap-2 mb-0.5">
-                                {รอสายพันธุ์ ? (
-                                  <p className="text-gray-400 text-sm">รอระบุสายพันธุ์</p>
-                                ) : (
-                                  <p className="font-bold text-gray-800 text-sm">{ร.animal_type || 'ไม่ระบุประเภท'}</p>
-                                )}
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${
-                                  ปิดเคสแล้ว ? 'text-gray-500 bg-gray-100 border-gray-200' : (สีสถานะ[ร.status] || 'text-gray-600 bg-gray-50 border-gray-200')
-                                }`}>
-                                  {ร.status}
-                                </span>
-                              </div>
-
-                              {/* ตำแหน่ง — กดได้ถ้ามีพิกัด */}
-                              {ร.latitude && ร.longitude ? (
-                                <a
-                                  href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
-                                  target="_blank" rel="noreferrer"
-                                  onClick={function (e) { e.stopPropagation() }}
-                                  className="inline-flex items-center gap-1 text-xs text-teal-700 font-semibold max-w-full"
-                                >
-                                  <MapPin size={13} className="shrink-0" />
-                                  <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
-                                  <span className="shrink-0 bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-0.5">Maps <ExternalLink size={9} className="shrink-0" /></span>
-                                </a>
-                              ) : (
-                                <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {ร.location_text || '-'}</p>
-                              )}
-
-                              <p className="text-xs text-gray-400 mt-0.5">{แปลงวันที่เวลา(ร.created_at)} · #{String(ร.id).padStart(6, '0')}</p>
-                              {ร.detail && (
-                                <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{ร.detail}"</p>
-                              )}
-
-                              {/* ป้ายเตือนเคสอาจซ้ำ — กดแล้วเปิด modal รวมเคสพร้อม pre-fill เคสหลักให้เลย */}
-                              {!ปิดเคสแล้ว && เคสซ้ำแผนที่[ร.id] && (
-                                <button
-                                  onClick={function (e) { e.stopPropagation(); เปิดรวมเคส(ร, เคสซ้ำแผนที่[ร.id].เคส) }}
-                                  className="mt-1.5 inline-flex items-center gap-1 bg-orange-100 text-orange-600 text-[11px] font-bold px-2 py-1 rounded-full active:bg-orange-200"
-                                >
-                                  <AlertTriangle size={12} className="shrink-0" /> อาจซ้ำกับ #{String(เคสซ้ำแผนที่[ร.id].เคส.id).padStart(6, '0')}
-                                  <span className="font-normal text-orange-400">· ห่าง {Math.round(เคสซ้ำแผนที่[ร.id].ระยะ)} ม.</span>
-                                </button>
-                              )}
-                            </div>
-                            <ChevronRight size={20} className="text-gray-300 shrink-0" />
-                          </div>
-                        </div>
-                      )
-                    })}
+          {/* รายการการ์ด — เรียงตามความเร่งด่วนจะโชว์เป็นลิสต์เรียบ (หัวข้อวันที่ใช้ไม่ได้แล้วเพราะลำดับไม่ตรงวัน) */}
+          {เรียงตามReports === 'urgency' ? (
+            <div className="px-4 space-y-3">
+              {รายงานกรองเรียงเร่งด่วน.map((ร) => การ์ดรายงาน(ร))}
+            </div>
+          ) : (
+            <div className="px-4 space-y-4">
+              {รายงานกรองตามวันที่.map(function (กลุ่ม) {
+                return (
+                  <div key={กลุ่ม.label}>
+                    <p className="text-xs font-semibold text-gray-400 mb-2 px-1 flex items-center gap-1.5"><Calendar size={12} className="shrink-0" /> {กลุ่ม.label}</p>
+                    <div className="space-y-3">
+                      {กลุ่ม.items.map((ร) => การ์ดรายงาน(ร))}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1207,6 +1325,13 @@ function VolunteerPage({ หน้า }) {
             const รายงานActiveกรอง = ประเภทเลือกUpdate.length === 0
               ? รายงานActive
               : รายงานActive.filter((r) => ประเภทเลือกUpdate.includes(ประเภทจาก(r.urgency).key))
+            // เรียงตามความเร่งด่วน (ดุร้าย → บาดเจ็บ → พลัดหลง) เมื่อเลือกไว้ — ไม่งั้นเรียงตามวันที่แจ้งเข้าล่าสุดก่อนตามเดิม
+            const รายงานActiveเรียง = เรียงตามUpdate === 'urgency'
+              ? [...รายงานActiveกรอง].sort(function (a, b) {
+                  const ต่าง = ประเภทแจ้งเรียง.indexOf(ประเภทจาก(a.urgency)) - ประเภทแจ้งเรียง.indexOf(ประเภทจาก(b.urgency))
+                  return ต่าง !== 0 ? ต่าง : new Date(b.created_at) - new Date(a.created_at)
+                })
+              : รายงานActiveกรอง
             function สลับประเภท(key) {
               setประเภทเลือกUpdate(function (prev) {
                 return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
@@ -1237,6 +1362,28 @@ function VolunteerPage({ หน้า }) {
                 </div>
               )}
 
+              {/* เรียงตาม — ล่าสุด หรือความเร่งด่วน (ดุร้าย → บาดเจ็บ → พลัดหลง) */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 shrink-0">เรียงตาม</span>
+                <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+                  {[
+                    { key: 'date',    label: 'ล่าสุด' },
+                    { key: 'urgency', label: 'ความเร่งด่วน' },
+                  ].map(function (opt) {
+                    const isActive = เรียงตามUpdate === opt.key
+                    return (
+                      <button key={opt.key} onClick={() => setเรียงตามUpdate(opt.key)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                          isActive ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {รายงานActiveกรอง.length === 0 && (
                 <div className="text-center py-16">
                   {รายงานActive.length === 0 ? <PartyPopper size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" /> : <Search size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />}
@@ -1249,7 +1396,7 @@ function VolunteerPage({ หน้า }) {
                 </div>
               )}
 
-              {รายงานActiveกรอง.map(function (ร) {
+              {รายงานActiveเรียง.map(function (ร) {
                 return (
                   <div key={ร.id}
                     style={{ borderLeftColor: ประเภทจาก(ร.urgency).hex }}
@@ -1364,6 +1511,17 @@ function VolunteerPage({ หน้า }) {
             <p className="text-xs text-gray-400 mt-0.5">รวมสัตว์ที่มาจากรายงาน (สถานะ อยู่ศูนย์พักพิง)</p>
           </div>
 
+          {/* ค้นหา — จับคู่ชื่อ สายพันธุ์ หรือสถานที่พบ */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
+            <input
+              value={ค้นหาสัตว์}
+              onChange={(e) => setค้นหาสัตว์(e.target.value)}
+              placeholder="ค้นหาชื่อ สายพันธุ์ หรือสถานที่พบ..."
+              className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm bg-white focus:outline-none focus:border-teal-400"
+            />
+          </div>
+
           {(function () {
             // Tabs กรองสถานะ — อยู่ศูนย์พักพิง (รวมอยู่ระหว่างรักษา) / รอหาบ้าน / รับเลี้ยงแล้ว
             const กลุ่มสถานะตามแท็บ = {
@@ -1382,6 +1540,14 @@ function VolunteerPage({ หน้า }) {
             const สัตว์ตามแท็บ = สัตว์จากDB.filter(function (s) {
               return กลุ่มสถานะตามแท็บ[แท็บสัตว์].includes(s.status)
             })
+            const สัตว์ตามแท็บค้น = ค้นหาสัตว์.trim()
+              ? สัตว์ตามแท็บ.filter(function (s) {
+                  const q = ค้นหาสัตว์.trim().toLowerCase()
+                  return (s.name || '').toLowerCase().includes(q)
+                    || (s.breed || '').toLowerCase().includes(q)
+                    || (s.location || '').toLowerCase().includes(q)
+                })
+              : สัตว์ตามแท็บ
             const ข้อความว่างตามแท็บ = {
               shelter: 'ไม่มีสัตว์ในศูนย์ตอนนี้',
               waiting: 'ยังไม่มีสัตว์ที่รอหาบ้าน',
@@ -1413,17 +1579,23 @@ function VolunteerPage({ หน้า }) {
                   </div>
                 )}
 
-                {!โหลดสัตว์ && สัตว์ตามแท็บ.length === 0 && (
+                {!โหลดสัตว์ && สัตว์ตามแท็บค้น.length === 0 && (
                   <div className="text-center py-12 text-gray-400">
-                    <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
+                    {สัตว์ตามแท็บ.length === 0
+                      ? <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
+                      : <Search size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
+                    }
                     <p className="text-sm">
-                      {สัตว์จากDB.length === 0 ? 'ยังไม่มีสัตว์ในระบบ' : ข้อความว่างตามแท็บ[แท็บสัตว์]}
+                      {สัตว์ตามแท็บ.length !== 0
+                        ? 'ไม่พบสัตว์ที่ตรงกับคำค้นหา'
+                        : (สัตว์จากDB.length === 0 ? 'ยังไม่มีสัตว์ในระบบ' : ข้อความว่างตามแท็บ[แท็บสัตว์])
+                      }
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-3">
-                  {สัตว์ตามแท็บ.map(function (สัตว์) {
+                  {สัตว์ตามแท็บค้น.map(function (สัตว์) {
                     // สายพันธุ์ที่ใช้ได้จริง — ตัด sentinel ของ AI + ค่าว่างออก (เหลือ null ให้โชว์ "รอระบุ")
                     const สายพันธุ์ = (สัตว์.breed && สัตว์.breed !== 'ไม่สามารถวิเคราะห์ได้' && สัตว์.breed !== 'ไม่ระบุ') ? สัตว์.breed : null
                     // ป้ายประเภทการแจ้งเหตุที่ส่งไม้ต่อมาจากรายงาน (สีตาม urgency) — โชว์เฉพาะตัวที่มาจากรายงาน
@@ -1517,16 +1689,24 @@ function VolunteerPage({ หน้า }) {
             {[
               // ใช้โทน teal/เทาเท่านั้น — แดง/ส้ม/เหลือง สงวนไว้สื่อ "ความเร่งด่วนของการแจ้ง" อย่างเดียว
               // (ดู ประเภทแจ้งเรียง) ถ้าเอามาใช้กับตัวเลขสถิติด้วย จะอ่านผิดว่าตัวเลขไหนเร่งด่วน
-              { ชื่อ: 'รายงานทั้งหมด',  ค่า: สถิติ.รายงาน,       Icon: ClipboardList, bg: 'bg-teal-50',   text: 'text-teal-700' },
+              { ชื่อ: 'รายงานทั้งหมด',  ค่า: สถิติ.รายงาน,       Icon: ClipboardList, bg: 'bg-teal-50',   text: 'text-teal-700', เดือนนี้: สถิติเดือนนี้.รายงาน,      เดือนก่อน: สถิติเดือนก่อน.รายงาน },
               { ชื่อ: 'รอดำเนินการ',    ค่า: สถิติ.รอดำเนินการ,  Icon: Hourglass,     bg: 'bg-slate-100', text: 'text-slate-600' },
               { ชื่อ: 'สัตว์ในดูแล',    ค่า: สถิติ.สัตว์,         Icon: PawPrint,      bg: 'bg-teal-50',   text: 'text-teal-700' },
-              { ชื่อ: 'รับเลี้ยงแล้ว',   ค่า: สถิติ.รับเลี้ยงแล้ว, Icon: Heart,         bg: 'bg-slate-100', text: 'text-slate-600' },
+              { ชื่อ: 'รับเลี้ยงแล้ว',   ค่า: สถิติ.รับเลี้ยงแล้ว, Icon: Heart,         bg: 'bg-slate-100', text: 'text-slate-600', เดือนนี้: สถิติเดือนนี้.รับเลี้ยงแล้ว, เดือนก่อน: สถิติเดือนก่อน.รับเลี้ยงแล้ว },
             ].map(function (stat) {
+              // ต่าง = เทียบเดือนนี้กับเดือนก่อน — มีเฉพาะสถิติที่เป็น "ยอดใหม่ต่อเดือน" จริงๆ (รอดำเนินการ/สัตว์ในดูแล เป็นยอดคงเหลือ ณ ปัจจุบัน เทียบแบบนี้ไม่ได้ความหมาย)
+              const มีแนวโน้ม = stat.เดือนนี้ != null
+              const ต่าง = มีแนวโน้ม ? stat.เดือนนี้ - stat.เดือนก่อน : 0
               return (
                 <div key={stat.ชื่อ} className={`rounded-2xl p-4 shadow-sm ${stat.bg}`}>
                   <stat.Icon size={26} strokeWidth={1.5} className={`mb-1 ${stat.text}`} />
                   <p className={`text-3xl font-bold ${stat.text}`}>{stat.ค่า}</p>
                   <p className="text-xs text-gray-500 mt-1">{stat.ชื่อ}</p>
+                  {มีแนวโน้ม && (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      เดือนนี้ {stat.เดือนนี้} ({ต่าง > 0 ? `+${ต่าง}` : ต่าง < 0 ? ต่าง : 'เท่าเดิม'}{ต่าง !== 0 ? ' จากเดือนก่อน' : ''})
+                    </p>
+                  )}
                 </div>
               )
             })}
@@ -1591,6 +1771,12 @@ function VolunteerPage({ หน้า }) {
         const จุดกรอง = filterMap.length === 0
           ? พิกัดเปิด
           : พิกัดเปิด.filter((r) => filterMap.includes(ประเภทจาก(r.urgency).key))
+        // มีตำแหน่งเจ้าหน้าที่แล้ว → เรียงเคสใกล้สุดก่อน ให้รู้ว่าควรไปจุดไหนก่อนโดยไม่ต้องกะระยะเอง
+        const จุดกรองแสดง = ตำแหน่งฉัน
+          ? จุดกรอง
+              .map((r) => ({ ...r, _ระยะ: ระยะทางเมตร(ตำแหน่งฉัน.lat, ตำแหน่งฉัน.lng, r.latitude, r.longitude) }))
+              .sort((a, b) => a._ระยะ - b._ระยะ)
+          : จุดกรอง
         // แสดง chip เฉพาะประเภทที่มีรายงานเข้ามาจริง (count > 0)
         const ประเภทที่มี = ประเภทแจ้งเรียง
           .map((p) => ({ ...p, count: พิกัดเปิด.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
@@ -1632,14 +1818,19 @@ function VolunteerPage({ หน้า }) {
               <>
                 {/* แผนที่ — isolate: กัก z-index ภายในของ Leaflet (สูงถึง 1000) ไม่ให้ทะลุขึ้นทับ modal */}
                 <div className="px-4">
-                  <div className="isolate rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 340 }}>
+                  <div className="relative isolate rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 340 }}>
                     <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
                       <MapController โฟกัส={โฟกัสจุด} />
                       <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                      {จุดกรอง.map((r) => (
+                      {ตำแหน่งฉัน && (
+                        <Marker position={[ตำแหน่งฉัน.lat, ตำแหน่งฉัน.lng]} icon={หมุดตัวเอง}>
+                          <Popup>ตำแหน่งของคุณ</Popup>
+                        </Marker>
+                      )}
+                      {จุดกรองแสดง.map((r) => (
                         <Marker key={r.id} position={[r.latitude, r.longitude]} icon={หมุดสี(ประเภทจาก(r.urgency).hex)}>
                           <Popup>
                             <div className="text-sm">
@@ -1660,6 +1851,17 @@ function VolunteerPage({ หน้า }) {
                         </Marker>
                       ))}
                     </MapContainer>
+
+                    {/* ปุ่มหาตำแหน่งฉัน — ลอยมุมล่างขวาของแผนที่ แบบเดียวกับปุ่ม locate ทั่วไปที่เจ้าหน้าที่คุ้นเคย */}
+                    <button
+                      onClick={หาตำแหน่งฉัน}
+                      disabled={กำลังหาตำแหน่ง}
+                      aria-label="หาตำแหน่งของฉัน"
+                      title="หาตำแหน่งของฉัน"
+                      className="absolute bottom-3 right-3 z-[1000] w-11 h-11 rounded-full bg-white shadow-md flex items-center justify-center text-teal-600 active:scale-95 transition-all disabled:opacity-60"
+                    >
+                      {กำลังหาตำแหน่ง ? <Loader2 size={20} className="animate-spin" /> : <LocateFixed size={20} />}
+                    </button>
                   </div>
                 </div>
 
@@ -1673,12 +1875,13 @@ function VolunteerPage({ หน้า }) {
                 {/* List รายการเคส — กดแล้วแผนที่บินไปที่จุดนั้น */}
                 <div className="px-4 space-y-2 pb-4">
                   <p className="text-xs text-gray-400">
-                    {จุดกรอง.length} จุดในมุมมองนี้ · แตะเพื่อซูมแผนที่ · แตะสองครั้งเพื่อจัดการ
+                    {จุดกรองแสดง.length} จุดในมุมมองนี้ · แตะเพื่อซูมแผนที่ · แตะสองครั้งเพื่อจัดการ
+                    {ตำแหน่งฉัน ? ' · เรียงตามระยะใกล้ฉันที่สุด' : ''}
                   </p>
-                  {จุดกรอง.length === 0 && (
+                  {จุดกรองแสดง.length === 0 && (
                     <div className="text-center py-8 text-gray-400 text-sm">ไม่มีจุดในตัวกรองนี้</div>
                   )}
-                  {จุดกรอง.map((r) => (
+                  {จุดกรองแสดง.map((r) => (
                     <div key={r.id}
                       onClick={() => setโฟกัสจุด({ lat: r.latitude, lng: r.longitude, id: r.id, t: Date.now() })}
                       onDoubleClick={() => เปิดจัดการจากแผนที่(r)}
@@ -1689,7 +1892,14 @@ function VolunteerPage({ หน้า }) {
                         <span className="w-3 h-3 rounded-full shrink-0" style={{ background: ประเภทจาก(r.urgency).hex }} />
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-gray-800 text-sm truncate">{r.animal_type || 'ไม่ระบุ'}</p>
-                          <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {r.location_text || '-'} · #{String(r.id).padStart(6, '0')}</p>
+                          <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                            <MapPin size={12} className="shrink-0" /> {r.location_text || '-'} · #{String(r.id).padStart(6, '0')}
+                            {r._ระยะ != null && (
+                              <span className="text-teal-600 font-medium shrink-0">
+                                · ห่าง {r._ระยะ < 1000 ? `${Math.round(r._ระยะ)} ม.` : `${(r._ระยะ / 1000).toFixed(1)} กม.`}
+                              </span>
+                            )}
+                          </p>
                         </div>
                         <a
                           href={`https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`}
