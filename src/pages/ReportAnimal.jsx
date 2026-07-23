@@ -7,7 +7,7 @@ import {
   Footprints, HeartPulse, ShieldAlert, Circle, CircleDot,
   MapPin, LocateFixed, Loader2, Map, X,
   CheckCircle2, XCircle, Smartphone, AlertTriangle,
-  PawPrint, Clock, Bot, ArrowLeft
+  PawPrint, Clock, Bot, ArrowLeft, Camera, Images
 } from 'lucide-react'
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -629,7 +629,7 @@ function ReportAnimal({ user }) {
             <button onClick={ปิดกล้อง} className="inline-flex items-center gap-1.5 text-white text-sm px-3 py-2 bg-white/20 rounded-full">
               <X size={14} className="shrink-0" /> ยกเลิก
             </button>
-            <p className="text-white font-medium text-sm">📷 ถ่ายรูปสัตว์</p>
+            <p className="text-white font-medium text-sm flex items-center gap-1.5"><Camera size={14} className="shrink-0" /> ถ่ายรูปสัตว์</p>
             <div className="w-16" />
           </div>
 
@@ -832,8 +832,8 @@ function ReportAnimal({ user }) {
         {/* ส่วนรูปภาพ */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">ภาพถ่ายสัตว์</p>
-          <p className="text-xs text-gray-400 mb-2">
-            📸 ถ่ายให้สัตว์อยู่กลางภาพและเต็มเฟรม จะช่วยให้ AI วิเคราะห์ได้แม่นยำขึ้น
+          <p className="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
+            <Camera size={12} className="shrink-0" /> ถ่ายให้สัตว์อยู่กลางภาพและเต็มเฟรม จะช่วยให้ AI วิเคราะห์ได้แม่นยำขึ้น
           </p>
 
           {รูปภาพPreview ? (
@@ -849,12 +849,12 @@ function ReportAnimal({ user }) {
               <div className="absolute bottom-0 inset-x-0 bg-black/50 flex items-center justify-center gap-3 px-5 py-3">
                 <button onClick={เปิดกล้อง}
                   className="flex items-center gap-1.5 text-white text-sm font-medium">
-                  <span className="text-xl">📷</span> ถ่ายรูป
+                  <Camera size={18} className="shrink-0" /> ถ่ายรูป
                 </button>
                 <span className="w-px h-4 bg-white/30" />
                 <button onClick={() => inputGallery.current.click()}
                   className="flex items-center gap-1.5 text-white text-sm font-medium">
-                  <span className="text-xl">🖼️</span> เลือกจากคลัง
+                  <Images size={18} className="shrink-0" /> เลือกจากคลัง
                 </button>
               </div>
             </div>
@@ -865,7 +865,7 @@ function ReportAnimal({ user }) {
                 onClick={เปิดกล้อง}
                 className="w-full h-64 border-2 border-dashed border-orange-300 rounded-2xl bg-white flex flex-col items-center justify-center active:bg-orange-50 transition-colors"
               >
-                <span className="text-6xl mb-3">📷</span>
+                <Camera size={56} strokeWidth={1.5} className="text-orange-300 mb-3" />
                 <p className="text-base font-semibold text-gray-600">แตะเพื่อถ่ายรูป</p>
                 <p className="text-xs text-gray-400 mt-1">ระบบจะขอสิทธิ์เข้าถึงกล้อง</p>
               </button>
@@ -874,7 +874,7 @@ function ReportAnimal({ user }) {
                 onClick={() => inputGallery.current.click()}
                 className="absolute bottom-3 right-3 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm flex items-center gap-1.5 text-gray-600 text-xs font-medium"
               >
-                <span className="text-base">🖼️</span> คลัง
+                <Images size={16} className="shrink-0" /> คลัง
               </button>
             </div>
           )}

@@ -32,6 +32,7 @@ function FindPet() {
 
   // เก็บค่าตัวกรองที่ผู้ใช้เลือก
   const [ประเภทสัตว์, setประเภทสัตว์] = useState('สุนัข')
+  const [สายพันธุ์,   setสายพันธุ์]   = useState('')   // '' = ทุกสายพันธุ์
   const [ช่วงอายุ,    setช่วงอายุ]    = useState('')   // '' | 'เด็ก' | 'โต'
   const [เพศ,         setเพศ]         = useState('')
   const [ขนาด,        setขนาด]        = useState('')
@@ -96,6 +97,7 @@ function FindPet() {
   function ค้นหาสัตว์() {
     const กรอง = สัตว์ทั้งหมด.filter(function (สัตว์) {
       if (สัตว์.ชนิด !== ประเภทสัตว์) return false
+      if (สายพันธุ์ && สัตว์.สายพันธุ์ !== สายพันธุ์) return false
       if (เพศ && สัตว์.เพศ !== เพศ) return false
       if (ขนาด && สัตว์.ขนาด !== ขนาด) return false
       if (ช่วงอายุ === 'เด็ก' && !อายุกลุ่มเด็ก.includes(สัตว์.อายุ)) return false
@@ -106,6 +108,18 @@ function FindPet() {
     setผลค้นหา(กรอง)
     setแท็บ('result')
   }
+
+  // สายพันธุ์ที่มีจริงในกลุ่มประเภทสัตว์ที่เลือกอยู่ — โชว์แค่ตัวเลือกที่มีสัตว์จริงพร้อมจำนวน แทนดรอปดาวน์ 47 สายพันธุ์ที่ส่วนใหญ่จะไม่มีผลลัพธ์
+  const สายพันธุ์ที่มี = (function () {
+    const นับ = {}
+    สัตว์ทั้งหมด.forEach(function (ส) {
+      if (ส.ชนิด !== ประเภทสัตว์ || !ส.สายพันธุ์ || ส.สายพันธุ์ === 'ไม่ระบุ') return
+      นับ[ส.สายพันธุ์] = (นับ[ส.สายพันธุ์] || 0) + 1
+    })
+    return Object.keys(นับ)
+      .sort(function (a, b) { return นับ[b] - นับ[a] })
+      .map(function (b) { return { ชื่อ: b, count: นับ[b] } })
+  })()
 
   // ---- หน้า Loading ----
   if (กำลังโหลด) {
@@ -226,7 +240,7 @@ function FindPet() {
               {['สุนัข', 'แมว'].map((ประเภท) => (
                 <button
                   key={ประเภท}
-                  onClick={() => setประเภทสัตว์(ประเภท)}
+                  onClick={() => { setประเภทสัตว์(ประเภท); setสายพันธุ์('') }}
                   className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1.5 ${
                     ประเภทสัตว์ === ประเภท
                       ? 'border-green-500 bg-green-500 text-white'
@@ -238,6 +252,28 @@ function FindPet() {
               ))}
             </div>
           </div>
+
+          {/* เลือกสายพันธุ์ — โชว์เฉพาะสายพันธุ์ที่มีสัตว์จริงของประเภทที่เลือกไว้ ไม่มีเลยไม่ต้องโชว์หัวข้อนี้ */}
+          {สายพันธุ์ที่มี.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">สายพันธุ์</p>
+              <div className="flex gap-2 flex-wrap">
+                {สายพันธุ์ที่มี.map((b) => (
+                  <button
+                    key={b.ชื่อ}
+                    onClick={() => setสายพันธุ์(สายพันธุ์ === b.ชื่อ ? '' : b.ชื่อ)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1 ${
+                      สายพันธุ์ === b.ชื่อ
+                        ? 'border-green-500 bg-green-500 text-white'
+                        : 'border-gray-200 bg-white text-gray-700'
+                    }`}
+                  >
+                    {b.ชื่อ} <span className={สายพันธุ์ === b.ชื่อ ? 'text-white/80' : 'text-gray-400'}>({b.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* เลือกอายุ */}
           <div>
