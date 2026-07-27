@@ -16,7 +16,6 @@ import LostAndFoundPage from './pages/LostAndFoundPage'
 import TrackReport      from './pages/TrackReport'
 import PetDetail        from './pages/PetDetail'
 import ProfilePage      from './pages/ProfilePage'
-import PetGuide         from './pages/PetGuide'
 import ContactPage      from './pages/ContactPage'
 import NotificationPage from './pages/NotificationPage'
 import VolunteerPage    from './pages/VolunteerPage'
@@ -200,7 +199,6 @@ function App() {
         <Route path="/track"         element={ต้องLogin(<TrackReport user={user} />)} />
         <Route path="/pet/:id"       element={ต้องLogin(<PetDetail />)} />
         <Route path="/profile"       element={ต้องLogin(<ProfilePage user={user} />)} />
-        <Route path="/pet-guide"     element={ต้องLogin(<PetGuide />)} />
         <Route path="/contact"       element={ต้องLogin(<ContactPage />)} />
         <Route path="/notifications" element={ต้องLogin(<NotificationPage user={user} />)} />
 
