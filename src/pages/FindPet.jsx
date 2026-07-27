@@ -4,9 +4,20 @@
 // แต่กันไว้อีกชั้น: สัตว์ที่ออกจากความดูแลไปแล้วต้องไม่หลุดมาโชว์ ถึงข้อมูลเก่าจะยังค้าง publish_mode ไว้
 // ตัวกรองเป็นการกรองข้อมูลจริงจากฟิลด์ที่เจ้าหน้าที่กรอกไว้ ไม่ใช่คะแนนสุ่ม
 
+// ---- แนวคิดหน้านี้: "ดูทั้งหมด" เป็นหลัก ตัวกรองเป็นตัวช่วยเสริม ----
+// เดิมแยกเป็น 3 แท็บ (ค้นหาแบบละเอียด/ดูทั้งหมด/ผลลัพธ์) ต้องกดปุ่ม "ค้นหา" ถึงเห็นผล
+// ตอนนี้รวมเหลือหน้าเดียว: เห็นสัตว์ทั้งหมดทันทีตั้งแต่เข้ามา ตัวกรองพับเก็บไว้ (กดเปิดเอง)
+// และทุกตัวกรองใช้ผลจริงแบบ "กรองสด" — เลือกปุ๊บผลลัพธ์อัปเดตทันที ไม่ต้องกดค้นหา
+//
+// จุดสำคัญที่แก้: ก่อนหน้านี้ตัวกรองแต่ละช่อง (สายพันธุ์/อายุ/เพศ/ขนาด) นับจำนวนแยกจากกันอิสระ
+// ทำให้เลือกสายพันธุ์ที่มีจริง + ขนาดที่มีจริง แต่ "ไม่มีตัวไหนที่ตรงทั้งสองอย่างพร้อมกัน" ก็เจอ 0 ตัวได้
+// (เช่น สายพันธุ์นี้เจ้าหน้าที่บันทึกไว้แต่ตัวเล็ก-กลาง แต่ผู้ใช้ดันกดขนาดใหญ่)
+// ตอนนี้ทุกตัวกรองคำนวณจำนวนโดยอิงตัวกรองอื่นที่เลือกอยู่แล้วเสมอ (faceted count) —
+// ตัวเลือกไหนกดแล้วจะเจอ 0 ตัว จะโชว์ (0) และกดไม่ได้ตั้งแต่แรก กันทางตันไม่ให้เกิดขึ้นเลย
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, PawPrint, MapPin, ArrowLeft } from 'lucide-react'
+import { Search, PawPrint, MapPin, ArrowLeft, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
 import { supabase } from '../supabase'   // นำเข้า supabase client
 import AnimalIcon from '../components/AnimalIcon'
 
@@ -18,11 +29,25 @@ const สถานะออกไปแล้ว = ['มีผู้รับเ
 const อายุกลุ่มเด็ก = ['น้อยกว่า 1 ปี', '1–2 ปี']
 const อายุกลุ่มโต   = ['2–5 ปี', '5–10 ปี', 'มากกว่า 10 ปี']
 
+// ---- เกณฑ์รองรับอนาคต: ถ้าข้อมูลสัตว์เยอะขึ้นจนสายพันธุ์มีเป็นสิบๆ แบบ ----
+// เกินจำนวนนี้ค่อยพับเก็บเป็นปุ่ม "+N สายพันธุ์อื่นๆ" กันแถบชิปยาวจนกลืนแผงตัวกรอง
+const จำนวนสายพันธุ์ที่แสดงก่อนพับ = 8
+// เกินจำนวนนี้ (ตอนขยายดูทั้งหมดแล้ว) ค่อยโผล่ช่องค้นหา ให้พิมพ์กรองแทนไถหาเองในชิปเป็นสิบๆ อัน
+const จำนวนสายพันธุ์ที่เริ่มมีช่องค้นหา = 12
+
+// ตรวจว่าสัตว์ตัวหนึ่งตรงกับตัวกรองที่ระบุไหม — เว้นคีย์ไหนไว้ (ไม่ส่งมา) แปลว่าไม่กรองมิตินั้น
+// ใช้ฟังก์ชันเดียวทั้งกรองผลลัพธ์จริง และนับจำนวนต่อตัวเลือกในแต่ละแถบ (แค่เว้นมิติของตัวเองออกตอนนับ)
+function ตรงกับตัวกรอง(สัตว์, { breed = '', age = '', gender = '', size = '' } = {}) {
+  if (breed && สัตว์.สายพันธุ์ !== breed) return false
+  if (gender && สัตว์.เพศ !== gender) return false
+  if (size && สัตว์.ขนาด !== size) return false
+  if (age === 'เด็ก' && !อายุกลุ่มเด็ก.includes(สัตว์.อายุ)) return false
+  if (age === 'โต'   && !อายุกลุ่มโต.includes(สัตว์.อายุ))   return false
+  return true
+}
+
 function FindPet() {
   const navigate = useNavigate()
-
-  // แท็บที่แสดงอยู่: 'form' = ตัวกรอง, 'result' = ผลค้นหา, 'all' = ดูทั้งหมด
-  const [แท็บ, setแท็บ] = useState('form')
 
   // กำลัง Loading อยู่ไหม
   const [กำลังโหลด, setกำลังโหลด] = useState(true)
@@ -30,15 +55,17 @@ function FindPet() {
   // สัตว์ที่ประกาศหาบ้านใหม่ (publish_mode = 'adoption') ดึงมาจาก Database
   const [สัตว์ทั้งหมด, setSัตว์ทั้งหมด] = useState([])
 
+  // แผงตัวกรองเปิดอยู่ไหม — พับเก็บโดยดีฟอลต์ เพราะดูสัตว์ทั้งหมดคือหลัก ตัวกรองเป็นแค่ตัวช่วยเสริม
+  const [ตัวกรองเปิด, setตัวกรองเปิด] = useState(false)
+
   // เก็บค่าตัวกรองที่ผู้ใช้เลือก
   const [ประเภทสัตว์, setประเภทสัตว์] = useState('สุนัข')
   const [สายพันธุ์,   setสายพันธุ์]   = useState('')   // '' = ทุกสายพันธุ์
+  const [แสดงสายพันธุ์ทั้งหมด, setแสดงสายพันธุ์ทั้งหมด] = useState(false) // false = พับเหลือแค่สายพันธุ์ยอดฮิต
+  const [คำค้นสายพันธุ์, setคำค้นสายพันธุ์] = useState('') // ใช้กรองชิปสายพันธุ์ตอนขยายดูทั้งหมดแล้ว
   const [ช่วงอายุ,    setช่วงอายุ]    = useState('')   // '' | 'เด็ก' | 'โต'
   const [เพศ,         setเพศ]         = useState('')
   const [ขนาด,        setขนาด]        = useState('')
-
-  // เก็บผลการค้นหา
-  const [ผลค้นหา, setผลค้นหา] = useState([])
 
   // ---- ดึงสัตว์ที่เผยแพร่แล้วจาก Supabase ตอนโหลดหน้า ----
   useEffect(function () {
@@ -93,33 +120,80 @@ function FindPet() {
     ดึงข้อมูลสัตว์()
   }, [])
 
-  // ฟังก์ชันค้นหาสัตว์ — กรองจากข้อมูลจริงตามเงื่อนไขที่เลือก
-  function ค้นหาสัตว์() {
-    const กรอง = สัตว์ทั้งหมด.filter(function (สัตว์) {
-      if (สัตว์.ชนิด !== ประเภทสัตว์) return false
-      if (สายพันธุ์ && สัตว์.สายพันธุ์ !== สายพันธุ์) return false
-      if (เพศ && สัตว์.เพศ !== เพศ) return false
-      if (ขนาด && สัตว์.ขนาด !== ขนาด) return false
-      if (ช่วงอายุ === 'เด็ก' && !อายุกลุ่มเด็ก.includes(สัตว์.อายุ)) return false
-      if (ช่วงอายุ === 'โต'   && !อายุกลุ่มโต.includes(สัตว์.อายุ))   return false
-      return true
-    })
+  // สัตว์เฉพาะประเภทที่เลือกอยู่ — ฐานตั้งต้นก่อนกรองมิติอื่น
+  const สัตว์ตามประเภท = สัตว์ทั้งหมด.filter(function (ส) { return ส.ชนิด === ประเภทสัตว์ })
 
-    setผลค้นหา(กรอง)
-    setแท็บ('result')
-  }
+  // ผลลัพธ์จริงที่จะแสดง — ใช้ตัวกรองครบทุกมิติพร้อมกัน (กรองสด ไม่ต้องกดปุ่ม)
+  const ผลลัพธ์ = สัตว์ตามประเภท.filter(function (ส) {
+    return ตรงกับตัวกรอง(ส, { breed: สายพันธุ์, age: ช่วงอายุ, gender: เพศ, size: ขนาด })
+  })
 
-  // สายพันธุ์ที่มีจริงในกลุ่มประเภทสัตว์ที่เลือกอยู่ — โชว์แค่ตัวเลือกที่มีสัตว์จริงพร้อมจำนวน แทนดรอปดาวน์ 47 สายพันธุ์ที่ส่วนใหญ่จะไม่มีผลลัพธ์
+  // สายพันธุ์ที่มีจริง — นับโดยอิงตัวกรอง อายุ/เพศ/ขนาด ที่เลือกอยู่ (ไม่รวมตัวเอง) เพื่อไม่ให้โผล่สายพันธุ์ที่กดแล้วเจอ 0 ตัว
   const สายพันธุ์ที่มี = (function () {
     const นับ = {}
-    สัตว์ทั้งหมด.forEach(function (ส) {
-      if (ส.ชนิด !== ประเภทสัตว์ || !ส.สายพันธุ์ || ส.สายพันธุ์ === 'ไม่ระบุ') return
+    สัตว์ตามประเภท.forEach(function (ส) {
+      if (!ส.สายพันธุ์ || ส.สายพันธุ์ === 'ไม่ระบุ') return
+      if (!ตรงกับตัวกรอง(ส, { age: ช่วงอายุ, gender: เพศ, size: ขนาด })) return
       นับ[ส.สายพันธุ์] = (นับ[ส.สายพันธุ์] || 0) + 1
     })
     return Object.keys(นับ)
       .sort(function (a, b) { return นับ[b] - นับ[a] })
       .map(function (b) { return { ชื่อ: b, count: นับ[b] } })
   })()
+
+  // สายพันธุ์เยอะเกินจะโชว์ทีเดียวไหม — ถ้าเยอะเกิน ค่อยพับเหลือแค่ตัวยอดฮิต แล้วให้กด "อื่นๆ" เพื่อขยาย
+  const ต้องพับสายพันธุ์ = สายพันธุ์ที่มี.length > จำนวนสายพันธุ์ที่แสดงก่อนพับ
+  const ต้องมีช่องค้นหาสายพันธุ์ = สายพันธุ์ที่มี.length > จำนวนสายพันธุ์ที่เริ่มมีช่องค้นหา
+
+  // รายการชิปสายพันธุ์ที่จะเรนเดอร์จริง: พับ = แค่ top N, ขยายแล้ว = ทั้งหมด (หรือกรองด้วยคำค้นถ้ามีช่องค้นหา)
+  const สายพันธุ์ที่แสดง = (function () {
+    if (!แสดงสายพันธุ์ทั้งหมด) return สายพันธุ์ที่มี.slice(0, จำนวนสายพันธุ์ที่แสดงก่อนพับ)
+    const คำค้น = คำค้นสายพันธุ์.trim()
+    if (!คำค้น) return สายพันธุ์ที่มี
+    return สายพันธุ์ที่มี.filter(function (b) { return b.ชื่อ.includes(คำค้น) })
+  })()
+
+  // ตัวเลือกอายุ/เพศ/ขนาด — แต่ละอันนับจำนวนโดยอิงตัวกรองมิติอื่นที่เลือกอยู่ (ไม่รวมมิติของตัวเอง)
+  // เพื่อให้ตัวเลือกไหนกดแล้วเจอ 0 ตัว รู้ตัวได้ก่อนกด ไม่ใช่มารู้ทีหลังว่า "หาไม่เจอ"
+  const ตัวเลือกอายุ = ['เด็ก', 'โต'].map(function (กลุ่ม) {
+    const count = สัตว์ตามประเภท.filter(function (ส) {
+      return ตรงกับตัวกรอง(ส, { breed: สายพันธุ์, gender: เพศ, size: ขนาด })
+        && (กลุ่ม === 'เด็ก' ? อายุกลุ่มเด็ก.includes(ส.อายุ) : อายุกลุ่มโต.includes(ส.อายุ))
+    }).length
+    return { label: กลุ่ม, count }
+  })
+
+  const ตัวเลือกเพศ = ['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].map(function (g) {
+    const count = สัตว์ตามประเภท.filter(function (ส) {
+      return ตรงกับตัวกรอง(ส, { breed: สายพันธุ์, age: ช่วงอายุ, size: ขนาด }) && ส.เพศ === g
+    }).length
+    return { label: g, count }
+  })
+
+  const ตัวเลือกขนาด = ['เล็ก', 'กลาง', 'ใหญ่'].map(function (sz) {
+    const count = สัตว์ตามประเภท.filter(function (ส) {
+      return ตรงกับตัวกรอง(ส, { breed: สายพันธุ์, age: ช่วงอายุ, gender: เพศ }) && ส.ขนาด === sz
+    }).length
+    return { label: sz, count }
+  })
+
+  const จำนวนตัวกรองที่ใช้งาน = [สายพันธุ์, ช่วงอายุ, เพศ, ขนาด].filter(Boolean).length
+
+  function ล้างตัวกรอง() {
+    setสายพันธุ์('')
+    setช่วงอายุ('')
+    setเพศ('')
+    setขนาด('')
+    setแสดงสายพันธุ์ทั้งหมด(false)
+    setคำค้นสายพันธุ์('')
+  }
+
+  // สลับประเภทสัตว์ — รีเซ็ตตัวกรองอื่นทั้งหมด เพราะสายพันธุ์ (และบางทีขนาด/อายุ) ของหมา-แมวไม่เหมือนกัน
+  // กันไม่ให้ตัวกรองเดิมค้างมาแล้วบังเอิญกลายเป็นเงื่อนไขที่หาตัวไหนไม่เจอเลยสำหรับประเภทใหม่
+  function เลือกประเภทสัตว์(ประเภท) {
+    setประเภทสัตว์(ประเภท)
+    ล้างตัวกรอง()
+  }
 
   // ---- หน้า Loading ----
   if (กำลังโหลด) {
@@ -147,204 +221,225 @@ function FindPet() {
         </div>
       </div>
 
-      {/* แท็บสลับระหว่าง "ตัวกรอง" และ "ดูทั้งหมด" */}
-      <div className="flex mx-4 mt-4 bg-gray-100 rounded-xl p-1">
-        <button
-          onClick={() => setแท็บ('form')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-            แท็บ === 'form' || แท็บ === 'result'
-              ? 'bg-white text-green-700 shadow-sm'
-              : 'text-gray-500'
-          }`}
-        >
-          <Search size={15} className="shrink-0" /> ค้นหาแบบละเอียด
-        </button>
-        <button
-          onClick={() => setแท็บ('all')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-            แท็บ === 'all'
-              ? 'bg-white text-green-700 shadow-sm'
-              : 'text-gray-500'
-          }`}
-        >
-          <PawPrint size={15} className="shrink-0" /> ดูทั้งหมด ({สัตว์ทั้งหมด.length})
-        </button>
-      </div>
+      <div className="px-4 pt-4 space-y-4">
 
-      {/* ---- แสดงผลการค้นหา ---- */}
-      {แท็บ === 'result' && (
-        <div className="px-4 pt-4 space-y-4">
-          <p className="text-sm text-gray-500 font-medium">
-            พบ {ผลค้นหา.length} ตัว ที่ตรงกับเงื่อนไข
-          </p>
-
-          {ผลค้นหา.length === 0 && (
-            <div className="text-center py-10 text-gray-400">
-              <Search size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
-              <p>ไม่พบสัตว์ที่ตรงกับเงื่อนไข</p>
-            </div>
-          )}
-
-          {ผลค้นหา.map((สัตว์) => (
-            <การ์ดสัตว์
-              key={สัตว์.id}
-              สัตว์={สัตว์}
-              onClick={() => navigate(`/pet/${สัตว์.id}`, { state: { สัตว์ } })}
-            />
+        {/* เลือกประเภทสัตว์ — เห็นตลอด เพราะเป็นตัวแบ่งผลลัพธ์หลัก */}
+        <div className="flex gap-3">
+          {['สุนัข', 'แมว'].map((ประเภท) => (
+            <button
+              key={ประเภท}
+              onClick={() => เลือกประเภทสัตว์(ประเภท)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1.5 ${
+                ประเภทสัตว์ === ประเภท
+                  ? 'border-green-500 bg-green-500 text-white'
+                  : 'border-gray-200 bg-white text-gray-700'
+              }`}
+            >
+              <AnimalIcon ชนิด={ประเภท} size={18} className="shrink-0" /> {ประเภท}
+            </button>
           ))}
+        </div>
 
+        {/* แถบสรุปผลลัพธ์ + ปุ่มเปิด/ปิดตัวกรอง — ตัวกรองเป็นแค่ตัวช่วยเสริม ไม่ใช่ขั้นตอนบังคับ */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500 font-medium">
+            พบ {ผลลัพธ์.length} ตัว
+          </p>
           <button
-            onClick={() => setแท็บ('form')}
-            className="w-full border-2 border-green-400 text-green-600 rounded-xl py-3 text-sm font-medium"
+            onClick={() => setตัวกรองเปิด(!ตัวกรองเปิด)}
+            className={`flex items-center gap-1.5 pl-3 pr-2.5 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+              ตัวกรองเปิด ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 bg-white text-gray-600'
+            }`}
           >
-            ค้นหาใหม่อีกครั้ง
+            <SlidersHorizontal size={14} className="shrink-0" />
+            ตัวกรอง
+            {จำนวนตัวกรองที่ใช้งาน > 0 && (
+              <span className="w-4 h-4 flex items-center justify-center rounded-full bg-green-500 text-white text-[10px] font-semibold">
+                {จำนวนตัวกรองที่ใช้งาน}
+              </span>
+            )}
+            <ChevronDown size={14} className={`shrink-0 transition-transform ${ตัวกรองเปิด ? 'rotate-180' : ''}`} />
           </button>
         </div>
-      )}
 
-      {/* ---- ดูสัตว์ทั้งหมด ---- */}
-      {แท็บ === 'all' && (
-        <div className="px-4 pt-4 space-y-4">
-          <p className="text-sm text-gray-500 font-medium">
-            สัตว์ที่พร้อมหาบ้าน {สัตว์ทั้งหมด.length} ตัว
-          </p>
+        {/* ---- แผงตัวกรอง — พับเก็บโดยดีฟอลต์ ---- */}
+        {ตัวกรองเปิด && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-5">
 
-          {สัตว์ทั้งหมด.length === 0 && (
-            <div className="text-center py-10 text-gray-400">
-              <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
-              <p>ยังไม่มีสัตว์ที่พร้อมหาบ้านในตอนนี้</p>
-              <p className="text-xs mt-1">เจ้าหน้าที่ศูนย์พักพิงกำลังคัดกรองสัตว์อยู่</p>
-            </div>
-          )}
+            {/* เลือกสายพันธุ์ — โชว์เฉพาะสายพันธุ์ที่มีสัตว์จริงตรงกับตัวกรองอื่นที่เลือกอยู่ ไม่มีเลยไม่ต้องโชว์หัวข้อนี้
+                ถ้ามีเยอะ (เผื่ออนาคตข้อมูลสัตว์เพิ่มขึ้น) จะพับเหลือแค่ top N ยอดฮิต + ปุ่มขยาย และถ้าเยอะมากจริงๆ จะมีช่องค้นหาให้พิมพ์กรองแทนไถหาเอง */}
+            {สายพันธุ์ที่มี.length > 0 && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2">
+                  สายพันธุ์ <span className="text-gray-400 font-normal">({สายพันธุ์ที่มี.length})</span>
+                </p>
 
-          {สัตว์ทั้งหมด.map((สัตว์) => (
-            <การ์ดสัตว์
-              key={สัตว์.id}
-              สัตว์={สัตว์}
-              onClick={() => navigate(`/pet/${สัตว์.id}`, { state: { สัตว์ } })}
-            />
-          ))}
-        </div>
-      )}
+                {/* ช่องค้นหาสายพันธุ์ — โผล่เฉพาะตอนขยายดูทั้งหมดแล้ว และสายพันธุ์เยอะเกินกว่าจะไถหาเองสะดวก */}
+                {แสดงสายพันธุ์ทั้งหมด && ต้องมีช่องค้นหาสายพันธุ์ && (
+                  <div className="relative mb-2">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" aria-hidden="true" />
+                    <input
+                      type="text"
+                      value={คำค้นสายพันธุ์}
+                      onChange={(e) => setคำค้นสายพันธุ์(e.target.value)}
+                      placeholder="พิมพ์ค้นหาสายพันธุ์..."
+                      aria-label="ค้นหาสายพันธุ์"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-gray-200 text-sm text-gray-700 placeholder:text-gray-500 focus:outline-none focus:border-green-400"
+                    />
+                  </div>
+                )}
 
-      {/* ---- หน้าฟอร์มตัวกรอง ---- */}
-      {แท็บ === 'form' && (
-        <div className="px-4 pt-5 space-y-6">
+                <div className="flex gap-2 flex-wrap">
+                  {สายพันธุ์ที่แสดง.map((b) => (
+                    <button
+                      key={b.ชื่อ}
+                      onClick={() => setสายพันธุ์(สายพันธุ์ === b.ชื่อ ? '' : b.ชื่อ)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1 ${
+                        สายพันธุ์ === b.ชื่อ
+                          ? 'border-green-500 bg-green-500 text-white'
+                          : 'border-gray-200 bg-white text-gray-700'
+                      }`}
+                    >
+                      {b.ชื่อ} <span className={สายพันธุ์ === b.ชื่อ ? 'text-white/80' : 'text-gray-400'}>({b.count})</span>
+                    </button>
+                  ))}
 
-          {/* เลือกประเภทสัตว์ */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-              <PawPrint size={15} className="text-gray-500 shrink-0" /> ประเภทสัตว์
-            </p>
-            <div className="flex gap-3">
-              {['สุนัข', 'แมว'].map((ประเภท) => (
-                <button
-                  key={ประเภท}
-                  onClick={() => { setประเภทสัตว์(ประเภท); setสายพันธุ์('') }}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1.5 ${
-                    ประเภทสัตว์ === ประเภท
-                      ? 'border-green-500 bg-green-500 text-white'
-                      : 'border-gray-200 bg-white text-gray-700'
-                  }`}
-                >
-                  <AnimalIcon ชนิด={ประเภท} size={18} className="shrink-0" /> {ประเภท}
-                </button>
-              ))}
-            </div>
-          </div>
+                  {สายพันธุ์ที่แสดง.length === 0 && (
+                    <p className="text-xs text-gray-400 py-1.5">ไม่พบสายพันธุ์ที่ค้นหา</p>
+                  )}
+                </div>
 
-          {/* เลือกสายพันธุ์ — โชว์เฉพาะสายพันธุ์ที่มีสัตว์จริงของประเภทที่เลือกไว้ ไม่มีเลยไม่ต้องโชว์หัวข้อนี้ */}
-          {สายพันธุ์ที่มี.length > 0 && (
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">สายพันธุ์</p>
-              <div className="flex gap-2 flex-wrap">
-                {สายพันธุ์ที่มี.map((b) => (
+                {/* ปุ่มพับ/ขยาย — โผล่เฉพาะตอนสายพันธุ์เยอะกว่าที่พับไว้พอดี (จำนวนสัตว์ในระบบเยอะขึ้นในอนาคต) */}
+                {ต้องพับสายพันธุ์ && (
                   <button
-                    key={b.ชื่อ}
-                    onClick={() => setสายพันธุ์(สายพันธุ์ === b.ชื่อ ? '' : b.ชื่อ)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1 ${
-                      สายพันธุ์ === b.ชื่อ
-                        ? 'border-green-500 bg-green-500 text-white'
-                        : 'border-gray-200 bg-white text-gray-700'
-                    }`}
+                    onClick={() => { setแสดงสายพันธุ์ทั้งหมด(!แสดงสายพันธุ์ทั้งหมด); setคำค้นสายพันธุ์('') }}
+                    className="mt-2 text-xs font-semibold text-green-600 active:text-green-700"
                   >
-                    {b.ชื่อ} <span className={สายพันธุ์ === b.ชื่อ ? 'text-white/80' : 'text-gray-400'}>({b.count})</span>
+                    {แสดงสายพันธุ์ทั้งหมด
+                      ? 'ย่อรายการ'
+                      : `+${สายพันธุ์ที่มี.length - จำนวนสายพันธุ์ที่แสดงก่อนพับ} สายพันธุ์อื่นๆ`}
                   </button>
-                ))}
+                )}
+              </div>
+            )}
+
+            {/* เลือกอายุ — ตัวเลือกไหนรวมกับตัวกรองอื่นแล้วเจอ 0 ตัว จะจางลงและกดไม่ได้ */}
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">อายุ</p>
+              <div className="flex gap-3 flex-wrap">
+                {ตัวเลือกอายุ.map(({ label, count }) => {
+                  const เลือกอยู่ = ช่วงอายุ === label
+                  const กดไม่ได้ = count === 0 && !เลือกอยู่
+                  return (
+                    <button
+                      key={label}
+                      disabled={กดไม่ได้}
+                      onClick={() => setช่วงอายุ(เลือกอยู่ ? '' : label)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1 ${
+                        เลือกอยู่ ? 'border-green-500 bg-green-500 text-white'
+                        : กดไม่ได้ ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 bg-white text-gray-700'
+                      }`}
+                    >
+                      {label} <span className={เลือกอยู่ ? 'text-white/80' : 'text-gray-400'}>({count})</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
+
+            {/* เลือกเพศ — ตัวเลือกไหนรวมกับตัวกรองอื่นแล้วเจอ 0 ตัว จะจางลงและกดไม่ได้ */}
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">เพศ</p>
+              <div className="flex gap-3 flex-wrap">
+                {ตัวเลือกเพศ.map(({ label, count }) => {
+                  const เลือกอยู่ = เพศ === label
+                  const กดไม่ได้ = count === 0 && !เลือกอยู่
+                  return (
+                    <button
+                      key={label}
+                      disabled={กดไม่ได้}
+                      onClick={() => setเพศ(เลือกอยู่ ? '' : label)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1 ${
+                        เลือกอยู่ ? 'border-green-500 bg-green-500 text-white'
+                        : กดไม่ได้ ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 bg-white text-gray-700'
+                      }`}
+                    >
+                      {label} <span className={เลือกอยู่ ? 'text-white/80' : 'text-gray-400'}>({count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* เลือกขนาดตัว — ตัวเลือกไหนรวมกับตัวกรองอื่นแล้วเจอ 0 ตัว จะจางลงและกดไม่ได้ */}
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">ขนาดตัว</p>
+              <div className="flex gap-3 flex-wrap">
+                {ตัวเลือกขนาด.map(({ label, count }) => {
+                  const เลือกอยู่ = ขนาด === label
+                  const กดไม่ได้ = count === 0 && !เลือกอยู่
+                  return (
+                    <button
+                      key={label}
+                      disabled={กดไม่ได้}
+                      onClick={() => setขนาด(เลือกอยู่ ? '' : label)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-1 ${
+                        เลือกอยู่ ? 'border-green-500 bg-green-500 text-white'
+                        : กดไม่ได้ ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 bg-white text-gray-700'
+                      }`}
+                    >
+                      {label} <span className={เลือกอยู่ ? 'text-white/80' : 'text-gray-400'}>({count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {จำนวนตัวกรองที่ใช้งาน > 0 && (
+              <button
+                onClick={ล้างตัวกรอง}
+                className="flex items-center gap-1 text-xs font-semibold text-gray-500 active:text-gray-700"
+              >
+                <X size={13} className="shrink-0" /> ล้างตัวกรองทั้งหมด
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ---- รายการสัตว์ — กรองสดตามตัวกรองที่เลือกอยู่ (ไม่มีตัวกรองก็คือสัตว์ทั้งหมด) ---- */}
+        <div className="space-y-4">
+          {ผลลัพธ์.length === 0 && (
+            <div className="text-center py-10 text-gray-400">
+              <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
+              {สัตว์ตามประเภท.length === 0 ? (
+                <>
+                  <p>ยังไม่มี{ประเภทสัตว์}ที่พร้อมหาบ้านในตอนนี้</p>
+                  <p className="text-xs mt-1">เจ้าหน้าที่ศูนย์พักพิงกำลังคัดกรองสัตว์อยู่</p>
+                </>
+              ) : (
+                <>
+                  <p>ไม่พบสัตว์ที่ตรงกับตัวกรอง</p>
+                  <button onClick={ล้างตัวกรอง} className="text-xs mt-1 text-green-600 font-semibold">
+                    ล้างตัวกรองทั้งหมด
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
-          {/* เลือกอายุ */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">อายุ</p>
-            <div className="flex gap-3 flex-wrap">
-              {['เด็ก', 'โต'].map((ตัวเลือก) => (
-                <button
-                  key={ตัวเลือก}
-                  onClick={() => setช่วงอายุ(ช่วงอายุ === ตัวเลือก ? '' : ตัวเลือก)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                    ช่วงอายุ === ตัวเลือก
-                      ? 'border-green-500 bg-green-500 text-white'
-                      : 'border-gray-200 bg-white text-gray-700'
-                  }`}
-                >
-                  {ตัวเลือก}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* เลือกเพศ */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">เพศ</p>
-            <div className="flex gap-3 flex-wrap">
-              {['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].map((ตัวเลือก) => (
-                <button
-                  key={ตัวเลือก}
-                  onClick={() => setเพศ(เพศ === ตัวเลือก ? '' : ตัวเลือก)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                    เพศ === ตัวเลือก
-                      ? 'border-green-500 bg-green-500 text-white'
-                      : 'border-gray-200 bg-white text-gray-700'
-                  }`}
-                >
-                  {ตัวเลือก}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* เลือกขนาดตัว */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">ขนาดตัว</p>
-            <div className="flex gap-3 flex-wrap">
-              {['เล็ก', 'กลาง', 'ใหญ่'].map((ตัวเลือก) => (
-                <button
-                  key={ตัวเลือก}
-                  onClick={() => setขนาด(ขนาด === ตัวเลือก ? '' : ตัวเลือก)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                    ขนาด === ตัวเลือก
-                      ? 'border-green-500 bg-green-500 text-white'
-                      : 'border-gray-200 bg-white text-gray-700'
-                  }`}
-                >
-                  {ตัวเลือก}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ปุ่มค้นหา */}
-          <button
-            onClick={ค้นหาสัตว์}
-            className="w-full bg-green-500 text-white rounded-xl py-3.5 font-semibold text-base"
-          >
-            ค้นหาสัตว์เลี้ยง
-          </button>
-
+          {ผลลัพธ์.map((สัตว์) => (
+            <การ์ดสัตว์
+              key={สัตว์.id}
+              สัตว์={สัตว์}
+              onClick={() => navigate(`/pet/${สัตว์.id}`, { state: { สัตว์ } })}
+            />
+          ))}
         </div>
-      )}
+
+      </div>
 
     </div>
   )
