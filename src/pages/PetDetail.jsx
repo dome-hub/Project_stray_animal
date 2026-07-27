@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Syringe, Scissors, PawPrint, FileText, Home, MapPin, Map,
-  Phone, User, CheckCircle2, XCircle, HelpCircle, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight
+  Phone, User, CheckCircle2, XCircle, HelpCircle, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight, ExternalLink
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import AnimalIcon from '../components/AnimalIcon'
@@ -253,6 +253,15 @@ function PetDetail() {
                 <span className="text-xs text-green-500 ml-auto">โทรเลย</span>
               </a>
             )}
+            {ศูนย์.shelter_location && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ศูนย์.shelter_location)}`}
+                target="_blank" rel="noreferrer"
+                className="flex gap-2 items-center justify-center bg-white border border-gray-200 text-gray-700 rounded-xl px-3 py-2.5 text-sm font-medium"
+              >
+                <ExternalLink size={15} className="shrink-0" /> ดูแผนที่
+              </a>
+            )}
             {ศูนย์.name && (
               <div className="flex gap-2 items-start">
                 <User size={16} className="text-gray-400 shrink-0 mt-0.5" />
@@ -328,8 +337,10 @@ function PetDetail() {
                 </ol>
               </div>
 
-              {/* ข้อมูลศูนย์ */}
-              {ศูนย์ ? (
+              {/* ข้อมูลศูนย์ — แยกสถานะโหลด/พบ/ไม่พบให้ชัด กันหน้าค้างที่ "กำลังโหลด" ทั้งที่โหลดเสร็จแล้วแต่ไม่มีข้อมูลศูนย์ในระบบ */}
+              {โหลดศูนย์ ? (
+                <p className="text-sm text-gray-400 text-center py-4">กำลังโหลดข้อมูลติดต่อ...</p>
+              ) : ศูนย์ ? (
                 <div className="space-y-3">
                   {ศูนย์.shelter_name && (
                     <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
@@ -362,12 +373,29 @@ function PetDetail() {
                   ) : (
                     <p className="text-sm text-gray-400 text-center py-2">ไม่มีข้อมูลเบอร์โทร</p>
                   )}
+                  {ศูนย์.shelter_location && (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ศูนย์.shelter_location)}`}
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center justify-center gap-1.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl py-3 w-full text-sm font-semibold"
+                    >
+                      <ExternalLink size={16} className="shrink-0" /> ดูแผนที่
+                    </a>
+                  )}
                   {ศูนย์.name && (
                     <p className="text-xs text-gray-400 text-center">ผู้รับผิดชอบ: {ศูนย์.name}</p>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-gray-400 text-center py-4">กำลังโหลดข้อมูลติดต่อ...</p>
+                <div className="text-center py-4 space-y-2">
+                  <p className="text-sm text-gray-500">ยังไม่มีข้อมูลศูนย์พักพิงในระบบ</p>
+                  <button
+                    onClick={() => navigate('/contact')}
+                    className="text-sm font-semibold text-green-600"
+                  >
+                    ไปหน้าติดต่อเรา แทน →
+                  </button>
+                </div>
               )}
 
               <button onClick={() => setแสดงContact(false)}
