@@ -38,6 +38,9 @@ function App() {
   const [user, setUser]           = useState(null)
   const [กำลังโหลด, setกำลังโหลด] = useState(true)  // รอเช็ค session ก่อน render
   const [ถูกระงับ, setถูกระงับ]   = useState(false)  // Global Block — บัญชีถูกระงับ
+  // role จริงจาก DB โหลดหรือยัง — user เริ่มต้นด้วย role: 'user' เสมอระหว่างรอ (ดู setUser ด้านล่าง)
+  // ต้องRole() ใช้เช็คตัวนี้ กัน admin/volunteer ที่ refresh หน้าโดนเด้งออกผิดๆ ก่อน role จริงมาถึง
+  const [roleพร้อม, setRoleพร้อม] = useState(false)
 
   // Warmup: ยิง HTTP request ไปยัง Supabase ทันทีที่ app โหลด
   // เพื่อ pre-establish DNS+TCP+TLS connection ก่อนที่ user จะกด Login
@@ -73,6 +76,7 @@ function App() {
         ) {
           // เข้าสู่ระบบใหม่ (หรือ session ใหม่) — ล้างสถานะ "ถูกระงับ" ค้างจากรอบก่อนทิ้ง
           setถูกระงับ(false)
+          setRoleพร้อม(false)
 
           // แสดงแอปทันที — ใช้ข้อมูลจาก Auth ก่อน ไม่รอ DB
           const authUser = session.user
@@ -116,6 +120,7 @@ function App() {
 
       if (error || !data) {
         setUser(fallback)
+        setRoleพร้อม(true)
       } else if (data.status === 'suspended') {
         // บัญชีถูกระงับ — Global Block: ตัดการเชื่อมต่อทันที ไม่ปล่อยให้เข้าแอป
         await บังคับออกเพราะถูกระงับ()
@@ -126,9 +131,11 @@ function App() {
           name:  data.name  || fallback.name,
           role:  data.role  || 'user',
         })
+        setRoleพร้อม(true)
       }
     } catch {
       setUser(fallback)
+      setRoleพร้อม(true)
     }
   }
 
@@ -181,6 +188,23 @@ function App() {
     return user ? component : <Navigate to="/" />
   }
 
+  // เหมือน ต้องLogin แต่เช็ค role ตรงตัวด้วย — กันไม่ให้ user ทั่วไป/role อื่น
+  // เข้าหน้า admin หรือ volunteer ได้แค่เพราะพิมพ์ URL ตรงๆ (เดิมเช็คแค่ login แล้วหรือยัง)
+  function ต้องRole(component, role) {
+    if (!user) return <Navigate to="/" />
+    if (user.role === role) return component
+    if (!roleพร้อม) {
+      // user.role ตั้งต้นเป็น 'user' เสมอระหว่างรอโหลด role จริงจาก DB (ดู setUser ใน onAuthStateChange)
+      // ถ้า redirect ทันทีตรงนี้ admin/volunteer ที่ refresh หน้าจะโดนเด้งออกผิดๆ ก่อน role จริงมาถึง
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-gray-300 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )
+    }
+    return <Navigate to="/home" />
+  }
+
   return (
     <BrowserRouter>
       <Layoutเนื้อหา user={user}>
@@ -203,18 +227,18 @@ function App() {
         <Route path="/notifications" element={ต้องLogin(<NotificationPage user={user} />)} />
 
         {/* === เจ้าหน้าที่ / อาสาสมัคร === */}
-        <Route path="/volunteer/reports" element={ต้องLogin(<VolunteerPage หน้า="reports" />)} />
-        <Route path="/volunteer/update"  element={ต้องLogin(<VolunteerPage หน้า="update" />)} />
-        <Route path="/volunteer/animals" element={ต้องLogin(<VolunteerPage หน้า="animals" />)} />
-        <Route path="/volunteer/stats"   element={ต้องLogin(<VolunteerPage หน้า="stats" />)} />
-        <Route path="/volunteer/map"     element={ต้องLogin(<VolunteerPage หน้า="map" />)} />
+        <Route path="/volunteer/reports" element={ต้องRole(<VolunteerPage หน้า="reports" />, 'volunteer')} />
+        <Route path="/volunteer/update"  element={ต้องRole(<VolunteerPage หน้า="update" />, 'volunteer')} />
+        <Route path="/volunteer/animals" element={ต้องRole(<VolunteerPage หน้า="animals" />, 'volunteer')} />
+        <Route path="/volunteer/stats"   element={ต้องRole(<VolunteerPage หน้า="stats" />, 'volunteer')} />
+        <Route path="/volunteer/map"     element={ต้องRole(<VolunteerPage หน้า="map" />, 'volunteer')} />
 
         {/* === Admin === */}
-        <Route path="/admin/dashboard" element={ต้องLogin(<AdminPage หน้า="dashboard" user={user} />)} />
-        <Route path="/admin/users"     element={ต้องLogin(<AdminPage หน้า="users"     user={user} />)} />
-        <Route path="/admin/areas"     element={ต้องLogin(<AdminPage หน้า="areas"     user={user} />)} />
-        <Route path="/admin/export"    element={ต้องLogin(<AdminPage หน้า="export"    user={user} />)} />
-        <Route path="/admin/settings"  element={ต้องLogin(<AdminPage หน้า="settings"  user={user} />)} />
+        <Route path="/admin/dashboard" element={ต้องRole(<AdminPage หน้า="dashboard" user={user} />, 'admin')} />
+        <Route path="/admin/users"     element={ต้องRole(<AdminPage หน้า="users"     user={user} />, 'admin')} />
+        <Route path="/admin/areas"     element={ต้องRole(<AdminPage หน้า="areas"     user={user} />, 'admin')} />
+        <Route path="/admin/export"    element={ต้องRole(<AdminPage หน้า="export"    user={user} />, 'admin')} />
+        <Route path="/admin/settings"  element={ต้องRole(<AdminPage หน้า="settings"  user={user} />, 'admin')} />
 
       </Routes>
       </Layoutเนื้อหา>
