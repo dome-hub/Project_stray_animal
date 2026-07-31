@@ -6,6 +6,23 @@ import { useState } from 'react'
 import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info } from 'lucide-react'
 import { supabase } from '../supabase'
 
+// ความยาวรหัสผ่านขั้นต่ำ — ตามแนวทางสากล (NIST/OWASP) ความยาวสำคัญกว่าการบังคับใส่อักขระพิเศษ
+const ความยาวรหัสผ่านขั้นต่ำ = 8
+
+// รหัสที่ยาวพอแต่ยังเดาง่าย — เทียบแบบไม่สนตัวพิมพ์เล็ก/ใหญ่
+const รหัสผ่านต้องห้าม = [
+  '12345678', '123456789', '1234567890', 'password', 'password1', 'password123',
+  'qwertyui', 'qwerty123', 'iloveyou', 'abc12345', '11111111', '00000000',
+  'admin123', 'letmein1', 'welcome1',
+]
+
+function รหัสผ่านอ่อนเกินไป(รหัส) {
+  const ล่าง = รหัส.toLowerCase()
+  if (รหัสผ่านต้องห้าม.includes(ล่าง)) return true
+  if (/^(.)\1+$/.test(รหัส)) return true            // ตัวเดียวซ้ำทั้งหมด เช่น aaaaaaaa
+  return false
+}
+
 function Login() {
   const [โหมด, setโหมด] = useState('login')   // 'login' | 'register'
 
@@ -106,8 +123,13 @@ function Login() {
       setข้อผิดพลาด('กรุณากรอกข้อมูลให้ครบทุกช่อง')
       return
     }
-    if (รหัสผ่านRegister.length < 6) {
-      setข้อผิดพลาด('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร')
+    if (รหัสผ่านRegister.length < ความยาวรหัสผ่านขั้นต่ำ) {
+      setข้อผิดพลาด(`รหัสผ่านต้องมีอย่างน้อย ${ความยาวรหัสผ่านขั้นต่ำ} ตัวอักษร`)
+      return
+    }
+    // ความยาวช่วยได้ก็จริง แต่ "12345678" ยาวพอแล้วยังเดาง่ายอยู่ดี — กันชุดที่ถูกเดาบ่อยที่สุดไว้ด้วย
+    if (รหัสผ่านอ่อนเกินไป(รหัสผ่านRegister)) {
+      setข้อผิดพลาด('รหัสผ่านนี้เดาง่ายเกินไป กรุณาตั้งรหัสผ่านอื่น')
       return
     }
 
@@ -288,7 +310,7 @@ function Login() {
               type="password"
               value={รหัสผ่านRegister}
               onChange={(e) => setรหัสผ่านRegister(e.target.value)}
-              placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)"
+              placeholder={`รหัสผ่าน (อย่างน้อย ${ความยาวรหัสผ่านขั้นต่ำ} ตัวอักษร)`}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
             />
 
