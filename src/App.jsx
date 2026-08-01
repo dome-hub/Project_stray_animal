@@ -7,6 +7,7 @@ import { supabase } from './supabase'
 import BottomNav from './components/BottomNav'
 import { แสดงแถบนำทาง, ความสูงแถบนำทาง } from './utils/navVisibility'
 
+import LandingPage      from './pages/LandingPage'
 import Login            from './pages/Login'
 import SuspendedPage    from './pages/SuspendedPage'
 import Home             from './pages/Home'
@@ -186,13 +187,13 @@ function App() {
   }
 
   function ต้องLogin(component) {
-    return user ? component : <Navigate to="/" />
+    return user ? component : <Navigate to="/login" />
   }
 
   // เหมือน ต้องLogin แต่เช็ค role ตรงตัวด้วย — กันไม่ให้ user ทั่วไป/role อื่น
   // เข้าหน้า admin หรือ volunteer ได้แค่เพราะพิมพ์ URL ตรงๆ (เดิมเช็คแค่ login แล้วหรือยัง)
   function ต้องRole(component, role) {
-    if (!user) return <Navigate to="/" />
+    if (!user) return <Navigate to="/login" />
     if (user.role === role) return component
     if (!roleพร้อม) {
       // user.role ตั้งต้นเป็น 'user' เสมอระหว่างรอโหลด role จริงจาก DB (ดู setUser ใน onAuthStateChange)
@@ -211,8 +212,11 @@ function App() {
       <Layoutเนื้อหา user={user}>
       <Routes>
 
+        {/* หน้าแรกสาธารณะ — อธิบายแอป ไม่ใช่ฟอร์ม login ตรงๆ (ดู LandingPage.jsx เรื่อง Google OAuth branding) */}
+        <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />
+
         {/* หน้า Login — ไม่ส่ง onLogin แล้ว Supabase Auth จัดการเอง */}
-        <Route path="/" element={user ? <Navigate to="/home" /> : <Login />} />
+        <Route path="/login" element={user ? <Navigate to="/home" /> : <Login />} />
 
         {/* นโยบายความเป็นส่วนตัว — public ไม่ต้อง login
             Google ต้องเปิด URL นี้ได้ตอนตรวจสอบ OAuth consent screen และผู้ใช้ต้องอ่านได้ก่อนสมัคร */}

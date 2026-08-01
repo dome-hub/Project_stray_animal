@@ -11,7 +11,7 @@ export const ความสูงแถบนำทาง = 56
 export function แสดงแถบนำทาง(user, pathname) {
   if (!user) return false                        // ยังไม่ได้เข้าระบบ
   if (user.role === 'admin') return false        // admin ใช้เมนูหน้าแรกตามเดิม
-  if (pathname === '/') return false             // หน้า login
+  if (pathname === '/' || pathname === '/login') return false  // หน้าแรก / หน้า login
   if (pathname.startsWith('/admin')) return false
   return true
 }
