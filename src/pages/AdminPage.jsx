@@ -153,12 +153,11 @@ function AdminPage({ หน้า, user }) {
     setโหลดผู้ใช้(false)
   }
 
-  // เปลี่ยน Role → อัปเดตใน Supabase จริง
+  // เปลี่ยน Role → เรียกผ่าน RPC admin_set_user_role แทนการ update ตรงๆ
+  // เพราะคอลัมน์ role ถูกถอดสิทธิ์ update ตรงออกจาก role authenticated แล้ว (ดู SQL hardening)
+  // มีแค่ฟังก์ชันนี้ (เช็ค is_admin() เองฝั่ง DB) เท่านั้นที่แก้ role ได้ กัน user ทั่วไปเลื่อนสิทธิ์ตัวเองผ่าน console
   async function เปลี่ยนRole(id, roleใหม่) {
-    const { error } = await supabase
-      .from('users')
-      .update({ role: roleใหม่ })
-      .eq('id', id)
+    const { error } = await supabase.rpc('admin_set_user_role', { target_ids: [id], new_role: roleใหม่ })
     if (!error) {
       setรายการผู้ใช้(รายการผู้ใช้.map((u) =>
         u.id === id ? { ...u, role: roleใหม่ } : u
@@ -168,13 +167,10 @@ function AdminPage({ หน้า, user }) {
     }
   }
 
-  // ระงับ / ยกเลิกระงับบัญชี → อัปเดตใน Supabase จริง
+  // ระงับ / ยกเลิกระงับบัญชี → เรียกผ่าน RPC admin_set_user_status เช่นกัน
   async function สลับสถานะ(id, สถานะปัจจุบัน) {
     const สถานะใหม่ = สถานะปัจจุบัน === 'suspended' ? 'active' : 'suspended'
-    const { error } = await supabase
-      .from('users')
-      .update({ status: สถานะใหม่ })
-      .eq('id', id)
+    const { error } = await supabase.rpc('admin_set_user_status', { target_ids: [id], new_status: สถานะใหม่ })
     if (!error) {
       setรายการผู้ใช้(รายการผู้ใช้.map((u) =>
         u.id === id ? { ...u, status: สถานะใหม่ } : u
@@ -184,9 +180,9 @@ function AdminPage({ หน้า, user }) {
     }
   }
 
-  // เปลี่ยน Role หลายคนพร้อมกัน (Bulk) → อัปเดตใน Supabase จริง
+  // เปลี่ยน Role หลายคนพร้อมกัน (Bulk) → RPC เดียวกันรับ array ของ id อยู่แล้ว
   async function เปลี่ยนRoleหลายคน(ids, roleใหม่) {
-    const { error } = await supabase.from('users').update({ role: roleใหม่ }).in('id', ids)
+    const { error } = await supabase.rpc('admin_set_user_role', { target_ids: ids, new_role: roleใหม่ })
     if (!error) {
       setรายการผู้ใช้(function (prev) {
         return prev.map(function (u) { return ids.includes(u.id) ? { ...u, role: roleใหม่ } : u })
@@ -196,9 +192,9 @@ function AdminPage({ หน้า, user }) {
     }
   }
 
-  // ระงับ / ยกเลิกระงับบัญชีหลายคนพร้อมกัน (Bulk) → อัปเดตใน Supabase จริง
+  // ระงับ / ยกเลิกระงับบัญชีหลายคนพร้อมกัน (Bulk) → RPC เดียวกันรับ array ของ id อยู่แล้ว
   async function เปลี่ยนสถานะหลายคน(ids, สถานะใหม่) {
-    const { error } = await supabase.from('users').update({ status: สถานะใหม่ }).in('id', ids)
+    const { error } = await supabase.rpc('admin_set_user_status', { target_ids: ids, new_status: สถานะใหม่ })
     if (!error) {
       setรายการผู้ใช้(function (prev) {
         return prev.map(function (u) { return ids.includes(u.id) ? { ...u, status: สถานะใหม่ } : u })
