@@ -19,12 +19,20 @@ function LandingPage() {
     <div className="min-h-screen bg-blue-50">
       <div className="max-w-lg mx-auto px-4 py-10">
 
-        {/* โลโก้ + ชื่อแอป */}
+        {/* โลโก้ + ชื่อแอป
+            ชื่อ "JaengJon" แยกเป็นหัวข้อหลักเดี่ยวๆ (ไม่ฝังในวงเล็บ) และมีคำอธิบายวัตถุประสงค์ทั้งอังกฤษ+ไทย
+            เพราะ Google OAuth branding verification เช็คว่าชื่อแอปตรงกับหน้าแรกไหม และหน้าแรกอธิบายวัตถุประสงค์ชัดหรือไม่ */}
         <div className="flex flex-col items-center text-center mb-8">
-          <img src="/logo.png" alt="แจ้งจร" className="w-20 h-20 rounded-2xl mb-4" />
-          <h1 className="text-3xl font-bold text-gray-800">แจ้งจร (JaengJon)</h1>
+          <img src="/logo.png" alt="JaengJon" className="w-20 h-20 rounded-2xl mb-4" />
+          <h1 className="text-3xl font-bold text-gray-800">JaengJon</h1>
+          <p className="text-gray-600 text-base font-medium mt-1">แจ้งจร</p>
+          <p className="text-gray-500 text-sm mt-3 max-w-sm leading-relaxed">
+            JaengJon is a stray animal reporting and management platform for Kamphaeng Saen,
+            Nakhon Pathom, Thailand. It helps residents report stray animals in need of help
+            and connects them with local officials and volunteers.
+          </p>
           <p className="text-gray-500 text-sm mt-2 max-w-sm leading-relaxed">
-            ระบบแจ้งเหตุและจัดการสัตว์จรจัด สำหรับตำบลกำแพงแสน อำเภอกำแพงแสน จังหวัดนครปฐม
+            แจ้งจร คือระบบแจ้งเหตุและจัดการสัตว์จรจัด สำหรับตำบลกำแพงแสน อำเภอกำแพงแสน จังหวัดนครปฐม
             ช่วยให้ประชาชนแจ้งพบสัตว์จรที่ต้องการความช่วยเหลือ และประสานงานกับเจ้าหน้าที่ในพื้นที่ได้ง่ายขึ้น
           </p>
         </div>
