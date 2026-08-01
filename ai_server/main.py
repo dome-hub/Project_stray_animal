@@ -31,7 +31,8 @@ app = FastAPI(title="Stray Animal Analyzer API", version="3.0-onnx-47breeds")
 # เพิ่ม/แก้โดเมนได้ทาง env ALLOWED_ORIGINS (คั่นด้วยจุลภาค) โดยไม่ต้องแก้โค้ด
 _origins_เริ่มต้น = [
     'https://project-stray-animal.onrender.com',       # เว็บทดสอบทั่วไป
-    'https://project-stray-animal-4z3d.onrender.com',  # เว็บที่ใช้ AI
+    'https://project-stray-animal-4z3d.onrender.com',  # ชื่อเก่าของเว็บหลัก (เผื่อยังมีลิงก์เก่าค้างอยู่)
+    'https://jaengjon.onrender.com',                   # เว็บหลักที่ใช้ AI (เปลี่ยนชื่อจาก -4z3d)
     'http://localhost:5173',    # vite dev
     'http://localhost:4173',    # vite preview
     'https://localhost',        # Capacitor Android (androidScheme ค่าเริ่มต้น)
