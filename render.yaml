@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: project-stray-animal
+    name: jaengjon
     env: static
     buildCommand: npm run build
     staticPublishPath: ./dist
