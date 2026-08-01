@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/pages/AdminPage.jsx"
+        ],
+        "createdAt": "2026-08-01T17:01:05.218Z",
+        "reason": "Pagination button: text-gray-600 and bg-purple-600 are opposite branches of the same ternary, so gray text never lands on the purple fill (user confirmed)"
+      }
+    ]
+  }
+}
