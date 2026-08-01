@@ -10,7 +10,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
-  Shield, Users, FileText, PawPrint, Heart, User, HardHat, MapPin, Map,
+  Shield, Users, FileText, PawPrint, Heart, User, HardHat, Map,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
   CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2,
   ChevronLeft, ChevronRight, X,
@@ -785,30 +785,6 @@ function AdminPage({ หน้า, user }) {
             )}
           </div>
 
-          {/* รายชื่อหมู่บ้าน — คอนเทนเนอร์เดียว คั่นด้วยเส้นบาง แทนการ์ดเงาแยกทีละหมู่ */}
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <p className="font-bold text-gray-800 flex items-center gap-2 px-4 pt-4 pb-3">
-              <MapPin size={18} className="text-gray-500 shrink-0" /> หมู่บ้านในพื้นที่
-            </p>
-            <div className="divide-y divide-gray-100">
-              {[
-                'หมู่ 1 — บ้านกำแพงแสน',
-                'หมู่ 2 — บ้านดอนข่อย',
-                'หมู่ 3 — บ้านหนองกระทุ่ม',
-                'หมู่ 4 — บ้านโคกพระเจดีย์',
-              ].map((พื้นที่, i) => (
-                <div key={i} className="flex items-center justify-between gap-3 px-4 py-3.5">
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 text-sm truncate">{พื้นที่}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5"><HardHat size={11} className="shrink-0" /> ยังไม่ได้กำหนดเจ้าหน้าที่</p>
-                  </div>
-                  <button className="text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium shrink-0">
-                    แก้ไข
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
