@@ -1,5 +1,5 @@
-// breeds.js — ข้อมูลสายพันธุ์สัตว์สำหรับหน้า "บทความน่ารู้"
-// อิงจากรายชื่อ 37 สายพันธุ์ที่โมเดล AI ของระบบวิเคราะห์ได้ (ai_server/model/metadata.json)
+// breeds.js — ข้อมูลสายพันธุ์สัตว์ ใช้เป็นรายการ autocomplete ในช่องกรอกสายพันธุ์ (ดู components/BreedInput.jsx)
+// อิงจากรายชื่อ 47 สายพันธุ์ที่โมเดล AI ของระบบวิเคราะห์ได้ (ai_server/model/metadata.json)
 // เพิ่มเนื้อหาการดูแล/ความเหมาะสม ที่สังเคราะห์จากขนาด+นิสัยของแต่ละสายพันธุ์
 
 const shibaInuPhoto = new URL('../../30.Shiba Inu.jpg', import.meta.url).href

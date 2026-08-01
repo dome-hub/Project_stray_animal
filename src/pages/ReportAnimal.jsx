@@ -13,7 +13,7 @@ import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
-import { สายพันธุ์ทั้งหมด } from '../data/breeds'
+import BreedInput from '../components/BreedInput'
 
 // ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
 const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
@@ -179,7 +179,6 @@ function ReportAnimal({ user }) {
   const [รายละเอียด,   setรายละเอียด]   = useState('')
   const [ผลAI,         setผลAI]         = useState(null)
   const [สายพันธุ์สุดท้าย, setสายพันธุ์สุดท้าย] = useState('')   // ใช้ค่านี้ตอนส่งจริง แก้ไขทับผล AI ได้เสมอ
-  const [แสดงตัวเลือกสายพันธุ์, setแสดงตัวเลือกสายพันธุ์] = useState(false)   // dropdown autocomplete สายพันธุ์
   const [กำลังวิเคราะห์, setกำลังวิเคราะห์] = useState(false)
   const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
   const [latitude,        setLatitude]        = useState(null)
@@ -263,9 +262,9 @@ function ReportAnimal({ user }) {
     }
   }
 
-  // ---- เลือกสายพันธุ์จากรายการ autocomplete — อัปเดตชื่อ + ขนาด/นิสัยให้ตรงกับสายพันธุ์ที่เลือก ----
+  // ---- เลือกสายพันธุ์จากรายการ autocomplete — อัปเดตขนาด/นิสัยให้ตรงกับสายพันธุ์ที่เลือก ----
+  // ชื่อสายพันธุ์ BreedInput เซ็ตให้แล้วผ่าน onChange ตรงนี้จึงดูแลแค่ผลวิเคราะห์ที่แสดงคู่กัน
   function เลือกสายพันธุ์จากรายการ(สายพันธุ์) {
-    setสายพันธุ์สุดท้าย(สายพันธุ์.ชื่อไทย)
     setผลAI(function (prev) {
       return {
         ...(prev || {}),
@@ -274,7 +273,6 @@ function ReportAnimal({ user }) {
         จากAI: prev?.จากAI ?? false,
       }
     })
-    setแสดงตัวเลือกสายพันธุ์(false)
   }
 
   // ---- เลือกรูปจากแกลเลอรี่ ----
@@ -907,40 +905,14 @@ function ReportAnimal({ user }) {
                   <span className="text-orange-500 font-medium"> (กรุณาระบุเอง)</span>
                 )}
               </label>
-              <input
-                type="text"
+              <BreedInput
                 value={สายพันธุ์สุดท้าย}
-                onChange={(e) => { setสายพันธุ์สุดท้าย(e.target.value); setแสดงตัวเลือกสายพันธุ์(true) }}
-                onFocus={() => setแสดงตัวเลือกสายพันธุ์(true)}
-                onBlur={() => setTimeout(() => setแสดงตัวเลือกสายพันธุ์(false), 150)}
+                onChange={setสายพันธุ์สุดท้าย}
+                onSelect={เลือกสายพันธุ์จากรายการ}
                 placeholder="พิมพ์ชื่อสายพันธุ์ เช่น ไทยหลังอาน, วิเชียรมาศ หรือพิมพ์เองถ้าไม่ทราบ"
-                autoComplete="off"
+                สี="orange"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-orange-400"
               />
-
-              {/* dropdown ตัวเลือกที่ตรงกับคำที่พิมพ์ */}
-              {แสดงตัวเลือกสายพันธุ์ && สายพันธุ์สุดท้าย.trim() !== '' && (function () {
-                const คำค้น = สายพันธุ์สุดท้าย.trim().toLowerCase()
-                const ที่ตรงกัน = สายพันธุ์ทั้งหมด
-                  .filter((b) => b.ชื่อไทย.toLowerCase().includes(คำค้น) || b.id.toLowerCase().includes(คำค้น))
-                  .slice(0, 6)
-                if (ที่ตรงกัน.length === 0) return null
-                return (
-                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    {ที่ตรงกัน.map((b) => (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onMouseDown={() => เลือกสายพันธุ์จากรายการ(b)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 flex items-center justify-between"
-                      >
-                        <span>{b.ชื่อไทย}</span>
-                        <span className="text-xs text-gray-400">{b.ประเภท} · {b.ขนาด}</span>
-                      </button>
-                    ))}
-                  </div>
-                )
-              })()}
             </div>
 
             <div className="space-y-2">

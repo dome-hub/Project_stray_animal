@@ -23,6 +23,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+import BreedInput from '../components/BreedInput'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -1462,17 +1463,22 @@ function VolunteerPage({ หน้า }) {
             <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
               <p className="font-bold text-gray-800">เพิ่มสัตว์เข้าศูนย์พักพิง</p>
               {[
-                { label: 'ชื่อสัตว์', val: ชื่อสัตว์, set: setชื่อสัตว์, placeholder: 'เช่น มะม่วง, ขาว', required: true },
-                { label: 'สายพันธุ์', val: สายพันธุ์, set: setSายพันธุ์, placeholder: 'เช่น สุนัขพันธุ์ไทย', required: false },
-                { label: 'สุขภาพ',   val: สุขภาพสัตว์, set: setSุขภาพสัตว์, placeholder: 'เช่น ปกติ, บาดเจ็บ', required: false },
+                { key: 'name',   label: 'ชื่อสัตว์', val: ชื่อสัตว์, set: setชื่อสัตว์, placeholder: 'เช่น มะม่วง, ขาว', required: true },
+                { key: 'breed',  label: 'สายพันธุ์', val: สายพันธุ์, set: setSายพันธุ์, placeholder: 'พิมพ์ชื่อสายพันธุ์ เช่น ไทยหลังอาน, วิเชียรมาศ', required: false },
+                { key: 'health', label: 'สุขภาพ',   val: สุขภาพสัตว์, set: setSุขภาพสัตว์, placeholder: 'เช่น ปกติ, บาดเจ็บ', required: false },
               ].map(function (f) {
                 return (
                   <div key={f.label}>
                     <p className="text-xs font-semibold text-gray-600 mb-1">
                       {f.label} {f.required && <span className="text-red-400">*</span>}
                     </p>
-                    <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.placeholder}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
+                    {/* สายพันธุ์ใช้ช่อง autocomplete ตัวเดียวกับหน้าแจ้งเหตุ ชื่อพันธุ์จะได้ตรงกันทั้งระบบ */}
+                    {f.key === 'breed' ? (
+                      <BreedInput value={f.val} onChange={f.set} placeholder={f.placeholder} สี="teal" />
+                    ) : (
+                      <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.placeholder}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
+                    )}
                   </div>
                 )
               })}
@@ -2566,12 +2572,17 @@ function VolunteerPage({ หน้า }) {
                 </select>
               </div>
 
-              {/* แถวที่ 3: สายพันธุ์ & ขนาดตัว */}
+              {/* แถวที่ 3: สายพันธุ์ & ขนาดตัว
+                  เลือกพันธุ์จากรายการแล้วเติมขนาดตัวให้อัตโนมัติ (แก้ทับเองได้) */}
               <div>
                 <p className="text-xs font-semibold text-gray-600 mb-1">สายพันธุ์</p>
-                <input value={สัตว์ที่แก้ไข.breed || ''} placeholder="เช่น สุนัขพันธุ์ไทย"
-                  onChange={function (e) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, breed: e.target.value } }) }}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
+                <BreedInput
+                  value={สัตว์ที่แก้ไข.breed || ''}
+                  onChange={function (ค่า) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, breed: ค่า } }) }}
+                  onSelect={function (b) { setSัตว์ที่แก้ไข(function (prev) { return { ...prev, size: b.ขนาด } }) }}
+                  placeholder="พิมพ์ชื่อสายพันธุ์ เช่น ไทยหลังอาน, วิเชียรมาศ"
+                  สี="teal"
+                />
               </div>
 
               <div>
