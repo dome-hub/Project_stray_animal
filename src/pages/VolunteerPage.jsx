@@ -24,6 +24,7 @@ import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
 import BreedInput from '../components/BreedInput'
+import { หมุดสี } from '../utils/mapMarker'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -47,25 +48,6 @@ function ประเภทจาก(urgency) {
   if (urgency === 'ด่วนมาก') return ประเภทแจ้งเรียง[0]
   if (urgency === 'ด่วน')    return ประเภทแจ้งเรียง[1]
   return ประเภทแจ้งเรียง[2] // ปานกลาง / null
-}
-
-// cache หมุด divIcon ตามสี เพื่อไม่สร้างใหม่ทุก render
-const _หมุดCache = {}
-function หมุดสี(color) {
-  if (_หมุดCache[color]) return _หมุดCache[color]
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="38" viewBox="0 0 26 38">
-    <path d="M13 0C5.8 0 0 5.8 0 13c0 9.2 13 25 13 25s13-15.8 13-25C26 5.8 20.2 0 13 0z" fill="${color}" stroke="white" stroke-width="2"/>
-    <circle cx="13" cy="13" r="5" fill="white"/>
-  </svg>`
-  const icon = L.divIcon({
-    html: svg,
-    className: '',
-    iconSize: [26, 38],
-    iconAnchor: [13, 38],
-    popupAnchor: [0, -34],
-  })
-  _หมุดCache[color] = icon
-  return icon
 }
 
 // หมุดตำแหน่งตัวเอง — จุดกลมทึบสีน้ำเงินมีวงแหวน แยกจากหมุดหยดน้ำสีเคสตั้งใจ กันสับสนว่าจุดไหนคือเจ้าหน้าที่เอง

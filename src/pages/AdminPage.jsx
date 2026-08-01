@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -16,6 +16,7 @@ import {
   ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
 import { supabase } from '../supabase'
+import { หมุดสี } from '../utils/mapMarker'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -27,6 +28,34 @@ L.Icon.Default.mergeOptions({
 
 // ศูนย์กลางตำบลกำแพงแสน อ.กำแพงแสน จ.นครปฐม
 const ศูนย์กลางแผนที่ = [14.0206, 99.9673]
+
+// ---- จัดกลุ่มสถานะเคสสำหรับลงสีหมุด ----
+// สถานะจริงมี 14 แบบ (ดูชุดเต็มใน TrackReport.jsx) ถ้าลงสีทีละแบบจะอ่านแผนที่ไม่ออก
+// ยุบเป็น 4 กลุ่มตามความหมาย — แอดมินต้องการเห็นว่าโซนไหนมีงานค้าง ไม่ใช่รายละเอียดทีละขั้น
+const กลุ่มสถานะ = [
+  { key: 'waiting', label: 'รอดำเนินการ',   hex: '#eab308', dot: 'bg-yellow-500', chipActive: 'border-yellow-500 bg-yellow-500 text-white',
+    สถานะ: ['รอดำเนินการ'] },
+  { key: 'active',  label: 'กำลังดำเนินการ', hex: '#3b82f6', dot: 'bg-blue-500',   chipActive: 'border-blue-500 bg-blue-500 text-white',
+    สถานะ: ['รับเรื่องแล้ว', 'ลงพื้นที่แล้ว', 'เข้าควบคุมแล้ว', 'ส่งรักษาสถานพยาบาล', 'ประกาศตามหาเจ้าของ', 'อยู่ศูนย์พักพิง'] },
+  { key: 'done',    label: 'สำเร็จ',         hex: '#22c55e', dot: 'bg-green-500',  chipActive: 'border-green-500 bg-green-500 text-white',
+    สถานะ: ['ส่งคืนเจ้าของสำเร็จ', 'ปล่อยกลับถิ่นเดิม', 'มีผู้รับเลี้ยง'] },
+  { key: 'closed',  label: 'ปิดเคส / อื่นๆ', hex: '#9ca3af', dot: 'bg-gray-400',   chipActive: 'border-gray-400 bg-gray-400 text-white',
+    สถานะ: ['เสียชีวิต', 'ยุติการค้นหา', 'เคสซ้ำซ้อน', 'ยกเลิกโดยผู้แจ้ง'] },
+]
+
+// สถานะที่ไม่รู้จัก (เช่นเพิ่มใหม่ในอนาคตแล้วลืมมาเติมที่นี่) ตกลงกลุ่มสุดท้าย ดีกว่าหมุดหาย
+function กลุ่มจากสถานะ(status) {
+  return กลุ่มสถานะ.find((g) => g.สถานะ.includes(status)) || กลุ่มสถานะ[กลุ่มสถานะ.length - 1]
+}
+
+// ตัวคุมแผนที่ — บินไปที่เคสที่กดจากรายการใต้แผนที่ (pattern เดียวกับ VolunteerPage)
+function MapControllerAdmin({ โฟกัส }) {
+  const map = useMap()
+  useEffect(function () {
+    if (โฟกัส) map.flyTo([โฟกัส.lat, โฟกัส.lng], 16, { duration: 0.8 })
+  }, [โฟกัส, map])
+  return null
+}
 
 // สีของแต่ละ Role
 const สีRole = {
@@ -84,6 +113,8 @@ function AdminPage({ หน้า, user }) {
   // ---- State: แผนที่รายงาน (พื้นที่) ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
+  const [กลุ่มที่เลือก, setกลุ่มที่เลือก] = useState([])   // ว่าง = แสดงทุกกลุ่ม
+  const [จุดโฟกัส, setจุดโฟกัส]         = useState(null) // เคสที่กดจากรายการใต้แผนที่
 
   // ---- ดึงสถิติ Dashboard ----
   useEffect(function () {
@@ -327,6 +358,16 @@ function AdminPage({ หน้า, user }) {
       day: 'numeric', month: 'short', year: 'numeric'
     })
   }
+
+  // ---- แผนที่พื้นที่: กรองตามสถานะที่เลือก (ไม่เลือกเลย = ทั้งหมด) ----
+  const รายงานที่กรอง = กลุ่มที่เลือก.length === 0
+    ? รายงานพิกัด
+    : รายงานพิกัด.filter((r) => กลุ่มที่เลือก.includes(กลุ่มจากสถานะ(r.status).key))
+
+  // รายการใต้แผนที่เรียงใหม่สุดขึ้นก่อน — query ไม่ได้ .order() ไว้ ลำดับจาก DB จึงไม่รับประกัน
+  const รายงานที่กรองเรียง = [...รายงานที่กรอง].sort(function (a, b) {
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
 
   // กรองผู้ใช้ตามคำค้นหา + Role + สถานะ
   const ผู้ใช้กรอง = รายการผู้ใช้.filter((u) => {
@@ -750,10 +791,50 @@ function AdminPage({ หน้า, user }) {
             <div className="flex items-center justify-between mb-0.5">
               <p className="font-bold text-gray-800 flex items-center gap-2"><Map size={18} className="text-gray-500 shrink-0" /> แผนที่รายงานทั้งหมด</p>
               {!โหลดแผนที่ && (
-                <span className="text-xs text-gray-400">{รายงานพิกัด.length} จุด</span>
+                <span className="text-xs text-gray-400">
+                  {รายงานที่กรอง.length === รายงานพิกัด.length
+                    ? `${รายงานพิกัด.length} จุด`
+                    : `${รายงานที่กรอง.length} / ${รายงานพิกัด.length} จุด`}
+                </span>
               )}
             </div>
             <p className="text-xs text-gray-400 mb-3">จังหวัดนครปฐม • ตำบลกำแพงแสน</p>
+
+            {/* ตัวกรองตามสถานะ — กดสลับเปิด/ปิดได้หลายอัน ไม่เลือกเลย = แสดงทั้งหมด
+                นับจำนวนจากข้อมูลที่โหลดมาแล้ว ไม่ยิง query เพิ่ม */}
+            {!โหลดแผนที่ && รายงานพิกัด.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {กลุ่มสถานะ.map(function (g) {
+                  const จำนวน = รายงานพิกัด.filter((r) => กลุ่มจากสถานะ(r.status).key === g.key).length
+                  const เลือกอยู่ = กลุ่มที่เลือก.includes(g.key)
+                  return (
+                    <button
+                      key={g.key}
+                      onClick={function () {
+                        setจุดโฟกัส(null)
+                        setกลุ่มที่เลือก(function (prev) {
+                          return prev.includes(g.key) ? prev.filter((k) => k !== g.key) : [...prev, g.key]
+                        })
+                      }}
+                      className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border-2 transition-colors ${
+                        เลือกอยู่ ? g.chipActive : 'border-gray-200 text-gray-600 bg-white'
+                      }`}
+                    >
+                      {!เลือกอยู่ && <span className={`w-2 h-2 rounded-full ${g.dot}`} />}
+                      {g.label} {จำนวน}
+                    </button>
+                  )
+                })}
+                {กลุ่มที่เลือก.length > 0 && (
+                  <button
+                    onClick={function () { setกลุ่มที่เลือก([]); setจุดโฟกัส(null) }}
+                    className="text-xs font-medium px-2.5 py-1.5 rounded-lg text-gray-500 underline"
+                  >
+                    ล้างตัวกรอง
+                  </button>
+                )}
+              </div>
+            )}
 
             {โหลดแผนที่ ? (
               <div className="text-center py-10">
@@ -767,8 +848,9 @@ function AdminPage({ หน้า, user }) {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {รายงานพิกัด.map((r) => (
-                    <Marker key={r.id} position={[r.latitude, r.longitude]}>
+                  <MapControllerAdmin โฟกัส={จุดโฟกัส} />
+                  {รายงานที่กรอง.map((r) => (
+                    <Marker key={r.id} position={[r.latitude, r.longitude]} icon={หมุดสี(กลุ่มจากสถานะ(r.status).hex)}>
                       <Popup>
                         <div className="text-sm">
                           <p className="font-bold">#{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}</p>
@@ -784,6 +866,45 @@ function AdminPage({ หน้า, user }) {
               </div>
             )}
           </div>
+
+          {/* รายการเคสบนแผนที่ — กดแล้วแผนที่บินไปที่หมุดนั้น
+              ใช้ข้อมูลชุดเดียวกับแผนที่ ไม่ได้โหลดเพิ่ม */}
+          {!โหลดแผนที่ && รายงานพิกัด.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <p className="font-bold text-gray-800 flex items-center gap-2 px-4 pt-4 pb-3">
+                <FileText size={18} className="text-gray-500 shrink-0" /> เคสบนแผนที่
+              </p>
+
+              {รายงานที่กรอง.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center px-4 pb-5">ไม่มีเคสในสถานะที่เลือก</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {รายงานที่กรองเรียง.map(function (r) {
+                    const g = กลุ่มจากสถานะ(r.status)
+                    const กำลังโฟกัส = จุดโฟกัส?.id === r.id
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={function () { setจุดโฟกัส({ id: r.id, lat: r.latitude, lng: r.longitude }) }}
+                        className={`w-full text-left flex items-start gap-3 px-4 py-3.5 transition-colors ${
+                          กำลังโฟกัส ? 'bg-purple-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${g.dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-800 text-sm truncate">
+                            #{String(r.id).padStart(6, '0')} — {r.animal_type || 'ไม่ระบุ'}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate mt-0.5">{r.location_text || 'ไม่ระบุสถานที่'}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{r.status} • {แปลงวันที่(r.created_at)}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
       )}
