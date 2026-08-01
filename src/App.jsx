@@ -17,6 +17,7 @@ import TrackReport      from './pages/TrackReport'
 import PetDetail        from './pages/PetDetail'
 import ProfilePage      from './pages/ProfilePage'
 import ContactPage      from './pages/ContactPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import NotificationPage from './pages/NotificationPage'
 import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
@@ -212,6 +213,10 @@ function App() {
 
         {/* หน้า Login — ไม่ส่ง onLogin แล้ว Supabase Auth จัดการเอง */}
         <Route path="/" element={user ? <Navigate to="/home" /> : <Login />} />
+
+        {/* นโยบายความเป็นส่วนตัว — public ไม่ต้อง login
+            Google ต้องเปิด URL นี้ได้ตอนตรวจสอบ OAuth consent screen และผู้ใช้ต้องอ่านได้ก่อนสมัคร */}
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
         {/* หน้าเมนูหลัก */}
         <Route path="/home" element={ต้องLogin(<Home user={user} onLogout={handleLogout} />)} />

@@ -3,6 +3,7 @@
 // role มาจาก public.users table เท่านั้น ไม่ให้ผู้ใช้เลือกเอง
 
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -371,6 +372,14 @@ function Login() {
             </>
           )}
         </button>
+
+        {/* ลิงก์นโยบายความเป็นส่วนตัว — ต้องมีให้ผู้ใช้อ่านได้ก่อนสมัคร และ Google ใช้ตรวจสอบ OAuth consent screen */}
+        <p className="text-xs text-gray-400 text-center mt-5 leading-relaxed">
+          การเข้าใช้งานถือว่าคุณยอมรับ<br />
+          <Link to="/privacy" className="text-blue-500 hover:text-blue-600 underline">
+            นโยบายความเป็นส่วนตัว
+          </Link>
+        </p>
 
       </div>
     </div>
