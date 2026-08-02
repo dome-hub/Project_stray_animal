@@ -23,6 +23,7 @@ import NotificationPage from './pages/NotificationPage'
 import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
 import NotFoundPage     from './pages/NotFoundPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 // เว้นที่ว่างด้านล่างเท่าความสูงแถบนำทาง กันเนื้อหาบรรทัดสุดท้ายถูกแถบทับ
 // ต้องแยกเป็น component เพราะ useLocation ใช้ได้เฉพาะข้างใน BrowserRouter
@@ -218,6 +219,10 @@ function App() {
 
         {/* หน้า Login — ไม่ส่ง onLogin แล้ว Supabase Auth จัดการเอง */}
         <Route path="/login" element={user ? <Navigate to="/home" /> : <Login />} />
+
+        {/* ตั้งรหัสผ่านใหม่ — ปลายทางของลิงก์ในอีเมล ต้องเข้าได้ทั้งที่ยังไม่ได้ล็อกอิน
+            และตอนที่ Supabase สร้าง session จาก token ในลิงก์ให้แล้ว จึงไม่ผูกกับ user */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* นโยบายความเป็นส่วนตัว — public ไม่ต้อง login
             Google ต้องเปิด URL นี้ได้ตอนตรวจสอบ OAuth consent screen และผู้ใช้ต้องอ่านได้ก่อนสมัคร */}

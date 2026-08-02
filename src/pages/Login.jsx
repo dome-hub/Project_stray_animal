@@ -4,8 +4,9 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info } from 'lucide-react'
+import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info, KeyRound, ArrowLeft } from 'lucide-react'
 import { supabase } from '../supabase'
+import { ข้อความError } from '../utils/errorMessage'
 
 // ความยาวรหัสผ่านขั้นต่ำ — ตามแนวทางสากล (NIST/OWASP) ความยาวสำคัญกว่าการบังคับใส่อักขระพิเศษ
 const ความยาวรหัสผ่านขั้นต่ำ = 8
@@ -44,9 +45,38 @@ function Login() {
   const [รอยืนยันเมล,   setรอยืนยันเมล]   = useState(false)
   const [ช้า,            setช้า]            = useState(false)
 
+  // ---- ลืมรหัสผ่าน ----
+  // เดิมไม่มีทางกู้รหัสเลย เจ้าหน้าที่ที่ลืมรหัสหลังใช้ไปหนึ่งเดือนเข้าเครื่องมือทำงานตัวเองไม่ได้อีก
+  const [อีเมลลืมรหัส,  setอีเมลลืมรหัส]  = useState('')
+  const [ส่งลิงก์แล้ว,  setSงลิงก์แล้ว]  = useState(false)
+
   function เปลี่ยนโหมด(โหมดใหม่) {
     setโหมด(โหมดใหม่)
     setข้อผิดพลาด('')
+  }
+
+  // ---- ขอลิงก์ตั้งรหัสผ่านใหม่ ----
+  async function handleลืมรหัส(e) {
+    e.preventDefault()
+    if (!อีเมลลืมรหัส.trim()) {
+      setข้อผิดพลาด('กรุณากรอกอีเมลที่ใช้สมัคร')
+      return
+    }
+    setกำลังโหลด(true)
+    setข้อผิดพลาด('')
+
+    const { error } = await supabase.auth.resetPasswordForEmail(อีเมลลืมรหัส.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setกำลังโหลด(false)
+
+    // ไม่บอกว่าอีเมลนี้มีบัญชีอยู่จริงหรือไม่ — กันคนไล่เดาว่าใครสมัครไว้บ้าง
+    // จึงแสดงหน้า "ส่งแล้ว" เหมือนกันทุกกรณี ยกเว้น error ระดับระบบจริงๆ
+    if (error && !/user not found|not found/i.test(error.message || '')) {
+      setข้อผิดพลาด(ข้อความError(error, 'ส่งลิงก์รีเซ็ตรหัสผ่าน'))
+      return
+    }
+    setSงลิงก์แล้ว(true)
   }
 
   // ---- Login ด้วย Google OAuth ----
@@ -95,21 +125,11 @@ function Login() {
         password: รหัสผ่านLogin,
       })
 
-      if (error) {
-        if (error.message.includes('Email not confirmed')) {
-          setข้อผิดพลาด('กรุณายืนยันอีเมลก่อน — ตรวจสอบกล่องจดหมายของคุณ')
-        } else if (
-          error.message.includes('Invalid login credentials') ||
-          error.message.includes('invalid_credentials')
-        ) {
-          setข้อผิดพลาด('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
-        } else {
-          setข้อผิดพลาด('เกิดข้อผิดพลาด: ' + error.message)
-        }
-      }
+      // ปล่อยให้ ข้อความError คุมทุกกรณี — เดิม branch สุดท้ายโยน error.message ภาษาอังกฤษดิบขึ้นจอ
+      if (error) setข้อผิดพลาด(ข้อความError(error, 'เข้าสู่ระบบ'))
       // ถ้าสำเร็จ → onAuthStateChange ใน App.jsx จะ set user → navigate อัตโนมัติ
     } catch (err) {
-      setข้อผิดพลาด('เชื่อมต่อไม่ได้: ' + err.message)
+      setข้อผิดพลาด(ข้อความError(err, 'เข้าสู่ระบบ'))
     } finally {
       clearTimeout(slowTimer)
       setกำลังโหลด(false)
@@ -146,17 +166,93 @@ function Login() {
     })
 
     if (error) {
-      if (error.message.includes('already registered')) {
-        setข้อผิดพลาด('อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบ')
-      } else {
-        setข้อผิดพลาด(error.message)
-      }
+      setข้อผิดพลาด(ข้อความError(error, 'สมัครสมาชิก'))
     } else {
       // สมัครสำเร็จ → แสดงหน้า "รอยืนยันอีเมล"
       setรอยืนยันเมล(true)
     }
 
     setกำลังโหลด(false)
+  }
+
+  // ---- หน้า: ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว ----
+  if (ส่งลิงก์แล้ว) {
+    return (
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
+          <MailOpen size={56} strokeWidth={1.5} className="text-blue-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">ตรวจสอบอีเมลของคุณ</h2>
+          <p className="text-gray-600 text-sm">หากมีบัญชีที่ใช้อีเมลนี้ เราได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่</p>
+          <p className="font-bold text-blue-600 my-2 break-all">{อีเมลลืมรหัส}</p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            ลิงก์ใช้ได้ครั้งเดียวและมีอายุจำกัด หากไม่เห็นอีเมลกรุณาตรวจโฟลเดอร์ Spam
+          </p>
+          <button
+            onClick={() => { setSงลิงก์แล้ว(false); เปลี่ยนโหมด('login') }}
+            className="mt-6 w-full bg-blue-600 active:bg-blue-700 text-white rounded-xl min-h-[44px] font-semibold transition-colors"
+          >
+            กลับไปหน้าเข้าสู่ระบบ
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- หน้า: กรอกอีเมลเพื่อขอลิงก์รีเซ็ต ----
+  if (โหมด === 'forgot') {
+    return (
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4 py-8">
+        <div className="bg-white rounded-3xl shadow-xl p-6 w-full max-w-sm">
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+              <KeyRound size={26} strokeWidth={1.75} />
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">ลืมรหัสผ่าน</h1>
+            <p className="text-gray-600 text-sm mt-1 leading-relaxed">
+              กรอกอีเมลที่ใช้สมัคร เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปให้
+            </p>
+          </div>
+
+          <form onSubmit={handleลืมรหัส} className="space-y-3">
+            <div>
+              <label htmlFor="อีเมลลืมรหัส" className="text-xs font-semibold text-gray-700 mb-1 block">อีเมล</label>
+              <input
+                id="อีเมลลืมรหัส"
+                type="email"
+                value={อีเมลลืมรหัส}
+                onChange={(e) => setอีเมลลืมรหัส(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
+
+            {ข้อผิดพลาด && (
+              <p className="text-red-700 text-xs text-center bg-red-50 py-2 px-3 rounded-lg" role="alert">
+                {ข้อผิดพลาด}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={กำลังโหลด}
+              className="w-full bg-blue-600 active:bg-blue-700 text-white rounded-xl min-h-[44px] font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {กำลังโหลด
+                ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังส่ง...</>
+                : 'ส่งลิงก์ตั้งรหัสผ่านใหม่'}
+            </button>
+          </form>
+
+          <button
+            onClick={() => เปลี่ยนโหมด('login')}
+            className="w-full mt-3 inline-flex items-center justify-center gap-1.5 text-sm text-gray-600 min-h-[44px]"
+          >
+            <ArrowLeft size={14} className="shrink-0" /> กลับไปหน้าเข้าสู่ระบบ
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // ---- หน้า: รอยืนยันอีเมล ----
@@ -227,26 +323,37 @@ function Login() {
         {โหมด === 'login' && (
           <form onSubmit={handleLogin} className="space-y-3">
 
-            <input
-              type="email"
-              value={อีเมลLogin}
-              onChange={(e) => setอีเมลLogin(e.target.value)}
-              placeholder="อีเมล"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
-            />
+            {/* label ผูกกับ input ด้วย id/htmlFor — screen reader ต้องประกาศชื่อช่องได้โดยไม่พึ่ง placeholder
+                และ autoComplete ทำให้ password manager บนมือถือเสนอกรอก/บันทึกรหัสให้ */}
+            <div>
+              <label htmlFor="อีเมลเข้าระบบ" className="sr-only">อีเมล</label>
+              <input
+                id="อีเมลเข้าระบบ"
+                type="email"
+                value={อีเมลLogin}
+                onChange={(e) => setอีเมลLogin(e.target.value)}
+                placeholder="อีเมล"
+                autoComplete="email"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
 
             <div className="relative">
+              <label htmlFor="รหัสผ่านเข้าระบบ" className="sr-only">รหัสผ่าน</label>
               <input
+                id="รหัสผ่านเข้าระบบ"
                 type={แสดงรหัส ? 'text' : 'password'}
                 value={รหัสผ่านLogin}
                 onChange={(e) => setรหัสผ่านLogin(e.target.value)}
                 placeholder="รหัสผ่าน"
+                autoComplete="current-password"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 pr-12"
               />
               <button
                 type="button"
                 onClick={() => setแสดงรหัส(!แสดงรหัส)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label={แสดงรหัส ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 w-11 h-11 flex items-center justify-center transition-colors"
               >
                 {แสดงรหัส ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -255,10 +362,11 @@ function Login() {
             {/* แสดงข้อความเตือนว่า Supabase กำลังตื่น (หลัง 8 วิ) */}
             {กำลังโหลด && ช้า && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-center space-y-1">
-                <p className="text-xs text-orange-700 font-semibold flex items-center justify-center gap-1.5">
-                  <Loader2 size={14} className="animate-spin shrink-0" /> Supabase กำลังตื่นจาก sleep...
+                {/* เดิมเขียนว่า "Supabase กำลังตื่นจาก sleep" — ชื่อผู้ให้บริการฐานข้อมูลไม่ใช่เรื่องที่เจ้าหน้าที่ อบต. ต้องรู้ */}
+                <p className="text-xs text-orange-800 font-semibold flex items-center justify-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin shrink-0" /> กำลังเชื่อมต่อระบบ...
                 </p>
-                <p className="text-xs text-orange-500">กรุณารอสักครู่ อาจใช้เวลา 20–40 วินาที</p>
+                <p className="text-xs text-orange-700">ครั้งแรกของวันอาจใช้เวลา 20–40 วินาที</p>
                 <div className="flex justify-center gap-1 pt-1">
                   {[0,1,2].map(function(i) {
                     return <div key={i} className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -268,7 +376,7 @@ function Login() {
             )}
 
             {ข้อผิดพลาด && (
-              <p className="text-red-500 text-xs text-center bg-red-50 py-2 px-3 rounded-lg">
+              <p className="text-red-700 text-xs text-center bg-red-50 py-2 px-3 rounded-lg" role="alert">
                 {ข้อผิดพลาด}
               </p>
             )}
@@ -276,14 +384,22 @@ function Login() {
             <button
               type="submit"
               disabled={กำลังโหลด}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl min-h-[44px] font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {กำลังโหลด ? (
                 <>
                   <Loader2 size={16} className="animate-spin shrink-0" />
-                  {ช้า ? 'รอ Supabase...' : 'กำลังเข้าสู่ระบบ...'}
+                  {ช้า ? 'กำลังเชื่อมต่อ...' : 'กำลังเข้าสู่ระบบ...'}
                 </>
               ) : 'เข้าสู่ระบบ'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setอีเมลลืมรหัส(อีเมลLogin); เปลี่ยนโหมด('forgot') }}
+              className="w-full text-sm text-blue-600 font-medium min-h-[44px]"
+            >
+              ลืมรหัสผ่าน?
             </button>
 
           </form>
@@ -293,27 +409,42 @@ function Login() {
         {โหมด === 'register' && (
           <form onSubmit={handleRegister} className="space-y-3">
 
-            <input
-              type="text"
-              value={ชื่อ}
-              onChange={(e) => setชื่อ(e.target.value)}
-              placeholder="ชื่อ-นามสกุล"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
-            />
-            <input
-              type="email"
-              value={อีเมลRegister}
-              onChange={(e) => setอีเมลRegister(e.target.value)}
-              placeholder="อีเมล"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
-            />
-            <input
-              type="password"
-              value={รหัสผ่านRegister}
-              onChange={(e) => setรหัสผ่านRegister(e.target.value)}
-              placeholder={`รหัสผ่าน (อย่างน้อย ${ความยาวรหัสผ่านขั้นต่ำ} ตัวอักษร)`}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
-            />
+            <div>
+              <label htmlFor="ชื่อสมัคร" className="sr-only">ชื่อ-นามสกุล</label>
+              <input
+                id="ชื่อสมัคร"
+                type="text"
+                value={ชื่อ}
+                onChange={(e) => setชื่อ(e.target.value)}
+                placeholder="ชื่อ-นามสกุล"
+                autoComplete="name"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
+            <div>
+              <label htmlFor="อีเมลสมัคร" className="sr-only">อีเมล</label>
+              <input
+                id="อีเมลสมัคร"
+                type="email"
+                value={อีเมลRegister}
+                onChange={(e) => setอีเมลRegister(e.target.value)}
+                placeholder="อีเมล"
+                autoComplete="email"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
+            <div>
+              <label htmlFor="รหัสผ่านสมัคร" className="sr-only">รหัสผ่าน</label>
+              <input
+                id="รหัสผ่านสมัคร"
+                type="password"
+                value={รหัสผ่านRegister}
+                onChange={(e) => setรหัสผ่านRegister(e.target.value)}
+                placeholder={`รหัสผ่าน (อย่างน้อย ${ความยาวรหัสผ่านขั้นต่ำ} ตัวอักษร)`}
+                autoComplete="new-password"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
 
             <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-start gap-2">
               <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
