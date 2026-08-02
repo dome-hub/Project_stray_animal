@@ -24,6 +24,7 @@ import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
 import BreedInput from '../components/BreedInput'
+import LoadFailed from '../components/LoadFailed'
 import { หมุดสี } from '../utils/mapMarker'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
@@ -411,6 +412,8 @@ function VolunteerPage({ หน้า }) {
   // ---- รายงาน (shared: reports + update) ----
   const [รายงานทั้งหมด, setรายงานทั้งหมด] = useState([])
   const [โหลดรายงาน,   setโหลดรายงาน]   = useState(true)
+  // แยก "โหลดไม่สำเร็จ" ออกจาก "โหลดแล้วไม่มีข้อมูล" ให้ขาด — ดู components/LoadFailed.jsx
+  const [โหลดรายงานพลาด, setโหลดรายงานพลาด] = useState(false)
 
   // ---- Bottom sheet รายละเอียด (ใช้ทั้ง reports และ update) ----
   const [รายงานที่เปิด,  setรายงานที่เปิด]  = useState(null)   // report object
@@ -442,6 +445,7 @@ function VolunteerPage({ หน้า }) {
   // ---- Animals ----
   const [สัตว์จากDB,        setSัตว์จากDB]        = useState([])
   const [โหลดสัตว์,         setโหลดสัตว์]         = useState(true)
+  const [โหลดสัตว์พลาด,     setโหลดสัตว์พลาด]     = useState(false)
   const [แท็บสัตว์,         setแท็บสัตว์]         = useState('shelter')  // shelter | waiting | adopted
   const [ค้นหาสัตว์,       setค้นหาสัตว์]        = useState('')
   const [สัตว์ที่แก้ไข,      setSัตว์ที่แก้ไข]      = useState(null)
@@ -461,6 +465,8 @@ function VolunteerPage({ หน้า }) {
   const [สถิติ, setSถิติ] = useState({ รายงาน: 0, รอดำเนินการ: 0, สัตว์: 0, รับเลี้ยงแล้ว: 0 })
   const [สถิติเดือนนี้, setSถิติเดือนนี้]   = useState({ รายงาน: 0, รับเลี้ยงแล้ว: 0 })
   const [สถิติเดือนก่อน, setSถิติเดือนก่อน] = useState({ รายงาน: 0, รับเลี้ยงแล้ว: 0 })
+  const [โหลดสถิติ,      setโหลดสถิติ]      = useState(true)
+  const [โหลดสถิติพลาด,  setโหลดสถิติพลาด]  = useState(false)
   const [กำลังExport, setกำลังExport] = useState(false)
   const [วันที่เริ่ม,   setวันที่เริ่ม]   = useState('')  // ว่าง = ไม่กรอง
   const [วันที่สิ้นสุด, setวันที่สิ้นสุด] = useState('')
@@ -468,6 +474,7 @@ function VolunteerPage({ หน้า }) {
   // ---- แผนที่จุดเกิดเหตุ ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
+  const [โหลดแผนที่พลาด, setโหลดแผนที่พลาด] = useState(false)
   const [filterMap, setFilterMap]   = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [ประเภทเลือกUpdate, setประเภทเลือกUpdate] = useState([])  // multi-select ประเภทการแจ้ง; [] = แสดงทั้งหมด
   const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
@@ -494,33 +501,55 @@ function VolunteerPage({ หน้า }) {
     }
   }, [สัตว์ที่แก้ไข?.status, สัตว์ที่แก้ไข?.publish_mode])
 
+  // fetcher ทุกตัวด้านล่างต้องแยกให้ออกระหว่าง "สำเร็จแต่ได้ 0 แถว" กับ "ยิงไม่ถึงเซิร์ฟเวอร์"
+  // เพราะ UI สองกรณีนี้ต้องคนละหน้าตากันคนละเรื่อง (ดู components/LoadFailed.jsx)
+  // supabase-js ไม่ throw แต่คืน error object มา ส่วน network error ที่ throw จริงต้อง try/catch เอง
   async function ดึงรายงานพิกัด() {
     setโหลดแผนที่(true)
-    const { data, error } = await supabase
-      .from('reports')
-      .select('id, animal_type, location_text, detail, status, urgency, latitude, longitude, created_at')
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
-    if (!error && data) setรายงานพิกัด(data)
-    setโหลดแผนที่(false)
+    setโหลดแผนที่พลาด(false)
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('id, animal_type, location_text, detail, status, urgency, latitude, longitude, created_at')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+      if (error) throw error
+      setรายงานพิกัด(data || [])
+    } catch (err) {
+      console.error('ดึงรายงานพิกัดไม่สำเร็จ:', err.message)
+      setโหลดแผนที่พลาด(true)
+    } finally {
+      setโหลดแผนที่(false)
+    }
   }
 
   async function ดึงรายงาน() {
     setโหลดรายงาน(true)
-    const { data } = await supabase
-      .from('reports')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (data) setรายงานทั้งหมด(data)
-    setโหลดรายงาน(false)
+    setโหลดรายงานพลาด(false)
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setรายงานทั้งหมด(data || [])
+    } catch (err) {
+      console.error('ดึงรายงานไม่สำเร็จ:', err.message)
+      setโหลดรายงานพลาด(true)
+    } finally {
+      setโหลดรายงาน(false)
+    }
   }
 
   async function ดึงสัตว์() {
     setโหลดสัตว์(true)
-    const { data } = await supabase
+    setโหลดสัตว์พลาด(false)
+    try {
+    const { data, error } = await supabase
       .from('animals')
       .select('*')
       .order('created_at', { ascending: false })
+    if (error) throw error
     if (data) {
       // แปะประเภทการแจ้ง (urgency) ของรายงานต้นทางเข้าไปในแต่ละตัว — ใช้โชว์ป้ายประเภทบนการ์ด
       // ดึงเฉพาะ report ที่ถูกอ้างถึงจริง (ไม่ดึงทั้งตาราง) แล้ว join ฝั่ง client — ไม่ต้องพึ่ง FK/แก้ schema
@@ -535,10 +564,17 @@ function VolunteerPage({ หน้า }) {
       }
       setSัตว์จากDB(data.map((a) => ({ ...a, _urgency: a.report_id ? (urgencyMap[a.report_id] || null) : null })))
     }
-    setโหลดสัตว์(false)
+    } catch (err) {
+      console.error('ดึงสัตว์ไม่สำเร็จ:', err.message)
+      setโหลดสัตว์พลาด(true)
+    } finally {
+      setโหลดสัตว์(false)
+    }
   }
 
   async function ดึงสถิติ() {
+    setโหลดสถิติ(true)
+    setโหลดสถิติพลาด(false)
     // วันแรกของเดือนนี้ + เดือนก่อน (ไว้เทียบแนวโน้ม)
     const startOfMonth = new Date()
     startOfMonth.setDate(1)
@@ -546,6 +582,7 @@ function VolunteerPage({ หน้า }) {
     const startOfLastMonth = new Date(startOfMonth)
     startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1)
 
+    try {
     const [ร1, ร2, ร3, ร4, ร5, ร6, ร7, ร8] = await Promise.all([
       supabase.from('reports').select('id', { count: 'exact', head: true }),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'รอดำเนินการ'),
@@ -559,9 +596,18 @@ function VolunteerPage({ หน้า }) {
       supabase.from('reports').select('id', { count: 'exact', head: true }).gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
       supabase.from('animals').select('id', { count: 'exact', head: true }).eq('status', 'มีผู้รับเลี้ยง').gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
     ])
+    // ตัวไหนพลาดสักตัวถือว่าทั้งแดชบอร์ดเชื่อไม่ได้ — โชว์ตัวเลขบางส่วนแย่กว่าบอกตรงๆ ว่าโหลดไม่ได้
+    const พลาด = [ร1, ร2, ร3, ร4, ร5, ร6, ร7, ร8].find((r) => r.error)
+    if (พลาด) throw พลาด.error
     setSถิติ({ รายงาน: ร1.count || 0, รอดำเนินการ: ร2.count || 0, สัตว์: ร3.count || 0, รับเลี้ยงแล้ว: ร4.count || 0 })
     setSถิติเดือนนี้({ รายงาน: ร5.count || 0, รับเลี้ยงแล้ว: ร6.count || 0 })
     setSถิติเดือนก่อน({ รายงาน: ร7.count || 0, รับเลี้ยงแล้ว: ร8.count || 0 })
+    } catch (err) {
+      console.error('ดึงสถิติไม่สำเร็จ:', err.message)
+      setโหลดสถิติพลาด(true)
+    } finally {
+      setโหลดสถิติ(false)
+    }
   }
 
   // ---- หาตำแหน่งปัจจุบันของเจ้าหน้าที่ (GPS เบราว์เซอร์) — ใช้เรียงเคสบนแผนที่ตามระยะใกล้สุด ----
@@ -1251,8 +1297,14 @@ function VolunteerPage({ หน้า }) {
             </div>
           )}
 
-          {!โหลดรายงาน && รายงานกรองค้น.length === 0 && (
-            <div className="text-center py-16 text-gray-400">
+          {/* โหลดพลาดต้องมาก่อน empty state เสมอ ไม่งั้นรายการว่างเพราะเน็ตหลุด
+              จะไปโผล่เป็นไอคอนฉลอง "ไม่มีงานที่ต้องดำเนินการ" ซึ่งอ่านกลับด้านกับความจริง */}
+          {!โหลดรายงาน && โหลดรายงานพลาด && (
+            <LoadFailed onRetry={ดึงรายงาน} สิ่งที่โหลด="รายการแจ้ง" สี="teal" />
+          )}
+
+          {!โหลดรายงาน && !โหลดรายงานพลาด && รายงานกรองค้น.length === 0 && (
+            <div className="text-center py-16 text-gray-500">
               {รายงานตามสถานะ.length === 0
                 ? (แท็บรายงาน === 'active' ? <PartyPopper size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" /> : <ClipboardList size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />)
                 : <Search size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
@@ -1300,7 +1352,11 @@ function VolunteerPage({ หน้า }) {
             </div>
           )}
 
-          {!โหลดรายงาน && (function () {
+          {!โหลดรายงาน && โหลดรายงานพลาด && (
+            <LoadFailed onRetry={ดึงรายงาน} สิ่งที่โหลด="คิวงาน" สี="teal" />
+          )}
+
+          {!โหลดรายงาน && !โหลดรายงานพลาด && (function () {
             const ประเภทที่มีUpdate = ประเภทแจ้งเรียง
               .map((p) => ({ ...p, count: รายงานActive.filter((r) => ประเภทจาก(r.urgency).key === p.key).length }))
               .filter((p) => p.count > 0)
@@ -1567,8 +1623,12 @@ function VolunteerPage({ หน้า }) {
                   </div>
                 )}
 
-                {!โหลดสัตว์ && สัตว์ตามแท็บค้น.length === 0 && (
-                  <div className="text-center py-12 text-gray-400">
+                {!โหลดสัตว์ && โหลดสัตว์พลาด && (
+                  <LoadFailed onRetry={ดึงสัตว์} สิ่งที่โหลด="ข้อมูลสัตว์" สี="teal" />
+                )}
+
+                {!โหลดสัตว์ && !โหลดสัตว์พลาด && สัตว์ตามแท็บค้น.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
                     {สัตว์ตามแท็บ.length === 0
                       ? <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
                       : <Search size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
@@ -1673,6 +1733,20 @@ function VolunteerPage({ หน้า }) {
           ============================================================ */}
       {หน้า === 'stats' && (
         <div className="px-4 pt-4 space-y-4">
+          {/* สถิติที่โหลดพลาดจะเป็น 0 ทุกช่อง ซึ่งอ่านเหมือนตัวเลขจริงที่บังเอิญเป็นศูนย์
+              ตัวเลขผิดที่ดูมั่นใจอันตรายกว่าการบอกตรงๆ ว่าโหลดไม่ได้ */}
+          {โหลดสถิติ && (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-sm text-gray-500">กำลังโหลดสถิติ...</p>
+            </div>
+          )}
+
+          {!โหลดสถิติ && โหลดสถิติพลาด && (
+            <LoadFailed onRetry={ดึงสถิติ} สิ่งที่โหลด="สถิติ" สี="teal" />
+          )}
+
+          {!โหลดสถิติ && !โหลดสถิติพลาด && (
           <div className="grid grid-cols-2 gap-4">
             {[
               // ใช้โทน teal/เทาเท่านั้น — แดง/ส้ม/เหลือง สงวนไว้สื่อ "ความเร่งด่วนของการแจ้ง" อย่างเดียว
@@ -1699,8 +1773,9 @@ function VolunteerPage({ หน้า }) {
               )
             })}
           </div>
+          )}
 
-          {/* เลือกช่วงวันที่สำหรับ Export */}
+          {/* เลือกช่วงวันที่สำหรับ Export — ไม่พึ่งข้อมูลสถิติ จึงใช้งานได้แม้สถิติโหลดไม่ขึ้น */}
           <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
             <p className="text-sm font-semibold text-gray-700">เลือกช่วงวันที่ (ไม่บังคับ)</p>
             <div className="grid grid-cols-2 gap-3">
@@ -1800,8 +1875,11 @@ function VolunteerPage({ หน้า }) {
             {โหลดแผนที่ ? (
               <div className="text-center py-10">
                 <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-sm text-gray-400">กำลังโหลดตำแหน่งรายงาน...</p>
+                <p className="text-sm text-gray-500">กำลังโหลดตำแหน่งรายงาน...</p>
               </div>
+            ) : โหลดแผนที่พลาด ? (
+              /* แผนที่ว่างเปล่าอ่านได้ว่า "ไม่มีเหตุในพื้นที่" ซึ่งอันตรายพอกับรายการว่าง */
+              <LoadFailed onRetry={ดึงรายงานพิกัด} สิ่งที่โหลด="ตำแหน่งรายงาน" สี="teal" />
             ) : (
               <>
                 {/* แผนที่ — isolate: กัก z-index ภายในของ Leaflet (สูงถึง 1000) ไม่ให้ทะลุขึ้นทับ modal */}
