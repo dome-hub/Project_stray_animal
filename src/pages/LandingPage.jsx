@@ -24,8 +24,10 @@ function LandingPage() {
             เพราะ Google OAuth branding verification เช็คว่าชื่อแอปตรงกับหน้าแรกไหม และหน้าแรกอธิบายวัตถุประสงค์ชัดหรือไม่ */}
         <div className="flex flex-col items-center text-center mb-8">
           <img src="/logo.png" alt="JaengJon" className="w-20 h-20 rounded-2xl mb-4" />
+          {/* ชื่อเดี่ยวๆ "JaengJon" ให้ตรงกับช่อง App name ของ OAuth consent screen เป๊ะ
+              เดิมมีบรรทัด "แจ้งจร" คั่นตรงนี้ แล้ว Google ตรวจไม่ผ่านเพราะถือว่าหน้าเว็บใช้ชื่ออื่น
+              ชื่อไทยย้ายไปอยู่ในย่อหน้าคำอธิบายภาษาไทยด้านล่างแทน */}
           <h1 className="text-3xl font-bold text-gray-800">JaengJon</h1>
-          <p className="text-gray-600 text-base font-medium mt-1">แจ้งจร</p>
           <p className="text-gray-500 text-sm mt-3 max-w-sm leading-relaxed">
             JaengJon is a stray animal reporting and management platform for Kamphaeng Saen,
             Nakhon Pathom, Thailand. It helps residents report stray animals in need of help
