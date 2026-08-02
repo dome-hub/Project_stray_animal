@@ -366,12 +366,9 @@ function Login() {
                 <p className="text-xs text-orange-800 font-semibold flex items-center justify-center gap-1.5">
                   <Loader2 size={14} className="animate-spin shrink-0" /> กำลังเชื่อมต่อระบบ...
                 </p>
+                {/* เดิมมีจุดเด้ง 3 จุดต่อท้ายด้วย — สื่อความหมายเดียวกับ Loader2 ที่หมุนอยู่บรรทัดบนเป๊ะ
+                    กล่องเดียวมีอนิเมชันโหลดสองอันแข่งกันโดยไม่เพิ่มข้อมูลอะไร จึงเหลือไว้อันเดียว */}
                 <p className="text-xs text-orange-700">ครั้งแรกของวันอาจใช้เวลา 20–40 วินาที</p>
-                <div className="flex justify-center gap-1 pt-1">
-                  {[0,1,2].map(function(i) {
-                    return <div key={i} className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                  })}
-                </div>
               </div>
             )}
 
