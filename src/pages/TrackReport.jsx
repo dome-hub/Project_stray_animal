@@ -11,6 +11,8 @@ import {
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+import { useToast } from '../components/useToast'
+import { ข้อความError } from '../utils/errorMessage'
 
 // สีป้ายสถานะ (badge) — ครอบคลุมทุกสถานะจริงที่ backend เขียนได้ (ดู VolunteerPage เวิร์กโฟลว์ตามประเภท)
 const สีสถานะTR = {
@@ -152,12 +154,14 @@ function TimelineStepper({ reportType, currentStatus, size = 'sm' }) {
         return (
           <div key={idx} className="flex items-center flex-1">
             <div className="flex flex-col items-center">
+              {/* ขั้นที่ยังไม่ถึงเคยเป็น text-gray-400 บน bg-gray-200 = 1.9:1 อ่านแทบไม่ออก
+                  ทั้งที่มันคือส่วนที่บอกผู้แจ้งว่าเรื่องยังเหลืออีกกี่ขั้น — ต้องอ่านออกพอๆ กับขั้นที่ผ่านแล้ว */}
               <div className={`${dot} rounded-full flex items-center justify-center text-xs font-bold ${
-                done ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+                done ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
               }`}>
                 {done ? <Check size={size === 'lg' ? 14 : 11} strokeWidth={3} /> : (size === 'lg' ? step : '')}
               </div>
-              <p className={`text-center mt-1 leading-tight ${done ? 'text-green-600' : 'text-gray-400'}`}
+              <p className={`text-center mt-1 leading-tight ${done ? 'text-green-700' : 'text-gray-600'}`}
                 style={{ fontSize: '9px', maxWidth: maxW }}>
                 {label}
               </p>
@@ -228,11 +232,9 @@ function TrackReport({ user }) {
   const [แสดงModalยกเลิก, setแสดงModalยกเลิก] = useState(false)
   const [กำลังยกเลิก,     setกำลังยกเลิก]     = useState(false)
 
-  const [ข้อความสำเร็จ, setข้อความสำเร็จ] = useState('')   // toast สั้นๆ หลังบันทึก/ยกเลิก
-  function toast(msg) {
-    setข้อความสำเร็จ(msg)
-    setTimeout(() => setข้อความสำเร็จ(''), 3000)
-  }
+  // toast ย้ายไปใช้ตัวกลาง components/useToast.jsx แล้ว — เดิมหน้านี้มีของตัวเอง
+  // ซึ่งแสดงได้แต่ข้อความสำเร็จ ทำให้ทุก error ต้องไปลง alert() ของเบราว์เซอร์แทน
+  const { toast, toastError, ToastHost } = useToast()
 
   // ดึงรายงาน
   useEffect(function () {
@@ -301,7 +303,7 @@ function TrackReport({ user }) {
     if (!ไฟล์) return
     const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
     if (!ผลตรวจ.ok) {
-      alert(ผลตรวจ.error)
+      toastError(ผลตรวจ.error)
       event.target.value = ''
       return
     }
@@ -313,7 +315,7 @@ function TrackReport({ user }) {
 
   async function บันทึกแก้ไขรายงาน() {
     if (!รายงานที่เปิด || กำลังบันทึกแก้ไข) return
-    if (!ตำแหน่งแก้ไข.trim()) { alert('กรุณากรอกสถานที่พบสัตว์'); return }
+    if (!ตำแหน่งแก้ไข.trim()) { toastError('กรุณากรอกสถานที่พบสัตว์'); return }
     setกำลังบันทึกแก้ไข(true)
 
     let image_url = รายงานที่เปิด.image_url || null
@@ -322,7 +324,7 @@ function TrackReport({ user }) {
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปแก้ไข)
       if (uploadError) {
-        alert('อัปโหลดรูปไม่สำเร็จ: ' + uploadError.message)
+        toastError(ข้อความError(uploadError, 'อัปโหลดรูป'))
         setกำลังบันทึกแก้ไข(false)
         return
       }
@@ -338,7 +340,7 @@ function TrackReport({ user }) {
     }).eq('id', รายงานที่เปิด.id)
 
     setกำลังบันทึกแก้ไข(false)
-    if (error) { alert('บันทึกไม่สำเร็จ: ' + error.message); return }
+    if (error) { toastError(ข้อความError(error, 'บันทึกการแก้ไข')); return }
 
     const อัปเดตแล้ว = { ...รายงานที่เปิด, location_text: ตำแหน่งแก้ไข.trim(), detail: รายละเอียดแก้ไข.trim(), image_url }
     setรายงานที่เปิด(อัปเดตแล้ว)
@@ -355,7 +357,7 @@ function TrackReport({ user }) {
       .update({ status: 'ยกเลิกโดยผู้แจ้ง', updated_at: new Date().toISOString() })
       .eq('id', รายงานที่เปิด.id)
     setกำลังยกเลิก(false)
-    if (error) { alert('ยกเลิกไม่สำเร็จ: ' + error.message); return }
+    if (error) { toastError(ข้อความError(error, 'ยกเลิกรายงาน')); return }
 
     setรายการรายงาน(function (prev) {
       return prev.map((r) => (r.id === รายงานที่เปิด.id ? { ...r, status: 'ยกเลิกโดยผู้แจ้ง' } : r))
@@ -386,11 +388,7 @@ function TrackReport({ user }) {
     <div className="min-h-screen bg-indigo-50 pb-8">
 
       {/* Toast */}
-      {ข้อความสำเร็จ && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white text-sm px-5 py-3 rounded-2xl shadow-xl">
-          {ข้อความสำเร็จ}
-        </div>
-      )}
+      <ToastHost />
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">

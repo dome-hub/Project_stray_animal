@@ -25,6 +25,8 @@ import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fi
 import AnimalIcon from '../components/AnimalIcon'
 import BreedInput from '../components/BreedInput'
 import LoadFailed from '../components/LoadFailed'
+import { useToast } from '../components/useToast'
+import { ข้อความError } from '../utils/errorMessage'
 import { หมุดสี } from '../utils/mapMarker'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
@@ -408,6 +410,8 @@ function AnimalThumb({ imageUrl, type, size = 'md' }) {
 // ===========================================================================
 function VolunteerPage({ หน้า }) {
   const navigate = useNavigate()
+  // toast ย้ายมาใช้ตัวกลาง — เดิมหน้านี้มีของตัวเองที่แสดงได้แต่ข้อความสำเร็จ error จึงต้องไปลง alert()
+  const { toast, toastError, ToastHost } = useToast()
 
   // ---- รายงาน (shared: reports + update) ----
   const [รายงานทั้งหมด, setรายงานทั้งหมด] = useState([])
@@ -425,7 +429,6 @@ function VolunteerPage({ หน้า }) {
   const [สถานะใหม่,   setSถานะใหม่]   = useState('')
   const [หมายเหตุ,    setหมายเหตุ]    = useState('')
   const [กำลังบันทึก, setกำลังบันทึก] = useState(false)
-  const [แจ้งสำเร็จ,  setแจ้งสำเร็จ]  = useState('')   // ข้อความ toast
 
   // ---- Merge duplicate (รวมเคสซ้ำซ้อน) ----
   // เคสที่จะรวม = ใบที่กำลังจะถูกปิดเป็น "เคสซ้ำซ้อน" — แยกจาก รายงานที่เปิด เพราะเปิด modal ได้
@@ -635,7 +638,7 @@ function VolunteerPage({ หน้า }) {
   // ---- ดาวน์โหลดข้อมูลสัตว์เป็น CSV (เปิดได้ด้วย Excel) — กรองตามช่วงวันที่ได้ ----
   async function ดาวน์โหลดข้อมูลสัตว์() {
     if (วันที่เริ่ม && วันที่สิ้นสุด && วันที่เริ่ม > วันที่สิ้นสุด) {
-      alert('วันที่เริ่มต้องไม่มากกว่าวันที่สิ้นสุด')
+      toastError('วันที่เริ่มต้องไม่มากกว่าวันที่สิ้นสุด')
       return
     }
 
@@ -646,8 +649,9 @@ function VolunteerPage({ หน้า }) {
     const { data, error } = await query
 
     setกำลังExport(false)
-    if (error) { alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message); return }
-    if (!data || data.length === 0) { alert('ไม่มีข้อมูลสัตว์ในช่วงวันที่ที่เลือก'); return }
+    if (error) { toastError(ข้อความError(error, 'ดึงข้อมูลเพื่อส่งออก')); return }
+    // ช่วงวันที่ที่ไม่มีข้อมูลไม่ใช่ความผิดพลาด — เป็นคำตอบ จึงใช้ toast กลางไม่ใช่สีแดง
+    if (!data || data.length === 0) { toast('ไม่มีข้อมูลสัตว์ในช่วงวันที่ที่เลือก'); return }
 
     const headers = Object.keys(data[0]).join(',')
     const rows = data.map((row) =>
@@ -702,10 +706,6 @@ function VolunteerPage({ หน้า }) {
     เปิดรายละเอียด(data || r)
   }
 
-  function toast(msg) {
-    setแจ้งสำเร็จ(msg)
-    setTimeout(() => setแจ้งสำเร็จ(''), 3500)
-  }
 
   // ================================================================
   // รับเรื่อง (จาก reports inbox)
@@ -744,7 +744,7 @@ function VolunteerPage({ หน้า }) {
       })
       toast('รับเรื่องสำเร็จ! แจ้งเตือนผู้แจ้งแล้ว')
     } else {
-      alert('เกิดข้อผิดพลาด: ' + error.message)
+      toastError(ข้อความError(error, 'รับเรื่อง'))
     }
     setกำลังรับเรื่อง(false)
   }
@@ -767,7 +767,7 @@ function VolunteerPage({ หน้า }) {
       .eq('id', report.id)
 
     if (error) {
-      alert('บันทึกไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'บันทึกการอัปเดต'))
       setกำลังบันทึก(false)
       return
     }
@@ -866,7 +866,7 @@ function VolunteerPage({ หน้า }) {
   async function รวมเคสซ้ำซ้อน() {
     const master = Number(เคสหลักที่เลือก)
     if (!เคสที่จะรวม || !master || กำลังรวมเคส) return
-    if (master === เคสที่จะรวม.id) { alert('เลือกเคสหลักเป็นใบเดียวกันไม่ได้'); return }
+    if (master === เคสที่จะรวม.id) { toastError('เลือกเคสหลักเป็นใบเดียวกันไม่ได้'); return }
     setกำลังรวมเคส(true)
 
     // โยนรูปของเคสซ้ำไปรวมในคลังรูปของเคสหลัก เจ้าหน้าที่จะได้เห็นภาพจากผู้แจ้งทุกคน
@@ -888,7 +888,7 @@ function VolunteerPage({ หน้า }) {
     }).eq('id', เคสที่จะรวม.id)
 
     if (error) {
-      alert('รวมเคสไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'รวมเคสซ้ำซ้อน'))
       setกำลังรวมเคส(false)
       return
     }
@@ -976,7 +976,7 @@ function VolunteerPage({ หน้า }) {
       setข้อมูลรายงานสัตว์(null)
       toast('บันทึกข้อมูลสัตว์สำเร็จ!')
     } else {
-      alert('บันทึกไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'บันทึกข้อมูลสัตว์'))
     }
   }
 
@@ -1027,10 +1027,10 @@ function VolunteerPage({ หน้า }) {
     const urlใหม่ = []
     for (const ไฟล์ of ไฟล์ทั้งหมด) {
       const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
-      if (!ผลตรวจ.ok) { alert(`${ไฟล์.name}: ${ผลตรวจ.error}`); continue }
+      if (!ผลตรวจ.ok) { toastError(`${ไฟล์.name}: ${ผลตรวจ.error}`); continue }
       const ชื่อไฟล์ = `animal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${ไฟล์.name.replace(/\s/g, '_')}`
       const { data, error } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์)
-      if (error) { alert(`อัปโหลด ${ไฟล์.name} ไม่สำเร็จ: ${error.message}`); continue }
+      if (error) { toastError(`${ไฟล์.name}: ${ข้อความError(error, 'อัปโหลดรูป')}`); continue }
       const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(data.path)
       urlใหม่.push(urlData.publicUrl)
     }
@@ -1189,11 +1189,7 @@ function VolunteerPage({ หน้า }) {
     <div className="min-h-screen bg-teal-50 pb-8">
 
       {/* Toast */}
-      {แจ้งสำเร็จ && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white text-sm px-5 py-3 rounded-2xl shadow-xl">
-          {แจ้งสำเร็จ}
-        </div>
-      )}
+      <ToastHost />
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">

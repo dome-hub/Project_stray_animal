@@ -10,6 +10,8 @@ import {
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+import { useToast } from '../components/useToast'
+import { ข้อความError } from '../utils/errorMessage'
 
 // Role display config
 const roleMap = {
@@ -36,6 +38,7 @@ const สีสถานะ = {
 function ProfilePage({ user }) {
   const navigate  = useNavigate()
   const inputรูป  = useRef(null)
+  const { toastError, ToastHost } = useToast()
 
   const currentRole = user?.role || 'user'
   const roleInfo    = roleMap[currentRole] || roleMap.user
@@ -182,7 +185,7 @@ function ProfilePage({ user }) {
       setข้อมูลDB(function (p) { return { ...p, name: ชื่อชั่วคราว.trim() } })
       setกำลังแก้ไขชื่อ(false)
     } catch (err) {
-      alert('บันทึกชื่อไม่สำเร็จ: ' + err.message)
+      toastError(ข้อความError(err, 'บันทึกชื่อ'))
     } finally {
       setกำลังบันทึกชื่อ(false)
     }
@@ -203,7 +206,7 @@ function ProfilePage({ user }) {
       setServiceArea(shelterTemp.area.trim())
       setกำลังแก้ไขShelter(false)
     } catch (err) {
-      alert('บันทึกไม่สำเร็จ: ' + err.message)
+      toastError(ข้อความError(err, 'บันทึกข้อมูลศูนย์พักพิง'))
     } finally {
       setกำลังบันทึกShelter(false)
     }
@@ -236,7 +239,8 @@ function ProfilePage({ user }) {
     if (!ไฟล์) return
     const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
     if (!ผลตรวจ.ok) {
-      alert(ผลตรวจ.error)
+      // ผลตรวจ.error เป็นข้อความไทยจาก fileValidation อยู่แล้ว ไม่ต้องผ่านตัวแปลง
+      toastError(ผลตรวจ.error)
       event.target.value = ''
       return
     }
@@ -253,7 +257,7 @@ function ProfilePage({ user }) {
       if (updateError) throw new Error(updateError.message)
       setรูปโปรไฟล์(publicUrl)
     } catch (err) {
-      alert('อัปโหลดรูปไม่สำเร็จ: ' + err.message)
+      toastError(ข้อความError(err, 'อัปโหลดรูปโปรไฟล์'))
     } finally {
       setกำลังอัปโหลดรูป(false)
       event.target.value = ''
@@ -292,6 +296,7 @@ function ProfilePage({ user }) {
 
   return (
     <div className="min-h-screen bg-blue-50 pb-8">
+      <ToastHost />
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">

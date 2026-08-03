@@ -14,6 +14,8 @@ import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import BreedInput from '../components/BreedInput'
+import { useToast } from '../components/useToast'
+import { ข้อความError } from '../utils/errorMessage'
 
 // ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
 const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
@@ -168,6 +170,7 @@ function LocationPickerModal({ ตำแหน่งเริ่มต้น, �
 
 function ReportAnimal({ user }) {
   const navigate = useNavigate()
+  const { toastError, ToastHost } = useToast()
   const inputGallery = useRef(null)     // เลือกจากคลัง (file input ธรรมดา)
   const videoRef     = useRef(null)     // video element สำหรับ live camera
   const streamRef    = useRef(null)     // MediaStream ที่กำลังเปิดอยู่
@@ -281,7 +284,8 @@ function ReportAnimal({ user }) {
     if (!ไฟล์) return
     const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
     if (!ผลตรวจ.ok) {
-      alert(ผลตรวจ.error)
+      // ข้อความจาก fileValidation เป็นภาษาไทยอยู่แล้ว
+      toastError(ผลตรวจ.error)
       event.target.value = ''
       return
     }
@@ -389,7 +393,7 @@ function ReportAnimal({ user }) {
       },
       function () {
         setกำลังหาตำแหน่ง(false)
-        alert('ไม่สามารถระบุตำแหน่งได้ กรุณากรอกด้วยตนเอง')
+        toastError('ระบุตำแหน่งอัตโนมัติไม่ได้ กรุณาปักหมุดบนแผนที่หรือพิมพ์สถานที่เอง')
       },
       { enableHighAccuracy: true, timeout: 15000 }
     )
@@ -441,7 +445,7 @@ function ReportAnimal({ user }) {
 
     setกำลังส่ง(false)
     if (error) {
-      alert(error.message)
+      toastError(ข้อความError(error, 'ส่งรายงาน'))
     } else {
       if (user?.id) {
         await supabase.from('notifications').insert({
@@ -523,7 +527,7 @@ function ReportAnimal({ user }) {
     }).eq('id', เคสซ้ำ.id)
 
     setกำลังรวมเคส(false)
-    if (error) { alert('แนบข้อมูลไม่สำเร็จ: ' + error.message); return }
+    if (error) { toastError(ข้อความError(error, 'แนบข้อมูลเข้าเคสเดิม')); return }
 
     if (user?.id) {
       await supabase.from('notifications').insert({
@@ -616,6 +620,7 @@ function ReportAnimal({ user }) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
+      <ToastHost />
 
       {/* Modal: เลือกพิกัดจากแผนที่ */}
       {แสดงModalแผนที่ && (

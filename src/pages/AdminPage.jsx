@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { หมุดสี } from '../utils/mapMarker'
+import { useToast } from '../components/useToast'
+import { ข้อความError } from '../utils/errorMessage'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -74,6 +76,7 @@ const เลเบลRole = {
 function AdminPage({ หน้า, user }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { toast, toastError, ToastHost } = useToast()
 
   // ---- State: Dashboard ----
   const [สถิติ, setSถิติ] = useState({ ผู้ใช้: 0, รายงาน: 0, สัตว์: 0, รับเลี้ยง: 0 })
@@ -194,7 +197,7 @@ function AdminPage({ หน้า, user }) {
         u.id === id ? { ...u, role: roleใหม่ } : u
       ))
     } else {
-      alert('เปลี่ยน Role ไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'เปลี่ยนสิทธิ์'))
     }
   }
 
@@ -207,7 +210,7 @@ function AdminPage({ หน้า, user }) {
         u.id === id ? { ...u, status: สถานะใหม่ } : u
       ))
     } else {
-      alert('เปลี่ยนสถานะไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'เปลี่ยนสถานะบัญชี'))
     }
   }
 
@@ -219,7 +222,7 @@ function AdminPage({ หน้า, user }) {
         return prev.map(function (u) { return ids.includes(u.id) ? { ...u, role: roleใหม่ } : u })
       })
     } else {
-      alert('เปลี่ยนสิทธิ์ไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'เปลี่ยนสิทธิ์'))
     }
   }
 
@@ -231,7 +234,7 @@ function AdminPage({ หน้า, user }) {
         return prev.map(function (u) { return ids.includes(u.id) ? { ...u, status: สถานะใหม่ } : u })
       })
     } else {
-      alert('เปลี่ยนสถานะไม่สำเร็จ: ' + error.message)
+      toastError(ข้อความError(error, 'เปลี่ยนสถานะบัญชี'))
     }
   }
 
@@ -331,8 +334,9 @@ function AdminPage({ หน้า, user }) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (error) { alert('ดึงข้อมูลไม่สำเร็จ: ' + error.message); return }
-    if (!data || data.length === 0) { alert('ยังไม่มีข้อมูลในตารางนี้'); return }
+    if (error) { toastError(ข้อความError(error, 'ดึงข้อมูลเพื่อส่งออก')); return }
+    // ไม่มีข้อมูลไม่ใช่ความผิดพลาด — เป็นข้อเท็จจริงที่ต้องบอก จึงใช้ toast กลางไม่ใช่สีแดง
+    if (!data || data.length === 0) { toast('ยังไม่มีข้อมูลในตารางนี้'); return }
 
     const headers = Object.keys(data[0]).join(',')
     const rows = data.map((row) =>
@@ -451,6 +455,7 @@ function AdminPage({ หน้า, user }) {
 
   return (
     <div className="min-h-screen bg-purple-50 pb-8">
+      <ToastHost />
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
