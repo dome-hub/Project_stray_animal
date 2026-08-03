@@ -310,6 +310,27 @@ function ระยะทางเมตร(lat1, lon1, lat2, lon2) {
 }
 
 // ---- Helper: แปลงวันที่ ----
+// ---- เคสที่ยังไม่มีใครรับเรื่องเกินกำหนด ----
+// ตอนส่งรายงาน ระบบเขียนแจ้งเตือนถึงผู้แจ้งว่า "เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง"
+// (ดู ReportAnimal.jsx) แต่ไม่มีอะไรในหน้าเจ้าหน้าที่แสดงนาฬิกาเรือนนั้นเลย
+// เคสที่ค้างมา 12 วันหน้าตาเหมือนเคสที่เพิ่งเข้าเมื่อเช้าทุกประการ
+const ชั่วโมงเกินกำหนด = 24
+
+function ชั่วโมงที่ค้าง(str) {
+  if (!str) return 0
+  return Math.floor((Date.now() - new Date(str).getTime()) / 3600000)
+}
+
+// นับเฉพาะเคสที่ "ยังไม่มีใครกดรับเรื่อง" — พอรับเรื่องแล้วถือว่ามีคนดูแลอยู่ นาฬิกาหยุดนับ
+function เกินกำหนดรับเรื่อง(ร) {
+  return ร.status === 'รอดำเนินการ' && ชั่วโมงที่ค้าง(ร.created_at) >= ชั่วโมงเกินกำหนด
+}
+
+function ข้อความค้าง(ชั่วโมง) {
+  if (ชั่วโมง >= 48) return `เกินกำหนด · ค้าง ${Math.floor(ชั่วโมง / 24)} วัน`
+  return `เกินกำหนด · ค้าง ${ชั่วโมง} ชม.`
+}
+
 function แปลงวันที่เวลา(str) {
   if (!str) return ''
   const d = new Date(str)
@@ -1113,20 +1134,57 @@ function VolunteerPage({ หน้า }) {
     const ประเภท = ประเภทจาก(ร.urgency)
     const รอสายพันธุ์ = ร.animal_type === 'ไม่สามารถวิเคราะห์ได้'
     const ปิดเคสแล้ว = แท็บรายงาน === 'history'
+    const ค้างนาน = !ปิดเคสแล้ว && เกินกำหนดรับเรื่อง(ร)
+    const ชั่วโมง = ค้างนาน ? ชั่วโมงที่ค้าง(ร.created_at) : 0
+
+    // ชื่อที่ screen reader จะอ่านแทนการ์ดทั้งใบ — ต้องพอให้ตัดสินใจได้ว่าจะเปิดไหมโดยไม่ต้องเข้าไปดู
+    const ชื่อสำหรับอ่าน = [
+      `รายงาน #${String(ร.id).padStart(6, '0')}`,
+      ประเภท.label,
+      รอสายพันธุ์ ? 'รอระบุสายพันธุ์' : (ร.animal_type || 'ไม่ระบุประเภท'),
+      ร.location_text || '',
+      `สถานะ ${ร.status}`,
+      ค้างนาน ? ข้อความค้าง(ชั่วโมง) : '',
+    ].filter(Boolean).join(' ')
+
     return (
       <div key={ร.id}
         style={{ borderLeftColor: ปิดเคสแล้ว ? '#d1d5db' : ประเภท.hex }}
-        className={`w-full text-left rounded-2xl shadow-sm overflow-hidden transition-all active:scale-95 cursor-pointer border-l-4 ${
-          ปิดเคสแล้ว ? 'bg-gray-50 opacity-75' : 'bg-white'
+        className={`relative w-full text-left rounded-2xl shadow-sm overflow-hidden border-l-4 focus-within:ring-2 focus-within:ring-teal-500 focus-within:ring-offset-1 ${
+          ปิดเคสแล้ว ? 'bg-gray-50 opacity-75' : ค้างนาน ? 'bg-red-50' : 'bg-white'
         }`}
-        onClick={() => เปิดรายละเอียด(ร)}
       >
-        <div className="p-4 flex items-center gap-3">
+        {/* วงแหวนเตือนเคสค้างเกิน 24 ชม. — เต้นช้าๆ 2 วิ/รอบ ไม่ใช่กะพริบถี่ (WCAG 2.3.1)
+            แยกเป็นชั้นซ้อนต่างหากเพื่อให้ opacity เต้นเฉพาะวงแหวน ตัวหนังสือยังคมชัดตลอด
+            motion-safe: ปิดอนิเมชันเองเมื่อผู้ใช้ตั้งเครื่องว่าลดการเคลื่อนไหว — ป้ายข้อความยังอยู่ */}
+        {ค้างนาน && (
+          <span aria-hidden="true"
+            className="absolute inset-0 rounded-2xl ring-2 ring-red-500 pointer-events-none motion-safe:animate-pulse" />
+        )}
+
+        {/* การ์ดทั้งใบเคยเป็น <div onClick> — คีย์บอร์ดโฟกัสไม่ได้ screen reader อ่านเป็นข้อความเปล่า
+            ใช้ปุ่มซ้อนเต็มพื้นที่แทน (ไม่ครอบเนื้อหา) เพื่อไม่ให้ลิงก์ Maps และปุ่มรวมเคสซ้อนอยู่ในปุ่ม ซึ่งเป็น HTML ที่ไม่ถูกต้อง */}
+        <button
+          type="button"
+          onClick={() => เปิดรายละเอียด(ร)}
+          aria-label={ชื่อสำหรับอ่าน}
+          className="absolute inset-0 z-0 w-full h-full cursor-pointer focus:outline-none active:bg-black/5"
+        />
+
+        <div className="relative p-4 flex items-center gap-3 pointer-events-none">
           <AnimalThumb imageUrl={ร.image_url} type={ร.animal_type} />
           <div className="flex-1 min-w-0">
-            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mb-1 ${ประเภท.badge}`}>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภท.dot}`} /> {ประเภท.short}
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${ประเภท.badge}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${ประเภท.dot}`} /> {ประเภท.short}
+              </span>
+              {/* ป้ายข้อความอยู่ถาวร ไม่พึ่งอนิเมชัน — ผู้ที่ปิดการเคลื่อนไหวต้องได้ข้อมูลเดียวกัน */}
+              {ค้างนาน && (
+                <span className="inline-flex items-center gap-1 bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+                  <AlertTriangle size={11} className="shrink-0" /> {ข้อความค้าง(ชั่วโมง)}
+                </span>
+              )}
+            </div>
             <div className="flex items-start justify-between gap-2 mb-0.5">
               {รอสายพันธุ์ ? (
                 <p className="text-gray-400 text-sm">รอระบุสายพันธุ์</p>
@@ -1146,7 +1204,7 @@ function VolunteerPage({ หน้า }) {
                 href={`https://www.google.com/maps?q=${ร.latitude},${ร.longitude}`}
                 target="_blank" rel="noreferrer"
                 onClick={function (e) { e.stopPropagation() }}
-                className="inline-flex items-center gap-1 text-xs text-teal-700 font-semibold max-w-full"
+                className="pointer-events-auto relative z-10 inline-flex items-center gap-1 text-xs text-teal-700 font-semibold max-w-full"
               >
                 <MapPin size={13} className="shrink-0" />
                 <span className="truncate">{ร.location_text || 'ดูตำแหน่ง'}</span>
@@ -1165,7 +1223,7 @@ function VolunteerPage({ หน้า }) {
             {!ปิดเคสแล้ว && เคสซ้ำแผนที่[ร.id] && (
               <button
                 onClick={function (e) { e.stopPropagation(); เปิดรวมเคส(ร, เคสซ้ำแผนที่[ร.id].เคส) }}
-                className="mt-1.5 inline-flex items-center gap-1 bg-orange-100 text-orange-600 text-[11px] font-bold px-2 py-1 rounded-full active:bg-orange-200"
+                className="pointer-events-auto relative z-10 mt-1.5 inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-1 rounded-full active:bg-orange-200"
               >
                 <AlertTriangle size={12} className="shrink-0" /> อาจซ้ำกับ #{String(เคสซ้ำแผนที่[ร.id].เคส.id).padStart(6, '0')}
                 <span className="font-normal text-orange-400">· ห่าง {Math.round(เคสซ้ำแผนที่[ร.id].ระยะ)} ม.</span>
