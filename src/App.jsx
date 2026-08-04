@@ -22,6 +22,8 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import NotificationPage from './pages/NotificationPage'
 import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
+import NotFoundPage     from './pages/NotFoundPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 // เว้นที่ว่างด้านล่างเท่าความสูงแถบนำทาง กันเนื้อหาบรรทัดสุดท้ายถูกแถบทับ
 // ต้องแยกเป็น component เพราะ useLocation ใช้ได้เฉพาะข้างใน BrowserRouter
@@ -218,6 +220,10 @@ function App() {
         {/* หน้า Login — ไม่ส่ง onLogin แล้ว Supabase Auth จัดการเอง */}
         <Route path="/login" element={user ? <Navigate to="/home" /> : <Login />} />
 
+        {/* ตั้งรหัสผ่านใหม่ — ปลายทางของลิงก์ในอีเมล ต้องเข้าได้ทั้งที่ยังไม่ได้ล็อกอิน
+            และตอนที่ Supabase สร้าง session จาก token ในลิงก์ให้แล้ว จึงไม่ผูกกับ user */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+
         {/* นโยบายความเป็นส่วนตัว — public ไม่ต้อง login
             Google ต้องเปิด URL นี้ได้ตอนตรวจสอบ OAuth consent screen และผู้ใช้ต้องอ่านได้ก่อนสมัคร */}
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
@@ -236,6 +242,8 @@ function App() {
         <Route path="/notifications" element={ต้องLogin(<NotificationPage user={user} />)} />
 
         {/* === เจ้าหน้าที่ / อาสาสมัคร === */}
+        {/* /volunteer เปล่าๆ คือสิ่งที่คนพิมพ์เองเมื่อเห็น /volunteer/reports — พาไปหน้าแรกของกลุ่มแทนที่จะตกไป 404 */}
+        <Route path="/volunteer" element={<Navigate to="/volunteer/reports" replace />} />
         <Route path="/volunteer/reports" element={ต้องRole(<VolunteerPage หน้า="reports" />, 'volunteer')} />
         <Route path="/volunteer/update"  element={ต้องRole(<VolunteerPage หน้า="update" />, 'volunteer')} />
         <Route path="/volunteer/animals" element={ต้องRole(<VolunteerPage หน้า="animals" />, 'volunteer')} />
@@ -243,11 +251,15 @@ function App() {
         <Route path="/volunteer/map"     element={ต้องRole(<VolunteerPage หน้า="map" />, 'volunteer')} />
 
         {/* === Admin === */}
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/dashboard" element={ต้องRole(<AdminPage หน้า="dashboard" user={user} />, 'admin')} />
         <Route path="/admin/users"     element={ต้องRole(<AdminPage หน้า="users"     user={user} />, 'admin')} />
         <Route path="/admin/areas"     element={ต้องRole(<AdminPage หน้า="areas"     user={user} />, 'admin')} />
         <Route path="/admin/export"    element={ต้องRole(<AdminPage หน้า="export"    user={user} />, 'admin')} />
         <Route path="/admin/settings"  element={ต้องRole(<AdminPage หน้า="settings"  user={user} />, 'admin')} />
+
+        {/* ต้องอยู่ท้ายสุดเสมอ — URL ที่ไม่ตรง route ไหนเลยเคยได้หน้าขาวไม่มีตัวอักษรสักตัว */}
+        <Route path="*" element={<NotFoundPage user={user} />} />
 
       </Routes>
       </Layoutเนื้อหา>
