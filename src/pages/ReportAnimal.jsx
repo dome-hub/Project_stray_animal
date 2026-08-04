@@ -20,7 +20,12 @@ import { ข้อความError } from '../utils/errorMessage'
 // ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
 const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
 
-const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000'
+// ค่า fallback ต้องเป็นเซิร์ฟเวอร์จริง ไม่ใช่ localhost
+// เพราะ .env ถูก gitignore ไว้ ใครก็ตามที่ clone แล้ว build (โดยเฉพาะตอนทำ APK)
+// จะไม่มี VITE_AI_API_URL แล้วได้ localhost:8000 ซึ่งในมือถือคือตัวเครื่องเอง → วิเคราะห์รูปพัง
+// เว็บบน Render ไม่เคยเจอปัญหานี้เพราะ render.yaml ตั้ง env ให้ตอน build
+// ถ้าจะรัน AI ในเครื่องตอนพัฒนา ให้สร้าง .env แล้วใส่ VITE_AI_API_URL=http://localhost:8000 ทับ
+const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://project-stray-animal-ai.onrender.com'
 
 // ตัวเลือกประเภทการแจ้ง — เรียงจากเร่งด่วนมากไปน้อย ใช้กำหนดความเร่งด่วน (urgency) ของรายงาน
 const เหตุผลตัวเลือก = [
