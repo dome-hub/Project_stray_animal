@@ -24,6 +24,9 @@ import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
 import NotFoundPage     from './pages/NotFoundPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import { useToast } from './components/useToast'
+import { ข้อความError } from './utils/errorMessage'
+import { ผูกตัวรับDeepLink } from './utils/googleSignIn'
 
 // เว้นที่ว่างด้านล่างเท่าความสูงแถบนำทาง กันเนื้อหาบรรทัดสุดท้ายถูกแถบทับ
 // ต้องแยกเป็น component เพราะ useLocation ใช้ได้เฉพาะข้างใน BrowserRouter
@@ -45,6 +48,7 @@ function App() {
   // role จริงจาก DB โหลดหรือยัง — user เริ่มต้นด้วย role: 'user' เสมอระหว่างรอ (ดู setUser ด้านล่าง)
   // ต้องRole() ใช้เช็คตัวนี้ กัน admin/volunteer ที่ refresh หน้าโดนเด้งออกผิดๆ ก่อน role จริงมาถึง
   const [roleพร้อม, setRoleพร้อม] = useState(false)
+  const { toastError, ToastHost } = useToast()
 
   // Warmup: ยิง HTTP request ไปยัง Supabase ทันทีที่ app โหลด
   // เพื่อ pre-establish DNS+TCP+TLS connection ก่อนที่ user จะกด Login
@@ -56,6 +60,16 @@ function App() {
     supabase.from('animals').select('id').limit(1).then(function () {}, function () {})
     supabase.auth.getSession().catch(function () {})
   }, [])
+
+  // รับ callback ของ Google Sign-In ที่เด้งกลับเข้าแอปผ่าน custom scheme (Android เท่านั้น)
+  // ต้องผูกที่ระดับ App ไม่ใช่หน้า Login เพราะระหว่างที่ผู้ใช้อยู่ในเบราว์เซอร์ระบบ
+  // Android อาจเก็บแอปเราไว้เบื้องหลังแล้วสร้าง component ใหม่ตอนกลับมา
+  // ตัว session ที่ตั้งสำเร็จจะไปเข้า onAuthStateChange ด้านล่างเองตามปกติ
+  useEffect(function () {
+    return ผูกตัวรับDeepLink(function (err) {
+      if (err) toastError(ข้อความError(err, 'เข้าสู่ระบบด้วย Google'))
+    })
+  }, [toastError])
 
   useEffect(function () {
     let cancelled = false
@@ -211,6 +225,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ToastHost />
       <Layoutเนื้อหา user={user}>
       <Routes>
 

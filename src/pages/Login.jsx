@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info, KeyRound, ArrowLeft } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ข้อความError } from '../utils/errorMessage'
+import { เข้าสู่ระบบGoogle, เป็นแอปมือถือ } from '../utils/googleSignIn'
 
 // ความยาวรหัสผ่านขั้นต่ำ — ตามแนวทางสากล (NIST/OWASP) ความยาวสำคัญกว่าการบังคับใส่อักขระพิเศษ
 const ความยาวรหัสผ่านขั้นต่ำ = 8
@@ -84,20 +85,17 @@ function Login() {
     setกำลังGoogle(true)
     setข้อผิดพลาด('')
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,  // redirect กลับมาหน้าแรกของแอป
-        },
-      })
-      if (error) {
-        setข้อผิดพลาด('Google login ไม่สำเร็จ: ' + error.message)
-        setกำลังGoogle(false)
-      }
-      // ถ้าสำเร็จ → browser จะ redirect ไปหน้า Google consent เอง
-      // เมื่อกลับมา onAuthStateChange ใน App.jsx จะ set user ให้อัตโนมัติ
-    } catch {
-      setข้อผิดพลาด('เชื่อมต่อ Google ไม่ได้ กรุณาลองใหม่')
+      // เว็บกับแอปมือถือใช้คนละเส้นทาง — ดู utils/googleSignIn.js
+      // (เดิมใช้ window.location.origin ซึ่งในแอปคือ https://localhost ที่ไม่มีอยู่จริง)
+      await เข้าสู่ระบบGoogle()
+
+      // บนมือถือ: เบราว์เซอร์ระบบเปิดขึ้นแล้ว ผู้ใช้ยังทำต่อในนั้น
+      // ปุ่มต้องเลิกหมุนเพราะหน้านี้ไม่ได้กำลังทำอะไรอยู่ และแอปอาจถูกพักไว้เบื้องหลัง
+      // ตัว session จะถูกตั้งตอน deep link กลับเข้าแอป (ดู ผูกตัวรับDeepLink ใน App.jsx)
+      if (เป็นแอปมือถือ()) setกำลังGoogle(false)
+      // บนเว็บ: กำลัง redirect ออกจากหน้าอยู่แล้ว ปล่อยให้ปุ่มหมุนค้างไว้
+    } catch (err) {
+      setข้อผิดพลาด(ข้อความError(err, 'เข้าสู่ระบบด้วย Google'))
       setกำลังGoogle(false)
     }
   }

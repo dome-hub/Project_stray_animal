@@ -22,6 +22,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- รับ callback ของ Google Sign-In กลับเข้าแอป
+                 ต้องมีอันนี้ ไม่งั้นหลังล็อกอินเสร็จเบราว์เซอร์จะพยายามเปิด
+                 com.jaengjorn.app://login-callback แล้วไม่มีแอปไหนรับ → ค้างที่หน้า Not Found
+                 scheme ต้องตรงกับ SCHEME_CALLBACK ใน src/utils/googleSignIn.js เป๊ะ
+                 (launchMode singleTask ด้านบนทำให้กลับเข้า Activity เดิม ไม่เปิดซ้อนใหม่) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.jaengjorn.app" android:host="login-callback" />
+            </intent-filter>
+
         </activity>
 
         <provider
