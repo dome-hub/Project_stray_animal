@@ -20,6 +20,11 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+import LoadFailed from '../components/LoadFailed'
+
+// เบอร์ไทย 10 หลักขึ้นต้น 0 — เกณฑ์เดียวกับหน้าโปรไฟล์และตอนแจ้งสัตว์จร
+// สำคัญกว่าที่อื่นด้วยซ้ำ เพราะเบอร์นี้คือช่องทางเดียวที่คนพบสัตว์จะติดต่อเจ้าของได้
+const รูปแบบเบอร์โทร = /^0[0-9]{9}$/
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite (idempotent — เรียกซ้ำได้)
 delete L.Icon.Default.prototype._getIconUrl
@@ -67,7 +72,12 @@ async function โหลดรายการ() {
 
   // ตารางใหม่อาจยังไม่ถูกสร้าง (ยังไม่รัน migration) → log ไว้ แต่ไม่ให้ทั้งหน้าพัง
   if (ผลAnimals.error) console.error('ดึง animals (lost_and_found) ไม่สำเร็จ:', ผลAnimals.error.message)
+  if (ผลReports.error) console.error('ดึง reports (ประกาศตามหาเจ้าของ) ไม่สำเร็จ:', ผลReports.error.message)
   if (ผลLost.error)    console.error('ดึง lost_pets ไม่สำเร็จ:', ผลLost.error.message)
+
+  // อ่านไม่ได้เลยสักแหล่ง = ปัญหาเครือข่าย/เซิร์ฟเวอร์ ต้องบอกผู้ใช้ตรงๆ
+  // ไม่ใช่ปล่อยให้ตกไปที่ "ยังไม่มีประกาศตามหาสัตว์เลี้ยง" ซึ่งคนกำลังตามหาสัตว์ของตัวเองอ่านแล้วเข้าใจผิด
+  const พลาดทั้งหมด = !!ผลAnimals.error && !!ผลReports.error && !!ผลLost.error
 
   const สัตว์ในศูนย์ = ผลAnimals.data || []
   const รายงานที่เข้าศูนย์แล้ว = new Set(สัตว์ในศูนย์.map((a) => a.report_id).filter(Boolean))
@@ -142,7 +152,7 @@ async function โหลดรายการ() {
       }),
   ]
 
-  return { found, lost: ผลLost.data || [] }
+  return { found, lost: ผลLost.data || [], พลาดทั้งหมด }
 }
 
 // ---- Helper: วันที่แบบสั้น มีปี พ.ศ. เช่น "20 ก.ค. 2569" ----
@@ -593,8 +603,15 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
     if (!ชนิด)               { setError('กรุณาเลือกประเภทสัตว์'); return }
     if (!สถานที่หาย.trim())  { setError('กรุณากรอกสถานที่ที่หาย'); return }
     if (!เบอร์ติดต่อ.trim()) { setError('กรุณากรอกเบอร์ติดต่อกลับ'); return }
+    if (!รูปแบบเบอร์โทร.test(เบอร์ติดต่อ.trim())) {
+      // เบอร์ผิดรูปแบบ = ประกาศนี้ติดต่อกลับไม่ได้เลย ต้องกันตั้งแต่ตอนโพสต์
+      setError('เบอร์ติดต่อต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0 (เช่น 0812345678)'); return
+    }
     if (เงินรางวัล && (isNaN(Number(เงินรางวัล)) || Number(เงินรางวัล) < 0)) {
       setError('กรุณากรอกเงินรางวัลเป็นตัวเลขที่ถูกต้อง'); return
+    }
+    if (วันที่หาย && วันที่หาย > new Date().toISOString().slice(0, 10)) {
+      setError('วันที่หายเป็นวันในอนาคตไม่ได้'); return
     }
     setError('')
     setกำลังบันทึก(true)
@@ -712,14 +729,16 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
 
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-1.5">วันที่หาย</p>
-            <input type="date" value={วันที่หาย} onChange={(e) => setวันที่หาย(e.target.value)}
+            <input type="date" value={วันที่หาย} max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setวันที่หาย(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-rose-400" />
           </div>
 
           {/* เบอร์ติดต่อ */}
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-1.5">เบอร์ติดต่อกลับ <span className="text-red-400">*</span></p>
-            <input type="tel" inputMode="numeric" value={เบอร์ติดต่อ} onChange={(e) => setเบอร์ติดต่อ(e.target.value)}
+            <input type="tel" inputMode="numeric" maxLength={10} value={เบอร์ติดต่อ}
+              onChange={(e) => setเบอร์ติดต่อ(e.target.value.replace(/\D/g, '').slice(0, 10))}
               placeholder="เช่น 0812345678"
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-400" />
             <p className="text-xs text-gray-400 mt-1">คนที่พบสัตว์ของคุณจะใช้เบอร์นี้ติดต่อกลับ</p>
@@ -836,8 +855,15 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
     if (!ชนิด)               { setError('กรุณาเลือกประเภทสัตว์'); return }
     if (!สถานที่หาย.trim())  { setError('กรุณากรอกสถานที่ที่หาย'); return }
     if (!เบอร์ติดต่อ.trim()) { setError('กรุณากรอกเบอร์ติดต่อกลับ'); return }
+    if (!รูปแบบเบอร์โทร.test(เบอร์ติดต่อ.trim())) {
+      // เบอร์ผิดรูปแบบ = ประกาศนี้ติดต่อกลับไม่ได้เลย ต้องกันตั้งแต่ตอนโพสต์
+      setError('เบอร์ติดต่อต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0 (เช่น 0812345678)'); return
+    }
     if (เงินรางวัล && (isNaN(Number(เงินรางวัล)) || Number(เงินรางวัล) < 0)) {
       setError('กรุณากรอกเงินรางวัลเป็นตัวเลขที่ถูกต้อง'); return
+    }
+    if (วันที่หาย && วันที่หาย > new Date().toISOString().slice(0, 10)) {
+      setError('วันที่หายเป็นวันในอนาคตไม่ได้'); return
     }
     setError('')
     setกำลังบันทึก(true)
@@ -1194,6 +1220,7 @@ function LostAndFoundPage({ user }) {
   const [สัตว์ที่ศูนย์พบ, setSัตว์ที่ศูนย์พบ] = useState([])
   const [โพสต์ตามหา,     setโพสต์ตามหา]     = useState([])
   const [กำลังโหลด,      setกำลังโหลด]      = useState(true)
+  const [โหลดพลาด,       setโหลดพลาด]       = useState(false)
   const [แสดงฟอร์ม,      setแสดงฟอร์ม]      = useState(false)
   const [สัตว์ที่เลือก,   setSัตว์ที่เลือก]   = useState(null)  // การ์ดที่กดในแท็บศูนย์พบ → เปิด modal
   const [โพสต์ที่ดู,      setโพสต์ที่ดู]      = useState(null)  // การ์ดที่กดในแท็บตามหา → เปิดดูรายละเอียด (แก้ไข/ลบได้ถ้าเป็นเจ้าของ)
@@ -1206,6 +1233,7 @@ function LostAndFoundPage({ user }) {
       if (ยกเลิก) return
       setSัตว์ที่ศูนย์พบ(ผล.found)
       setโพสต์ตามหา(ผล.lost)
+      setโหลดพลาด(ผล.พลาดทั้งหมด)
       setกำลังโหลด(false)
 
       // มาจากลิงก์ ?open=<id> (เช่น กดจากแบนเนอร์หน้า Home) → เปิด modal โพสต์นั้นเลย
@@ -1227,6 +1255,7 @@ function LostAndFoundPage({ user }) {
     const ผล = await โหลดรายการ()
     setSัตว์ที่ศูนย์พบ(ผล.found)
     setโพสต์ตามหา(ผล.lost)
+    setโหลดพลาด(ผล.พลาดทั้งหมด)
     setกำลังโหลด(false)
   }
 
@@ -1318,8 +1347,13 @@ function LostAndFoundPage({ user }) {
         </div>
       )}
 
+      {/* อ่านข้อมูลไม่ได้ — ต้องมาก่อน empty state เสมอ */}
+      {!กำลังโหลด && โหลดพลาด && (
+        <LoadFailed onRetry={รีเฟรช} สิ่งที่โหลด="ประกาศ" สี="orange" />
+      )}
+
       {/* Empty */}
-      {!กำลังโหลด && รายการที่แสดง.length === 0 && (
+      {!กำลังโหลด && !โหลดพลาด && รายการที่แสดง.length === 0 && (
         <div className="text-center py-16 px-6">
           {แท็บ === 'found'
             ? <PawPrint size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
@@ -1336,7 +1370,7 @@ function LostAndFoundPage({ user }) {
       )}
 
       {/* Grid การ์ด */}
-      {!กำลังโหลด && รายการที่แสดง.length > 0 && (
+      {!กำลังโหลด && !โหลดพลาด && รายการที่แสดง.length > 0 && (
         <div className="px-4 pt-4 grid grid-cols-2 gap-3">
           {แท็บ === 'found'
             ? สัตว์ที่ศูนย์พบ.map(function (a) {

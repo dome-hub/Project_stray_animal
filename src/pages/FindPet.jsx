@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, PawPrint, MapPin, ArrowLeft, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
 import { supabase } from '../supabase'   // นำเข้า supabase client
 import AnimalIcon from '../components/AnimalIcon'
+import LoadFailed from '../components/LoadFailed'
 
 // สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว — ต้องไม่โผล่ในหน้าหาบ้านไม่ว่ากรณีใด
 // (ตรงกับ สถานะสัตว์ออกไปแล้ว ใน VolunteerPage ที่บังคับ publish_mode = 'none' ให้อยู่แล้ว)
@@ -55,6 +56,10 @@ function FindPet() {
   // สัตว์ที่ประกาศหาบ้านใหม่ (publish_mode = 'adoption') ดึงมาจาก Database
   const [สัตว์ทั้งหมด, setSัตว์ทั้งหมด] = useState([])
 
+  // อ่านข้อมูลไม่ได้ (เน็ตหลุด/เซิร์ฟเวอร์ล่ม) ต้องหน้าตาไม่เหมือน "ยังไม่มีสัตว์หาบ้าน"
+  // เดิม error ลง console.log เฉยๆ แล้วปล่อยให้ตกไปที่ empty state ซึ่งบอกผู้ใช้ผิดความจริง
+  const [โหลดพลาด, setโหลดพลาด] = useState(false)
+
   // แผงตัวกรองเปิดอยู่ไหม — พับเก็บโดยดีฟอลต์ เพราะดูสัตว์ทั้งหมดคือหลัก ตัวกรองเป็นแค่ตัวช่วยเสริม
   const [ตัวกรองเปิด, setตัวกรองเปิด] = useState(false)
 
@@ -68,9 +73,9 @@ function FindPet() {
   const [ขนาด,        setขนาด]        = useState('')
 
   // ---- ดึงสัตว์ที่เผยแพร่แล้วจาก Supabase ตอนโหลดหน้า ----
-  useEffect(function () {
-    async function ดึงข้อมูลสัตว์() {
+  async function ดึงข้อมูลสัตว์() {
       setกำลังโหลด(true)
+      setโหลดพลาด(false)
 
       // เฉพาะสัตว์ที่เจ้าหน้าที่เลือกโหมด "ประกาศหาบ้านใหม่" (publish_mode = 'adoption') เท่านั้น
       // ไม่ผูกกับ status อีกแล้ว เพราะ status บอกแค่ว่าน้องอยู่ไหน ส่วนจะประกาศอะไรอยู่ที่ publish_mode
@@ -83,7 +88,9 @@ function FindPet() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.log('เกิดข้อผิดพลาดในการดึงข้อมูล:', error.message)
+        console.error('ดึงข้อมูลสัตว์หาบ้านไม่สำเร็จ:', error.message)
+        setSัตว์ทั้งหมด([])
+        setโหลดพลาด(true)
       } else {
         const แปลงแล้ว = data.map(function (สัตว์) {
           return {
@@ -115,8 +122,9 @@ function FindPet() {
       }
 
       setกำลังโหลด(false)
-    }
+  }
 
+  useEffect(function () {
     ดึงข้อมูลสัตว์()
   }, [])
 
@@ -411,7 +419,12 @@ function FindPet() {
 
         {/* ---- รายการสัตว์ — กรองสดตามตัวกรองที่เลือกอยู่ (ไม่มีตัวกรองก็คือสัตว์ทั้งหมด) ---- */}
         <div className="space-y-4">
-          {ผลลัพธ์.length === 0 && (
+          {/* อ่านข้อมูลไม่ได้ ต้องมาก่อน empty state เสมอ ไม่งั้นเน็ตหลุดจะอ่านเป็น "ไม่มีสัตว์หาบ้าน" */}
+          {โหลดพลาด && (
+            <LoadFailed onRetry={ดึงข้อมูลสัตว์} สิ่งที่โหลด="รายชื่อสัตว์" สี="orange" />
+          )}
+
+          {!โหลดพลาด && ผลลัพธ์.length === 0 && (
             <div className="text-center py-10 text-gray-400">
               <PawPrint size={40} strokeWidth={1.5} className="mx-auto mb-2 text-gray-300" />
               {สัตว์ตามประเภท.length === 0 ? (

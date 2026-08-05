@@ -2,13 +2,42 @@
 // ผู้ใช้ติดต่อขอรับเลี้ยงผ่านเบอร์ศูนย์พักพิง — เจ้าหน้าที่เป็นคนยืนยันการรับเลี้ยง
 
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import {
   Syringe, Scissors, PawPrint, FileText, Home, MapPin, Map,
   Phone, User, CheckCircle2, XCircle, HelpCircle, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight, ExternalLink
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import AnimalIcon from '../components/AnimalIcon'
+import LoadFailed from '../components/LoadFailed'
+
+// แปลงแถวจากตาราง animals เป็นรูปแบบที่หน้านี้ใช้ — ต้องตรงกับที่ FindPet ส่งมาทาง router state
+// เพราะหน้านี้รับข้อมูลได้ 2 ทาง: กดมาจากการ์ด (มี state) หรือเปิด URL ตรงๆ (ต้องดึงเอง)
+function แปลงสัตว์จากDB(a) {
+  const รูปทั้งหมด = (Array.isArray(a.photos) && a.photos.length > 0)
+    ? a.photos.filter(Boolean)
+    : (a.photo_url ? [a.photo_url] : [])
+  return {
+    id: a.id,
+    ชนิด: a.species === 'แมว' ? 'แมว'
+        : a.species === 'สุนัข' ? 'สุนัข'
+        : (a.breed?.includes('แมว') ? 'แมว' : 'สุนัข'),
+    รูป: รูปทั้งหมด[0] || null,
+    รูปทั้งหมด,
+    ชื่อ: a.name,
+    สายพันธุ์: a.breed || 'ไม่ระบุ',
+    อายุ: a.age || 'ไม่ระบุ',
+    เพศ: a.gender || 'ไม่ระบุ',
+    ขนาด: a.size || 'ไม่ระบุ',
+    สถานะ: a.status,
+    สุขภาพ: a.health,
+    ลักษณะ: a.description || '',
+    วัคซีน: a.vaccine_info || '',
+    ทำหมัน: a.neutered || '',
+    นิสัย: a.traits ? a.traits.split(',').map(function (t) { return t.trim() }).filter(Boolean) : [],
+    สถานที่: a.location || 'กำแพงแสน นครปฐม',
+  }
+}
 
 // ---- Image Carousel — เลื่อนดูรูปหลายรูปได้ (swipe บนมือถือ / ปุ่มลูกศร / จุด indicator) ----
 function ImageCarousel({ รูป, ชนิด, ชื่อ }) {
@@ -73,23 +102,32 @@ function ImageCarousel({ รูป, ชนิด, ชื่อ }) {
 function PetDetail() {
   const navigate = useNavigate()
   const { state } = useLocation()
+  const { id } = useParams()
 
-  const สัตว์ = state?.สัตว์ || {
-    id: 1,
-    ชนิด: 'สุนัข',
-    ชื่อ: 'มะม่วง',
-    สายพันธุ์: 'สุนัขพันธุ์ไทยผสม',
-    อายุ: '2 ปี',
-    เพศ: 'ตัวผู้',
-    ขนาด: 'กลาง',
-    นิสัย: ['เป็นมิตร', 'ขี้เล่น'],
-    สถานที่: 'ลาดพร้าว กรุงเทพฯ',
+  // กดมาจากการ์ดในหน้าค้นหา → ได้ข้อมูลมาทาง state ทันที ไม่ต้องรอโหลด
+  // เปิด URL ตรงๆ / refresh / กดย้อนกลับ-เดินหน้า → state หายไป ต้องดึงจาก DB ด้วย id ใน URL
+  // เดิมตรงนี้ fallback เป็นข้อมูลสัตว์สมมติ ("มะม่วง" ที่ลาดพร้าว) ซึ่งผู้ใช้เห็นเป็นประกาศจริง
+  const [สัตว์,        setSัตว์]        = useState(state?.สัตว์ || null)
+  const [กำลังโหลดสัตว์, setกำลังโหลดสัตว์] = useState(!state?.สัตว์)
+  const [โหลดสัตว์พลาด, setโหลดสัตว์พลาด] = useState(false)
+  const [ไม่พบสัตว์,    setไม่พบสัตว์]    = useState(false)
+
+  async function ดึงสัตว์() {
+    if (!id) { setไม่พบสัตว์(true); setกำลังโหลดสัตว์(false); return }
+    setกำลังโหลดสัตว์(true)
+    setโหลดสัตว์พลาด(false)
+    setไม่พบสัตว์(false)
+    const { data, error } = await supabase.from('animals').select('*').eq('id', id).maybeSingle()
+    if (error)      setโหลดสัตว์พลาด(true)
+    else if (!data) setไม่พบสัตว์(true)
+    else            setSัตว์(แปลงสัตว์จากDB(data))
+    setกำลังโหลดสัตว์(false)
   }
 
-  // คลังรูปสำหรับ carousel — ใช้ รูปทั้งหมด (ส่งมาจาก FindPet) ถ้าไม่มีก็ fallback เป็น [รูป] เดี่ยว
-  const รูปทั้งหมด = (Array.isArray(สัตว์.รูปทั้งหมด) && สัตว์.รูปทั้งหมด.length > 0)
-    ? สัตว์.รูปทั้งหมด
-    : (สัตว์.รูป ? [สัตว์.รูป] : [])
+  useEffect(function () {
+    if (state?.สัตว์) return   // มีข้อมูลจากหน้าก่อนแล้ว ไม่ต้องยิงซ้ำ
+    ดึงสัตว์()
+  }, [id])
 
   // ---- ข้อมูลศูนย์พักพิงจาก DB ----
   const [ศูนย์,       setศูนย์]       = useState(null)
@@ -108,6 +146,45 @@ function PetDetail() {
         setโหลดศูนย์(false)
       }, function () { setโหลดศูนย์(false) })
   }, [])
+
+  // ---- ยังไม่มีข้อมูลสัตว์: กำลังโหลด / โหลดพลาด / ไม่มีตัวนี้แล้ว ----
+  if (กำลังโหลดสัตว์ || โหลดสัตว์พลาด || ไม่พบสัตว์ || !สัตว์) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
+          <button onClick={() => navigate(-1)} aria-label="ย้อนกลับ"
+            className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="font-bold text-gray-800">ข้อมูลสัตว์</h1>
+        </div>
+
+        {กำลังโหลดสัตว์ ? (
+          <div className="flex flex-col items-center justify-center pt-24 gap-3">
+            <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-gray-500 text-sm">กำลังโหลดข้อมูลสัตว์...</p>
+          </div>
+        ) : โหลดสัตว์พลาด ? (
+          <LoadFailed onRetry={ดึงสัตว์} สิ่งที่โหลด="ข้อมูลสัตว์" สี="orange" />
+        ) : (
+          <div className="text-center pt-24 px-6">
+            <PawPrint size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
+            <p className="font-semibold text-gray-700">ไม่พบข้อมูลสัตว์ตัวนี้แล้ว</p>
+            <p className="text-sm text-gray-500 mt-1">อาจถูกนำออกจากประกาศ หรือมีผู้รับเลี้ยงไปแล้ว</p>
+            <button onClick={() => navigate('/find-pet')}
+              className="mt-5 bg-green-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium">
+              ดูสัตว์ตัวอื่น
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // คลังรูปสำหรับ carousel — ใช้ รูปทั้งหมด (ส่งมาจาก FindPet) ถ้าไม่มีก็ fallback เป็น [รูป] เดี่ยว
+  const รูปทั้งหมด = (Array.isArray(สัตว์.รูปทั้งหมด) && สัตว์.รูปทั้งหมด.length > 0)
+    ? สัตว์.รูปทั้งหมด
+    : (สัตว์.รูป ? [สัตว์.รูป] : [])
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">

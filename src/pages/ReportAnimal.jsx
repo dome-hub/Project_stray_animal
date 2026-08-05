@@ -194,6 +194,10 @@ function ReportAnimal({ user }) {
   const [กำลังส่ง,     setกำลังส่ง]     = useState(false)
   const [ส่งสำเร็จ,    setส่งสำเร็จ]    = useState(false)
   const [รหัสรายงาน,  setรหัสรายงาน]  = useState(null)
+  // หน้าสำเร็จใช้ร่วมกัน 2 กรณี — สร้างใบใหม่ กับ แนบเข้าเคสที่คนอื่นแจ้งไว้แล้ว
+  // กรณีหลังห้ามบอกว่า "เจ้าหน้าที่จะติดต่อกลับ" เพราะคนที่เจ้าหน้าที่ติดต่อคือผู้แจ้งคนแรก ไม่ใช่คนนี้
+  const [แนบเข้าเคสเดิม, setแนบเข้าเคสเดิม] = useState(false)
+  const [สถานะเคสที่แนบ, setSถานะเคสที่แนบ] = useState('')
 
   // ---- Location picker modal state ----
   const [แสดงModalแผนที่, setแสดงModalแผนที่] = useState(false)
@@ -205,6 +209,27 @@ function ReportAnimal({ user }) {
   const [แสดงกล้อง,   setแสดงกล้อง]   = useState(false)
   const [กล้องพร้อม,  setกล้องพร้อม]  = useState(false)
   const [errorกล้อง,  setErrorกล้อง]  = useState('')
+
+  // ---- ถามยืนยันตอนอัปโหลดรูปไม่สำเร็จ ----
+  // เดิมใช้ confirm() ของเบราว์เซอร์ ซึ่งในบิลด์ Capacitor จะขึ้นเป็น system dialog
+  // ที่มี origin ของแอปเป็นหัวเรื่อง = หน้าตาเดียวกับตอนแอปพัง (เหตุผลเดียวกับที่เลิกใช้ alert)
+  // เก็บ resolve ไว้ใน ref เพื่อให้ doSubmit ที่เป็น async รอคำตอบจากปุ่มบน sheet ได้
+  const [ถามส่งไม่มีรูป, setถามส่งไม่มีรูป] = useState(null)   // ข้อความสาเหตุ หรือ null = ไม่ถาม
+  const ตัวรอคำตอบ = useRef(null)
+
+  function ถามยืนยันส่งไม่มีรูป(สาเหตุ) {
+    return new Promise(function (resolve) {
+      ตัวรอคำตอบ.current = resolve
+      setถามส่งไม่มีรูป(สาเหตุ)
+    })
+  }
+
+  function ตอบยืนยันส่งไม่มีรูป(ยอมส่ง) {
+    setถามส่งไม่มีรูป(null)
+    const resolve = ตัวรอคำตอบ.current
+    ตัวรอคำตอบ.current = null
+    if (resolve) resolve(ยอมส่ง)
+  }
 
   // ---- Duplicate detection state ----
   const [เคสซ้ำ,        setเคสซ้ำ]        = useState(null)   // รายงานเดิมที่อยู่ใกล้จุดที่ปักหมุด
@@ -294,11 +319,20 @@ function ReportAnimal({ user }) {
       event.target.value = ''
       return
     }
-    setไฟล์รูปภาพ(ไฟล์)
-    setรูปภาพPreview(URL.createObjectURL(ไฟล์))
+    ตั้งรูปพรีวิว(ไฟล์)
     setผลAI(null)
     วิเคราะห์AIจริง(ไฟล์)   // ✅ เรียก AI จริงแทน mock
     event.target.value = ''
+  }
+
+  // ตั้งรูปพรีวิว + คืน object URL ของรูปก่อนหน้าให้ระบบ
+  // ถ่ายใหม่/เลือกใหม่หลายรอบเป็นเรื่องปกติของหน้านี้ ถ้าไม่ revoke รูปเก่าจะค้างใน memory ทั้งหมด
+  function ตั้งรูปพรีวิว(ไฟล์) {
+    setรูปภาพPreview(function (เก่า) {
+      if (เก่า) URL.revokeObjectURL(เก่า)
+      return URL.createObjectURL(ไฟล์)
+    })
+    setไฟล์รูปภาพ(ไฟล์)
   }
 
   // ---- เปิดกล้อง (getUserMedia) ----
@@ -351,9 +385,10 @@ function ReportAnimal({ user }) {
     canvas.height = video.videoHeight
     canvas.getContext('2d').drawImage(video, 0, 0)
     canvas.toBlob(function (blob) {
+      // toBlob คืน null ได้ถ้าเฟรมยังว่าง (กล้องยังไม่พร้อมจริง) — ถ้าไม่กันไว้ new File([null]) จะพัง
+      if (!blob) { toastError('ถ่ายรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); return }
       const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
-      setไฟล์รูปภาพ(file)
-      setรูปภาพPreview(URL.createObjectURL(file))
+      ตั้งรูปพรีวิว(file)
       setผลAI(null)
       วิเคราะห์AIจริง(file)   // ✅ เรียก AI จริงแทน mock
       ปิดกล้อง()
@@ -425,9 +460,7 @@ function ReportAnimal({ user }) {
       if (uploadError) {
         // อัปโหลดรูปไม่สำเร็จ — ต้องแจ้งผู้ใช้ทันที ไม่งั้นรายงานจะถูกส่งแบบไม่มีรูปโดยไม่มีใครรู้ตัว
         setกำลังส่ง(false)
-        const ส่งต่อไม่มีรูป = confirm(
-          `อัปโหลดรูปภาพไม่สำเร็จ (${uploadError.message})\nต้องการส่งรายงานต่อโดยไม่มีรูปหรือไม่?`
-        )
+        const ส่งต่อไม่มีรูป = await ถามยืนยันส่งไม่มีรูป(ข้อความError(uploadError, 'อัปโหลดรูป'))
         if (!ส่งต่อไม่มีรูป) return
         setกำลังส่ง(true)
       } else {
@@ -546,6 +579,8 @@ function ReportAnimal({ user }) {
 
     setแสดงModalซ้ำ(false)
     setรหัสรายงาน(เคสซ้ำ.id)
+    setแนบเข้าเคสเดิม(true)
+    setSถานะเคสที่แนบ(เคสซ้ำ.status || 'รอดำเนินการ')
     setส่งสำเร็จ(true)
   }
 
@@ -599,9 +634,20 @@ function ReportAnimal({ user }) {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center px-6 text-center">
         <CheckCircle2 size={72} strokeWidth={1.5} className="text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">แจ้งสำเร็จแล้ว!</h2>
-        <p className="text-gray-600 mb-1 font-medium">เดี๋ยวจะมีเจ้าหน้าที่ติดต่อกลับในไม่ช้า</p>
-        <p className="text-gray-400 text-sm mb-6">กรุณาเตรียมรับสาย / ข้อความจากเจ้าหน้าที่</p>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          {แนบเข้าเคสเดิม ? 'แนบข้อมูลเรียบร้อย!' : 'แจ้งสำเร็จแล้ว!'}
+        </h2>
+        {แนบเข้าเคสเดิม ? (
+          <>
+            <p className="text-gray-600 mb-1 font-medium">ข้อมูลของคุณถูกส่งให้เจ้าหน้าที่แล้ว</p>
+            <p className="text-gray-400 text-sm mb-6">เคสนี้มีผู้แจ้งไว้ก่อนแล้ว เจ้าหน้าที่จะติดต่อผู้แจ้งคนแรกเป็นหลัก</p>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-600 mb-1 font-medium">เดี๋ยวจะมีเจ้าหน้าที่ติดต่อกลับในไม่ช้า</p>
+            <p className="text-gray-400 text-sm mb-6">กรุณาเตรียมรับสาย / ข้อความจากเจ้าหน้าที่</p>
+          </>
+        )}
         <div className="bg-white rounded-2xl p-4 w-full max-w-xs mb-6 shadow-sm">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-500">รหัสรายงาน</span>
@@ -609,13 +655,16 @@ function ReportAnimal({ user }) {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">สถานะ</span>
-            <span className="text-yellow-600 font-medium">รอดำเนินการ</span>
+            {/* เคสที่แนบเข้าไปอาจเดินไปไกลกว่า "รอดำเนินการ" แล้ว — ต้องแสดงสถานะจริง ไม่ใช่ค่าตายตัว */}
+            <span className="text-yellow-600 font-medium">{แนบเข้าเคสเดิม ? สถานะเคสที่แนบ : 'รอดำเนินการ'}</span>
           </div>
         </div>
-        <button onClick={() => navigate('/track')}
-          className="bg-orange-500 text-white px-8 py-3 rounded-xl font-medium mb-3">
-          ติดตามสถานะรายงาน
-        </button>
+        {!แนบเข้าเคสเดิม && (
+          <button onClick={() => navigate('/track')}
+            className="bg-orange-500 text-white px-8 py-3 rounded-xl font-medium mb-3">
+            ติดตามสถานะรายงาน
+          </button>
+        )}
         <button onClick={() => navigate('/home')} className="text-gray-500 text-sm">
           กลับหน้าหลัก
         </button>
@@ -760,6 +809,37 @@ function ReportAnimal({ user }) {
             <p className="text-center text-xs text-gray-400 mt-3">
               ข้อมูลนี้จะถูกเก็บไว้ในโปรไฟล์ของคุณ
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          SHEET: อัปโหลดรูปไม่สำเร็จ — จะส่งรายงานต่อโดยไม่มีรูปไหม
+          ============================================================ */}
+      {ถามส่งไม่มีรูป && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-end">
+          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8">
+            <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+
+            <div className="text-center mb-5">
+              <AlertTriangle size={40} strokeWidth={1.5} className="text-orange-500 mx-auto mb-2" />
+              <h2 className="text-lg font-bold text-gray-800">แนบรูปภาพไม่สำเร็จ</h2>
+              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                {ถามส่งไม่มีรูป}
+              </p>
+              <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                ยังส่งรายงานต่อได้โดยไม่มีรูป แต่เจ้าหน้าที่จะระบุตัวสัตว์ได้ยากขึ้น
+              </p>
+            </div>
+
+            <button onClick={() => ตอบยืนยันส่งไม่มีรูป(true)}
+              className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-bold text-base flex items-center justify-center gap-2">
+              <CheckCircle2 size={18} className="shrink-0" /> ส่งต่อโดยไม่มีรูป
+            </button>
+            <button onClick={() => ตอบยืนยันส่งไม่มีรูป(false)}
+              className="w-full mt-2 border-2 border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm">
+              ยกเลิก แล้วลองแนบรูปใหม่
+            </button>
           </div>
         </div>
       )}

@@ -11,6 +11,7 @@ import {
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+import LoadFailed from '../components/LoadFailed'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 
@@ -211,6 +212,9 @@ function TrackReport({ user }) {
 
   const [รายการรายงาน, setรายการรายงาน] = useState([])
   const [กำลังโหลด,    setกำลังโหลด]    = useState(true)
+  // อ่านรายงานไม่ได้ ≠ ไม่มีรายงาน — ผู้แจ้งที่เห็น "คุณยังไม่มีรายงาน" ตอนเน็ตหลุด
+  // จะเข้าใจว่าเรื่องที่แจ้งไปหายจากระบบ แล้วแจ้งซ้ำอีกใบ
+  const [โหลดพลาด,     setโหลดพลาด]     = useState(false)
 
   // Tab: 'in-progress' = กำลังดำเนินการ, 'history' = ประวัติการแจ้ง (ปิดเคสแล้ว)
   const [แท็บ, setแท็บ] = useState('in-progress')
@@ -218,7 +222,6 @@ function TrackReport({ user }) {
   // Bottom sheet
   const [รายงานที่เปิด,   setรายงานที่เปิด]   = useState(null)
   const [ข้อมูลศูนย์,     setข้อมูลศูนย์]     = useState(null)   // volunteer + shelter info
-  const [โหลดศูนย์,      setโหลดศูนย์]      = useState(false)
 
   // แก้ไข/ยกเลิก — ทำได้เฉพาะตอนสถานะยัง "รอดำเนินการ" (เจ้าหน้าที่ยังไม่รับเรื่อง)
   const [โหมดแก้ไข,       setโหมดแก้ไข]       = useState(false)
@@ -237,20 +240,29 @@ function TrackReport({ user }) {
   const { toast, toastError, ToastHost } = useToast()
 
   // ดึงรายงาน
-  useEffect(function () {
-    async function ดึงรายงาน() {
-      if (!user?.id) { setกำลังโหลด(false); return }
-      setกำลังโหลด(true)
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('reporter_id', user.id)
-        .order('created_at', { ascending: false })
-      if (!error) setรายการรายงาน(data)
-      setกำลังโหลด(false)
+  async function ดึงรายงาน() {
+    if (!user?.id) { setกำลังโหลด(false); return }
+    setกำลังโหลด(true)
+    setโหลดพลาด(false)
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('reporter_id', user.id)
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error('ดึงรายงานของผู้ใช้ไม่สำเร็จ:', error.message)
+      setโหลดพลาด(true)
+    } else {
+      setรายการรายงาน(data || [])
     }
+    setกำลังโหลด(false)
+  }
+
+  // ต้องผูกกับ user?.id ไม่ใช่ [] — ตอนเปิดแอปจากการแตะแจ้งเตือนบนมือถือ หน้านี้ถูก mount
+  // ได้ก่อน session จะพร้อม ถ้าไม่ยิงซ้ำตอน user มาถึง หน้าจะค้างที่ "คุณยังไม่มีรายงาน" ตลอด
+  useEffect(function () {
     ดึงรายงาน()
-  }, [])
+  }, [user?.id])
 
   // ดึงข้อมูลศูนย์/เจ้าหน้าที่ครั้งเดียวตอนโหลด
   useEffect(function () {
@@ -403,7 +415,7 @@ function TrackReport({ user }) {
       </div>
 
       {/* Tabs — กำลังดำเนินการ / ประวัติการแจ้ง (แสดงเมื่อมีรายงานอย่างน้อย 1 รายการ) */}
-      {รายการรายงาน.length > 0 && (
+      {!โหลดพลาด && รายการรายงาน.length > 0 && (
         <TabsNav
           active={แท็บ}
           onChange={setแท็บ}
@@ -414,8 +426,13 @@ function TrackReport({ user }) {
 
       <div className="px-4 pt-4 space-y-4">
 
+        {/* อ่านข้อมูลไม่ได้ — ต้องมาก่อน empty state เสมอ ไม่งั้นจะบอกผู้แจ้งผิดว่าไม่มีรายงาน */}
+        {!กำลังโหลด && โหลดพลาด && (
+          <LoadFailed onRetry={ดึงรายงาน} สิ่งที่โหลด="รายงานของคุณ" สี="orange" />
+        )}
+
         {/* ไม่มีรายงานเลยสักรายการ */}
-        {!กำลังโหลด && รายการรายงาน.length === 0 && (
+        {!กำลังโหลด && !โหลดพลาด && รายการรายงาน.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 text-center">
             <ClipboardList size={56} strokeWidth={1.5} className="text-gray-300 mb-4" />
             <p className="text-gray-600 font-semibold">คุณยังไม่มีรายงาน</p>
@@ -428,7 +445,7 @@ function TrackReport({ user }) {
         )}
 
         {/* มีรายงาน แต่ไม่มีรายการในแท็บที่เลือกอยู่ */}
-        {!กำลังโหลด && รายการรายงาน.length > 0 && รายการที่แสดง.length === 0 && (
+        {!กำลังโหลด && !โหลดพลาด && รายการรายงาน.length > 0 && รายการที่แสดง.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-16 text-center">
             {แท็บ === 'in-progress' ? <Clock size={48} strokeWidth={1.5} className="text-gray-300 mb-3" /> : <FolderClosed size={48} strokeWidth={1.5} className="text-gray-300 mb-3" />}
             <p className="text-gray-600 font-semibold">

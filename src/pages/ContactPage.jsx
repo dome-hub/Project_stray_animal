@@ -41,7 +41,9 @@ function ContactPage() {
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/home')} className="text-gray-700">
+        {/* ขนาดปุ่มและ aria-label ให้ตรงกับปุ่มย้อนกลับของหน้าอื่นทั้งแอป (เดิมเป็นไอคอนเปล่า 20px กดยากบนมือถือ) */}
+        <button onClick={() => navigate('/home')} aria-label="ย้อนกลับ"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <div>

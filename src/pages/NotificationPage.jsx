@@ -7,6 +7,8 @@ import {
   Clock, Trash2, ArrowLeft
 } from 'lucide-react'
 import { supabase } from '../supabase'
+import { useToast } from '../components/useToast'
+import { ข้อความError } from '../utils/errorMessage'
 
 // parse string เป็น UTC เสมอ — ถ้าไม่มี timezone suffix ให้ต่อ Z เข้าไป
 function parseUTC(str) {
@@ -111,6 +113,7 @@ function NotificationPage({ user }) {
   const [รายการ, setรายการ]   = useState([])
   const [โหลด, setโหลด]       = useState(true)
   const [เมนูเปิด, setเมนูเปิด] = useState(null)   // id ของ item ที่เปิด ⋮ อยู่
+  const { toastError, ToastHost } = useToast()
 
   // volunteer/admin — เก็บ read-state ใน localStorage เพื่อคงค่าข้าม navigate
   const lsKey = `noti_read_${user?.id || 'anon'}`
@@ -258,11 +261,9 @@ function NotificationPage({ user }) {
               path:    '/admin/users',
             }
           })
-        // รวมแล้วเรียงตามเวลาล่าสุด
-        const all = [...reportItems, ...userItems].sort(function (a, b) {
-          return 0  // already sorted by fetch order
-        })
-        setรายการ(all)
+        // รวม 2 แหล่งแล้วปล่อยให้ จัดกลุ่มแจ้งเตือน เรียงตาม created ทีเดียวตอนแสดงผล
+        // (เดิมมี .sort ที่ return 0 เสมอ = ไม่ได้เรียงอะไรเลย ทั้งที่คอมเมนต์บอกว่าเรียงแล้ว)
+        setรายการ([...reportItems, ...userItems])
         setโหลด(false)
       }).catch(function () { setโหลด(false) })
       return
@@ -290,7 +291,14 @@ function NotificationPage({ user }) {
         return prev.map(function (n) { return n.id === item.id ? { ...n, อ่านแล้ว: true } : n })
       })
       if (item.dbId) {
-        await supabase.from('notifications').update({ is_read: true }).eq('id', item.dbId)
+        const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', item.dbId)
+        // เขียนไม่ผ่าน → คืนสถานะเดิม ไม่งั้นผู้ใช้เห็นว่าอ่านแล้วแต่กลับมาอีกทีก็ยังไม่อ่าน
+        if (error) {
+          console.error('ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ:', error.message)
+          setรายการ(function (prev) {
+            return prev.map(function (n) { return n.id === item.id ? { ...n, อ่านแล้ว: false } : n })
+          })
+        }
       }
     } else {
       setอ่านแล้วLocal(function (prev) {
@@ -309,9 +317,15 @@ function NotificationPage({ user }) {
 
   async function อ่านทั้งหมด() {
     if (role === 'user') {
+      const ก่อนหน้า = รายการ
       setรายการ(function (prev) { return prev.map(function (n) { return { ...n, อ่านแล้ว: true } }) })
       if (user?.id) {
-        await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id)
+        const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id)
+        if (error) {
+          // ย้อนกลับทั้งชุด — ไม่งั้นกระดิ่งบนหน้าแรกจะยังขึ้นเลขค้างอยู่ทั้งที่หน้านี้บอกว่าอ่านหมดแล้ว
+          setรายการ(ก่อนหน้า)
+          toastError(ข้อความError(error, 'ทำเครื่องหมายว่าอ่านทั้งหมด'))
+        }
       }
     } else {
       const allIds = รายการ.map(function (n) { return n.id })
@@ -324,9 +338,14 @@ function NotificationPage({ user }) {
   async function ลบแจ้งเตือน(item) {
     setเมนูเปิด(null)
     if (role === 'user') {
-      // ลบจาก DB
+      // ลบจาก DB — ลบไม่ผ่านต้องบอก ไม่ใช่หายจากจอแล้วโผล่กลับมาตอนเปิดหน้าใหม่
       if (item.dbId) {
-        await supabase.from('notifications').delete().eq('id', item.dbId)
+        const { error } = await supabase.from('notifications').delete().eq('id', item.dbId)
+        if (error) {
+          console.error('ลบการแจ้งเตือนไม่สำเร็จ:', error.message)
+          toastError(ข้อความError(error, 'ลบการแจ้งเตือน'))
+          return
+        }
       }
     } else {
       // volunteer/admin — บันทึก ID ที่ลบลง localStorage เพื่อกรองหลัง refresh
@@ -344,6 +363,8 @@ function NotificationPage({ user }) {
 
   return (
     <div className={`min-h-screen ${ธีม.bg} pb-8`} onClick={() => setเมนูเปิด(null)}>
+
+      <ToastHost />
 
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
