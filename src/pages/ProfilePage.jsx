@@ -10,6 +10,7 @@ import {
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
+import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 
@@ -78,6 +79,11 @@ function ProfilePage({ user }) {
   const [แสดงยืนยันลบบัญชี, setแสดงยืนยันลบบัญชี] = useState(false)
   const [กำลังลบบัญชี,      setกำลังลบบัญชี]      = useState(false)
   const [errorลบบัญชี,      setErrorลบบัญชี]      = useState('')
+  // ปุ่ม back ของ Android / Escape / โฟกัส — ดู components/useSheet.js
+  // ห้ามปิดระหว่างกำลังลบ ให้ตรงกับปุ่มยกเลิกที่ disabled อยู่
+  const ชีตลบบัญชี = useSheet(แสดงยืนยันลบบัญชี, function () {
+    if (!กำลังลบบัญชี) setแสดงยืนยันลบบัญชี(false)
+  })
 
   // ---- ข้อมูลแต่ละ Tab ----
   const [ประวัติแจ้ง,    setประวัติแจ้ง]    = useState([])
@@ -574,7 +580,7 @@ function ProfilePage({ user }) {
       {แสดงยืนยันลบบัญชี && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
              onClick={() => { if (!กำลังลบบัญชี) setแสดงยืนยันลบบัญชี(false) }}>
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
+          <div ref={ชีตลบบัญชี} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
                onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <div className="w-7" />

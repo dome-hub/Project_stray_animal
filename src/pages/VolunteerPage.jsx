@@ -25,6 +25,7 @@ import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fi
 import AnimalIcon from '../components/AnimalIcon'
 import BreedInput from '../components/BreedInput'
 import LoadFailed from '../components/LoadFailed'
+import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 import { หมุดสี } from '../utils/mapMarker'
@@ -507,6 +508,17 @@ function VolunteerPage({ หน้า }) {
   const [โฟกัสจุด, setโฟกัสจุด]     = useState(null)   // { lat, lng } ที่ให้แผนที่บินไป
   const [ตำแหน่งฉัน, setตำแหน่งฉัน] = useState(null)   // { lat, lng } ของเจ้าหน้าที่ — ใช้เรียงเคสใกล้สุดก่อน
   const [กำลังหาตำแหน่ง, setกำลังหาตำแหน่ง] = useState(false)
+
+  // ---- ปุ่ม back ของ Android / Escape / โฟกัส (ดู components/useSheet.js) ----
+  // sheet รายละเอียดกับอัปเดตใช้ state ตัวเดียวกัน แยกกันด้วยหน้าที่เปิดอยู่ จึงต้องแยก 2 ตัว
+  const ชีตรายละเอียด = useSheet(!!รายงานที่เปิด && (หน้า === 'reports' || หน้า === 'map'), ปิดรายละเอียด)
+  const ชีตอัปเดต     = useSheet(!!รายงานที่เปิด && หน้า === 'update', ปิดรายละเอียด)
+  const ชีตรวมเคส     = useSheet(แสดงModalรวมเคส && !!เคสที่จะรวม, function () {
+    if (!กำลังรวมเคส) ปิดรวมเคส()
+  })
+  const ชีตแก้ไขสัตว์ = useSheet(!!สัตว์ที่แก้ไข, function () {
+    if (!กำลังบันทึกสัตว์ && !กำลังอัปโหลดรูป) ปิดแก้ไขสัตว์()
+  })
 
   // ================================================================
   // FETCH
@@ -2106,7 +2118,7 @@ function VolunteerPage({ หน้า }) {
           ============================================================ */}
       {รายงานที่เปิด && (หน้า === 'reports' || หน้า === 'map') && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={ปิดรายละเอียด}>
-          <div className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
+          <div ref={ชีตรายละเอียด} className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
             <div className="flex items-center justify-between px-5 py-3">
@@ -2243,7 +2255,7 @@ function VolunteerPage({ หน้า }) {
           ============================================================ */}
       {รายงานที่เปิด && หน้า === 'update' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={ปิดรายละเอียด}>
-          <div className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
+          <div ref={ชีตอัปเดต} className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
             <div className="flex items-center justify-between px-5 py-3">
@@ -2430,7 +2442,7 @@ function VolunteerPage({ หน้า }) {
         return (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-end"
                onClick={ปิดรวมเคส}>
-            <div className="bg-white w-full rounded-t-3xl max-h-[85vh] overflow-y-auto"
+            <div ref={ชีตรวมเคส} className="bg-white w-full rounded-t-3xl max-h-[85vh] overflow-y-auto"
                  onClick={function (e) { e.stopPropagation() }}>
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
               <div className="flex items-center justify-between px-5 py-3">
@@ -2522,7 +2534,7 @@ function VolunteerPage({ หน้า }) {
       {สัตว์ที่แก้ไข && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
              onClick={ปิดแก้ไขสัตว์}>
-          <div className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
+          <div ref={ชีตแก้ไขสัตว์} className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 

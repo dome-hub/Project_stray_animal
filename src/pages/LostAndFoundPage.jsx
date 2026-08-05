@@ -21,6 +21,7 @@ import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
+import { useSheet } from '../components/useSheet'
 
 // เบอร์ไทย 10 หลักขึ้นต้น 0 — เกณฑ์เดียวกับหน้าโปรไฟล์และตอนแจ้งสัตว์จร
 // สำคัญกว่าที่อื่นด้วยซ้ำ เพราะเบอร์นี้คือช่องทางเดียวที่คนพบสัตว์จะติดต่อเจ้าของได้
@@ -188,6 +189,7 @@ function MapMoveTracker({ onMoveEnd }) {
 function Modalเลือกพิกัด({ ตำแหน่งเริ่มต้น, onConfirm, onClose }) {
   const [center, setCenter] = useState(ตำแหน่งเริ่มต้น)
   const [กำลังหาGPS, setกำลังหาGPS] = useState(!ตำแหน่งเริ่มต้น)
+  const ชีต = useSheet(true, onClose)   // mount เฉพาะตอนเปิดอยู่แล้ว
 
   // ยังไม่มีพิกัดเริ่มต้น → ขอ GPS ปัจจุบันมาเป็นจุดกึ่งกลางทันที
   useEffect(function () {
@@ -213,7 +215,7 @@ function Modalเลือกพิกัด({ ตำแหน่งเริ่
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+    <div ref={ชีต} className="fixed inset-0 z-[60] bg-white flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <button onClick={onClose} aria-label="ปิด" className="w-8 h-8 flex items-center justify-center text-gray-500">
           <X size={20} />
@@ -373,6 +375,7 @@ const ศูนย์ดูแล = {
 // (แทนการพาไปหน้าติดตามรายงาน ซึ่งเป็นมุมมองของผู้แจ้ง ไม่ใช่ผู้ตามหาเจ้าของ)
 // ================================================================
 function FoundPetDetailModal({ สัตว์, onClose }) {
+  const ชีต = useSheet(true, onClose)
   const รูปทั้งหมด = (สัตว์.รูปทั้งหมด || []).filter(Boolean)
   const มีหลายรูป = รูปทั้งหมด.length > 1
   const ที่ศูนย์ = สัตว์.ที่ศูนย์
@@ -396,7 +399,7 @@ function FoundPetDetailModal({ สัตว์, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center sm:justify-center" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto"
+      <div ref={ชีต} className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto"
            onClick={function (e) { e.stopPropagation() }}>
 
         {/* รูปภาพ — เลื่อนดูได้ถ้ามีหลายรูป */}
@@ -557,6 +560,7 @@ function FoundPetDetailModal({ สัตว์, onClose }) {
 // ================================================================
 function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
   const inputรูป = useRef(null)
+  const ชีต = useSheet(true, onClose)
 
   const [ชื่อสัตว์,   setชื่อสัตว์]   = useState('')
   const [ชนิด,       setชนิด]       = useState('')
@@ -648,7 +652,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={onClose}>
-      <div className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
+      <div ref={ชีต} className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
            onClick={function (e) { e.stopPropagation() }}>
 
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
@@ -812,6 +816,16 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
   const [แสดงยืนยันลบ, setแสดงยืนยันลบ] = useState(false)
   const [กำลังลบ,      setกำลังลบ]      = useState(false)
 
+  // ปุ่ม back ของ Android / Escape / โฟกัส — ดู components/useSheet.js
+  // sheet ยืนยันลบซ้อนอยู่บน sheet รายละเอียด กองซ้อนจะปิดตัวบนสุดก่อนเสมอ
+  const ชีตรายละเอียด = useSheet(true, function () {
+    if (โหมดแก้ไข) ปิดโหมดแก้ไข()   // อยู่ในโหมดแก้ไข → ถอยเป็นโหมดดูก่อน ไม่ปิดทั้ง sheet
+    else onClose()
+  })
+  const ชีตยืนยันลบ = useSheet(แสดงยืนยันลบ, function () {
+    if (!กำลังลบ) setแสดงยืนยันลบ(false)
+  })
+
   function เปิดโหมดแก้ไข() {
     setชื่อสัตว์(โพสต์.pet_name || '')
     setชนิด(โพสต์.species || '')
@@ -913,7 +927,7 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={onClose}>
-        <div className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
+        <div ref={ชีตรายละเอียด} className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
              onClick={function (e) { e.stopPropagation() }}>
 
           {/* Handle */}
@@ -1178,7 +1192,7 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
       {/* Modal ยืนยันลบ */}
       {แสดงยืนยันลบ && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-end" onClick={() => setแสดงยืนยันลบ(false)}>
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8" onClick={function (e) { e.stopPropagation() }}>
+          <div ref={ชีตยืนยันลบ} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8" onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 
             <div className="text-center mb-5">

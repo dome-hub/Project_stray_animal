@@ -14,6 +14,7 @@ import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import BreedInput from '../components/BreedInput'
+import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 
@@ -84,6 +85,8 @@ function จับการเลื่อนแผนที่({ onMoveEnd }) {
 function LocationPickerModal({ ตำแหน่งเริ่มต้น, กำลังยืนยัน, onConfirm, onClose }) {
   const [center, setCenter] = useState(ตำแหน่งเริ่มต้น)
   const [กำลังหาGPS, setกำลังหาGPS] = useState(!ตำแหน่งเริ่มต้น)
+  // component นี้ถูก mount เฉพาะตอนเปิดอยู่แล้ว จึงส่ง true ตรงๆ
+  const ชีต = useSheet(true, onClose)
 
   // โหลดโมดัลแล้วยังไม่มีพิกัดเริ่มต้น → ขอ GPS ปัจจุบันมาเป็นจุดกึ่งกลางแผนที่ทันที
   useEffect(function () {
@@ -108,7 +111,7 @@ function LocationPickerModal({ ตำแหน่งเริ่มต้น, �
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+    <div ref={ชีต} className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <button onClick={onClose} aria-label="ปิด" className="w-8 h-8 flex items-center justify-center text-gray-500">
@@ -242,6 +245,16 @@ function ReportAnimal({ user }) {
   const [กำลังบันทึกโทรศัพท์,   setกำลังบันทึกโทรศัพท์]   = useState(false)
   const [errorโทรศัพท์,          setErrorโทรศัพท์]          = useState('')
   const [ต้องกรอกเบอร์,          setต้องกรอกเบอร์]          = useState(false)
+
+  // ---- ปุ่ม back ของ Android / Escape / โฟกัส (ดู components/useSheet.js) ----
+  // กล้องปิดด้วย ปิดกล้อง() เสมอ เพราะต้องหยุด MediaStream ไม่ใช่แค่ซ่อน UI
+  const ชีตกล้อง    = useSheet(แสดงกล้อง, ปิดกล้อง)
+  const ชีตโทรศัพท์ = useSheet(แสดงModalโทรศัพท์, function () { setแสดงModalโทรศัพท์(false) })
+  // 2 อันนี้ต้องเลือกอย่างใดอย่างหนึ่ง กดย้อนกลับให้ถือเป็น "ยกเลิก" (ไม่ส่ง/ไม่แนบ)
+  const ชีตไม่มีรูป = useSheet(!!ถามส่งไม่มีรูป, function () { ตอบยืนยันส่งไม่มีรูป(false) })
+  const ชีตเคสซ้ำ   = useSheet(แสดงModalซ้ำ && !!เคสซ้ำ, function () {
+    if (!กำลังรวมเคส && !กำลังส่ง) setแสดงModalซ้ำ(false)
+  })
 
   // cleanup stream เมื่อ component unmount
   useEffect(function () {
@@ -688,7 +701,7 @@ function ReportAnimal({ user }) {
 
       {/* Camera Modal */}
       {แสดงกล้อง && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div ref={ชีตกล้อง} className="fixed inset-0 z-50 bg-black flex flex-col">
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 bg-black/60">
             <button onClick={ปิดกล้อง} className="inline-flex items-center gap-1.5 text-white text-sm px-3 py-2 bg-white/20 rounded-full">
@@ -751,7 +764,7 @@ function ReportAnimal({ user }) {
       {แสดงModalโทรศัพท์ && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end"
              onClick={() => setแสดงModalโทรศัพท์(false)}>
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-10"
+          <div ref={ชีตโทรศัพท์} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-10"
                onClick={function (e) { e.stopPropagation() }}>
 
             {/* handle + ปุ่มปิด */}
@@ -818,7 +831,7 @@ function ReportAnimal({ user }) {
           ============================================================ */}
       {ถามส่งไม่มีรูป && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-end">
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8">
+          <div ref={ชีตไม่มีรูป} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8">
             <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 
             <div className="text-center mb-5">
@@ -849,7 +862,7 @@ function ReportAnimal({ user }) {
           ============================================================ */}
       {แสดงModalซ้ำ && เคสซ้ำ && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8">
+          <div ref={ชีตเคสซ้ำ} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8">
             <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 
             <div className="text-center mb-4">

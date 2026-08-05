@@ -9,6 +9,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import UrgentLostPetsBanner from '../components/UrgentLostPetsBanner'
+import { useSheet } from '../components/useSheet'
 
 // โทนสีหลักของแต่ละ role — ผู้ใช้ทั่วไป = ส้ม (อบอุ่น/ขอความช่วยเหลือ), เจ้าหน้าที่ = ทีล (มืออาชีพ/น่าเชื่อถือ), แอดมิน = ม่วง
 const โทนRole = {
@@ -71,6 +72,8 @@ function Home({ user, onLogout }) {
 
   // ยืนยันก่อนออกจากระบบ กันกดพลาด
   const [แสดงยืนยันออก, setแสดงยืนยันออก] = useState(false)
+  // ปุ่ม back ของ Android / Escape / โฟกัส — ดู components/useSheet.js
+  const ชีตออกจากระบบ = useSheet(แสดงยืนยันออก, function () { setแสดงยืนยันออก(false) })
 
   // ดึง avatar_url ใหม่ทุกครั้งที่กลับมาหน้า Home
   const [avatarUrl, setAvatarUrl] = useState(null)
@@ -275,6 +278,7 @@ function Home({ user, onLogout }) {
           onClick={() => setแสดงยืนยันออก(false)}
         >
           <div
+            ref={ชีตออกจากระบบ}
             className="bg-white w-full max-w-xs rounded-3xl shadow-xl p-6 text-center"
             onClick={(e) => e.stopPropagation()}
           >

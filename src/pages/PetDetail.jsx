@@ -10,6 +10,7 @@ import {
 import { supabase } from '../supabase'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
+import { useSheet } from '../components/useSheet'
 
 // แปลงแถวจากตาราง animals เป็นรูปแบบที่หน้านี้ใช้ — ต้องตรงกับที่ FindPet ส่งมาทาง router state
 // เพราะหน้านี้รับข้อมูลได้ 2 ทาง: กดมาจากการ์ด (มี state) หรือเปิด URL ตรงๆ (ต้องดึงเอง)
@@ -133,6 +134,8 @@ function PetDetail() {
   const [ศูนย์,       setศูนย์]       = useState(null)
   const [โหลดศูนย์,   setโหลดศูนย์]   = useState(true)
   const [แสดงContact, setแสดงContact] = useState(false)
+  // ปุ่ม back ของ Android / Escape / โฟกัส — ดู components/useSheet.js
+  const ชีตติดต่อ = useSheet(แสดงContact, function () { setแสดงContact(false) })
 
   useEffect(function () {
     supabase
@@ -378,7 +381,7 @@ function PetDetail() {
       {แสดงContact && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
              onClick={() => setแสดงContact(false)}>
-          <div className="bg-white w-full rounded-t-3xl"
+          <div ref={ชีตติดต่อ} className="bg-white w-full rounded-t-3xl"
                onClick={function (e) { e.stopPropagation() }}>
 
             {/* Handle */}

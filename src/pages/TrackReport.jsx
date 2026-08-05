@@ -12,6 +12,7 @@ import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
+import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 
@@ -238,6 +239,10 @@ function TrackReport({ user }) {
   // toast ย้ายไปใช้ตัวกลาง components/useToast.jsx แล้ว — เดิมหน้านี้มีของตัวเอง
   // ซึ่งแสดงได้แต่ข้อความสำเร็จ ทำให้ทุก error ต้องไปลง alert() ของเบราว์เซอร์แทน
   const { toast, toastError, ToastHost } = useToast()
+
+  // ปุ่ม back ของ Android / Escape / โฟกัส — จัดการรวมที่ components/useSheet.js
+  const ชีตรายละเอียด = useSheet(!!รายงานที่เปิด, ปิดรายละเอียด)
+  const ชีตยกเลิก     = useSheet(แสดงModalยกเลิก, function () { setแสดงModalยกเลิก(false) })
 
   // ดึงรายงาน
   async function ดึงรายงาน() {
@@ -528,7 +533,7 @@ function TrackReport({ user }) {
           ============================================================ */}
       {รายงานที่เปิด && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={ปิดรายละเอียด}>
-          <div className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
+          <div ref={ชีตรายละเอียด} className="bg-white w-full rounded-t-3xl max-h-[90vh] overflow-y-auto"
                onClick={function (e) { e.stopPropagation() }}>
 
             {/* Handle */}
@@ -778,7 +783,7 @@ function TrackReport({ user }) {
       {แสดงModalยกเลิก && รายงานที่เปิด && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-end"
              onClick={() => setแสดงModalยกเลิก(false)}>
-          <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
+          <div ref={ชีตยกเลิก} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
                onClick={function (e) { e.stopPropagation() }}>
             <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 

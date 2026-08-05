@@ -19,6 +19,7 @@ import { supabase } from '../supabase'
 import { หมุดสี } from '../utils/mapMarker'
 import { useToast } from '../components/useToast'
 import LoadFailed from '../components/LoadFailed'
+import { useSheet } from '../components/useSheet'
 import { ข้อความError } from '../utils/errorMessage'
 
 // ใส่เครื่องหมาย ' นำหน้าค่าที่ขึ้นต้นด้วย = + - @ (และ tab/CR) ก่อนเขียนลง CSV
@@ -122,6 +123,15 @@ function AdminPage({ หน้า, user }) {
   // { type: 'role', newRole } | { type: 'suspend' } | { type: 'unsuspend' } — ผูกกับ userที่เลือก เสมอ
   const [actionรอยืนยัน, setActionรอยืนยัน] = useState(null)
   const [กำลังยืนยัน,    setกำลังยืนยัน]    = useState(false)
+
+  // ---- ปุ่ม back ของ Android / Escape / โฟกัส (ดู components/useSheet.js) ----
+  // sheet ยืนยันซ้อนอยู่บน sheet รายละเอียดผู้ใช้ กองซ้อนจะปิดตัวบนสุดก่อนเสมอ
+  const ชีตรายละเอียดผู้ใช้ = useSheet(!!userที่เลือก, function () {
+    setUserที่เลือก(null); setActionรอยืนยัน(null)
+  })
+  const ชีตยืนยัน = useSheet(!!actionรอยืนยัน, function () {
+    if (!กำลังยืนยัน) setActionรอยืนยัน(null)
+  })
 
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
@@ -1059,7 +1069,7 @@ function AdminPage({ หน้า, user }) {
           <div className="absolute inset-0 bg-black/40" onClick={() => { setUserที่เลือก(null); setActionรอยืนยัน(null) }} />
 
           {/* Sheet */}
-          <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+          <div ref={ชีตรายละเอียดผู้ใช้} className="relative bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
@@ -1246,7 +1256,7 @@ function AdminPage({ หน้า, user }) {
         return (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-end"
                onClick={() => !กำลังยืนยัน && setActionรอยืนยัน(null)}>
-            <div className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
+            <div ref={ชีตยืนยัน} className="bg-white w-full rounded-t-3xl px-5 pt-4 pb-8"
                  onClick={function (e) { e.stopPropagation() }}>
               <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
 
