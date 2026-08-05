@@ -477,6 +477,9 @@ function VolunteerPage({ หน้า }) {
   const [ข้อมูลรายงานสัตว์,  setข้อมูลรายงานสัตว์]  = useState(null)   // { report + reporter }
   const [โหลดรายงานสัตว์,   setโหลดรายงานสัตว์]   = useState(false)
   const [แสดงฟอร์มเพิ่ม, setแสดงฟอร์มเพิ่ม] = useState(false)
+  // กันกดซ้ำระหว่างรอเซิร์ฟเวอร์ — เน็ตภาคสนามช้า เจ้าหน้าที่กดย้ำเป็นเรื่องปกติ
+  // ถ้าไม่กัน ปุ่ม "บันทึกข้อมูลสัตว์" จะสร้างสัตว์ซ้ำเป็นใบที่สอง
+  const [กำลังบันทึกสัตว์, setกำลังบันทึกสัตว์] = useState(false)
   const [กำลังอัปโหลดรูป,   setกำลังอัปโหลดรูป]   = useState(false)   // กำลังอัปโหลดรูปเข้าคลังอยู่ไหม
   const inputรูปสัตว์ = useRef(null)
   const [ชื่อสัตว์,       setชื่อสัตว์]       = useState('')
@@ -665,8 +668,11 @@ function VolunteerPage({ หน้า }) {
 
     setกำลังExport(true)
     let query = supabase.from('animals').select('*').order('created_at', { ascending: false })
-    if (วันที่เริ่ม)   query = query.gte('created_at', `${วันที่เริ่ม}T00:00:00`)
-    if (วันที่สิ้นสุด) query = query.lte('created_at', `${วันที่สิ้นสุด}T23:59:59`)
+    // ต้องระบุ +07:00 ให้ชัด — created_at เป็น timestamptz ถ้าส่งเวลาลอยๆ ไปฐานข้อมูลจะอ่านเป็น UTC
+    // เจ้าหน้าที่เลือก "1 ส.ค." แล้วได้เที่ยงคืน UTC = 07:00 น. ตามเวลาไทย
+    // ผลคือรายการที่เข้ามาช่วงตี 0 ถึง 7 โมงเช้าของวันที่เลือก หายไปจากไฟล์รายงานทั้งหมด
+    if (วันที่เริ่ม)   query = query.gte('created_at', `${วันที่เริ่ม}T00:00:00+07:00`)
+    if (วันที่สิ้นสุด) query = query.lte('created_at', `${วันที่สิ้นสุด}T23:59:59+07:00`)
     const { data, error } = await query
 
     setกำลังExport(false)
@@ -674,12 +680,21 @@ function VolunteerPage({ หน้า }) {
     // ช่วงวันที่ที่ไม่มีข้อมูลไม่ใช่ความผิดพลาด — เป็นคำตอบ จึงใช้ toast กลางไม่ใช่สีแดง
     if (!data || data.length === 0) { toast('ไม่มีข้อมูลสัตว์ในช่วงวันที่ที่เลือก'); return }
 
-    const headers = Object.keys(data[0]).join(',')
-    const rows = data.map((row) =>
-      Object.values(row)
-        .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
-        .join(',')
-    )
+    // ใส่เครื่องหมาย ' นำหน้าค่าที่ขึ้นต้นด้วย = + - @ (และ tab/CR)
+    // Excel ตีความช่องที่ขึ้นต้นด้วยอักขระพวกนี้เป็น "สูตร" ถึงจะครอบด้วย " แล้วก็ตาม
+    // ข้อมูลหลายช่องมาจากที่ประชาชนพิมพ์เอง (สายพันธุ์/รายละเอียดจากรายงาน) จึงเชื่อไม่ได้
+    // ถ้าไม่กัน ไฟล์ที่เจ้าหน้าที่ อบต. เปิดใน Excel จะรันสูตรที่คนนอกเป็นคนเขียนให้
+    function กันสูตรExcel(ค่า) {
+      const s = String(ค่า ?? '')
+      return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+    }
+    const ช่อง = (v) => `"${กันสูตรExcel(v).replace(/"/g, '""')}"`
+
+    const คอลัมน์ = Object.keys(data[0])
+    const headers = คอลัมน์.map(ช่อง).join(',')
+    // อ่านค่าตามลำดับคอลัมน์ที่กำหนดไว้ ไม่ใช่ Object.values ของแต่ละแถว
+    // กันคอลัมน์เหลื่อมกันถ้าแถวไหนมีคีย์ไม่ครบ
+    const rows = data.map((row) => คอลัมน์.map((k) => ช่อง(row[k])).join(','))
     const csv = '﻿' + [headers, ...rows].join('\n') // BOM สำหรับ Excel ภาษาไทย
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
@@ -736,37 +751,59 @@ function VolunteerPage({ หน้า }) {
     setกำลังรับเรื่อง(true)
 
     const report = รายงานที่เปิด
-    const { error } = await supabase
+    // .eq('status','รอดำเนินการ') + .select() = กันเพื่อนร่วมงานแย่งเคสกันเอง
+    // เจ้าหน้าที่หลายคนเปิดรายการเดียวกันค้างไว้ได้ ถ้าอีกคนกดรับไปแล้วเราต้องรู้ ไม่ใช่ทับสถานะเขา
+    const { data: อัปเดตแล้ว, error } = await supabase
       .from('reports')
       .update({ status: 'รับเรื่องแล้ว', updated_at: new Date().toISOString() })
       .eq('id', report.id)
+      .eq('status', 'รอดำเนินการ')
+      .select('id')
 
-    if (!error) {
-      // ส่ง notification ให้ผู้แจ้ง
-      if (report.reporter_id) {
-        const { error: notiErr } = await supabase.from('notifications').insert({
-          user_id: report.reporter_id,
-          title:   'เจ้าหน้าที่รับเรื่องแล้ว 🦺',
-          body:    `รายงาน #${String(report.id).padStart(6, '0')} ของคุณได้รับการดูแลแล้ว เจ้าหน้าที่จะลงพื้นที่เพื่อรับสัตว์โดยเร็ว`,
-          type:    'report_update',
-          is_read: false,
-        })
-        if (notiErr) console.error('ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
-        else console.log('ส่ง notification ให้ผู้แจ้งสำเร็จ (reporter_id:', report.reporter_id, ')')
-      }
-      // อัปเดต local state
-      setรายงานทั้งหมด(function (prev) {
-        return prev.map(function (r) {
-          return r.id === report.id ? { ...r, status: 'รับเรื่องแล้ว' } : r
-        })
-      })
-      setรายงานที่เปิด(function (prev) {
-        return prev ? { ...prev, status: 'รับเรื่องแล้ว' } : prev
-      })
-      toast('รับเรื่องสำเร็จ! แจ้งเตือนผู้แจ้งแล้ว')
-    } else {
+    if (error) {
       toastError(ข้อความError(error, 'รับเรื่อง'))
+      setกำลังรับเรื่อง(false)
+      return
     }
+
+    if (!อัปเดตแล้ว || อัปเดตแล้ว.length === 0) {
+      // ไม่มีแถวไหนถูกแก้ = สถานะไม่ใช่ "รอดำเนินการ" แล้ว แปลว่ามีคนรับไปก่อน
+      toastError('เคสนี้มีเจ้าหน้าที่คนอื่นรับเรื่องไปแล้ว กรุณารีเฟรชรายการ')
+      setกำลังรับเรื่อง(false)
+      ปิดรายละเอียด()
+      ดึงรายงาน()
+      return
+    }
+
+    // ส่ง notification ให้ผู้แจ้ง
+    let แจ้งเตือนพลาด = false
+    if (report.reporter_id) {
+      const { error: notiErr } = await supabase.from('notifications').insert({
+        user_id: report.reporter_id,
+        title:   'เจ้าหน้าที่รับเรื่องแล้ว 🦺',
+        body:    `รายงาน #${String(report.id).padStart(6, '0')} ของคุณได้รับการดูแลแล้ว เจ้าหน้าที่จะลงพื้นที่เพื่อรับสัตว์โดยเร็ว`,
+        type:    'report_update',
+        is_read: false,
+      })
+      if (notiErr) {
+        console.error('ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+        แจ้งเตือนพลาด = true
+      }
+    }
+
+    // อัปเดต local state
+    setรายงานทั้งหมด(function (prev) {
+      return prev.map(function (r) {
+        return r.id === report.id ? { ...r, status: 'รับเรื่องแล้ว' } : r
+      })
+    })
+    setรายงานที่เปิด(function (prev) {
+      return prev ? { ...prev, status: 'รับเรื่องแล้ว' } : prev
+    })
+
+    // ห้ามบอกว่า "แจ้งเตือนผู้แจ้งแล้ว" ถ้ามันไม่ได้ส่ง — ผู้แจ้งคือชาวบ้านที่กำลังรอข่าวอยู่
+    if (แจ้งเตือนพลาด) toastError('รับเรื่องแล้ว แต่แจ้งเตือนผู้แจ้งไม่สำเร็จ — ควรโทรแจ้งเอง')
+    else toast('รับเรื่องสำเร็จ! แจ้งเตือนผู้แจ้งแล้ว')
     setกำลังรับเรื่อง(false)
   }
 
@@ -792,6 +829,10 @@ function VolunteerPage({ หน้า }) {
       setกำลังบันทึก(false)
       return
     }
+
+    // เก็บสิ่งที่ "พลาดเงียบๆ" ระหว่างทางไว้บอกท้ายสุด — งานพวกนี้ล้มได้โดยที่การอัปเดตสถานะยังสำเร็จ
+    // เดิมมันลง console.error อย่างเดียว เจ้าหน้าที่เห็นแค่ "บันทึกสถานะสำเร็จ!" แล้วเดินจากไป
+    const พลาดเงียบ = []
 
     // ถ้าสถานะถึง "อยู่ศูนย์พักพิง" → สร้างสัตว์ใน animals table อัตโนมัติ
     if (สถานะใหม่ === 'อยู่ศูนย์พักพิง') {
@@ -822,8 +863,11 @@ function VolunteerPage({ หน้า }) {
           publish_mode: โหมดเริ่มต้น,
           is_adoptable: false,
         })
-        if (animalErr) console.error('เพิ่มสัตว์ไม่สำเร็จ:', animalErr.message)
-        else console.log('เพิ่มสัตว์ในระบบอัตโนมัติสำเร็จ (report_id:', report.id, ')')
+        if (animalErr) {
+          // ถ้าเงียบตรงนี้ สัตว์ตัวนี้จะไม่โผล่ในหน้าจัดการข้อมูลสัตว์เลย และไม่มีใครรู้ว่าหายไปตอนไหน
+          console.error('เพิ่มสัตว์ไม่สำเร็จ:', animalErr.message)
+          พลาดเงียบ.push('สร้างประวัติสัตว์ในศูนย์ไม่สำเร็จ — ต้องเพิ่มเองที่หน้าจัดการข้อมูลสัตว์')
+        }
       }
     }
 
@@ -851,8 +895,10 @@ function VolunteerPage({ หน้า }) {
         type:    'report_update',
         is_read: false,
       })
-      if (notiErr) console.error('ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
-      else console.log('ส่ง notification ให้ผู้แจ้งสำเร็จ (reporter_id:', report.reporter_id, ')')
+      if (notiErr) {
+        console.error('ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+        พลาดเงียบ.push('แจ้งเตือนผู้แจ้งไม่สำเร็จ — ควรโทรแจ้งเอง')
+      }
     }
 
     // อัปเดต local state
@@ -863,7 +909,9 @@ function VolunteerPage({ หน้า }) {
           : r
       })
     })
-    toast('บันทึกสถานะสำเร็จ!')
+    // สถานะบันทึกแล้วจริง แต่ถ้ามีงานพ่วงล้ม ต้องไม่ขึ้นข้อความสำเร็จล้วนๆ ให้เข้าใจผิดว่าเรียบร้อยทุกอย่าง
+    if (พลาดเงียบ.length > 0) toastError(`บันทึกสถานะแล้ว แต่ ${พลาดเงียบ.join(' และ ')}`)
+    else toast('บันทึกสถานะสำเร็จ!')
     ปิดรายละเอียด()
     setกำลังบันทึก(false)
   }
@@ -942,7 +990,8 @@ function VolunteerPage({ หน้า }) {
   // Animals: เพิ่ม + แก้ไข
   // ================================================================
   async function บันทึกสัตว์ใหม่() {
-    if (!ชื่อสัตว์ || !เพศสัตว์) return
+    if (!ชื่อสัตว์ || !เพศสัตว์ || กำลังบันทึกสัตว์) return
+    setกำลังบันทึกสัตว์(true)
     const { error } = await supabase.from('animals').insert({
       name:     ชื่อสัตว์,
       gender:   เพศสัตว์,
@@ -963,10 +1012,15 @@ function VolunteerPage({ หน้า }) {
       // เจ้าหน้าที่กดซ้ำไปเรื่อยๆ โดยไม่รู้ว่าทำไมสัตว์ไม่ขึ้นในรายการ
       toastError(ข้อความError(error, 'เพิ่มสัตว์'))
     }
+    setกำลังบันทึกสัตว์(false)
   }
 
   async function บันทึกแก้ไขสัตว์() {
-    if (!สัตว์ที่แก้ไข || กำลังอัปโหลดรูป) return
+    if (!สัตว์ที่แก้ไข || กำลังบันทึกสัตว์) return
+    // กดบันทึกระหว่างรูปยังอัปโหลดไม่เสร็จ เดิมคือ return เงียบๆ — ไม่มีสปินเนอร์ ไม่มีข้อความ
+    // เจ้าหน้าที่กดแล้วไม่มีอะไรเกิดขึ้นเลย ซึ่งอ่านได้อย่างเดียวว่าแอปค้าง
+    if (กำลังอัปโหลดรูป) { toastError('กำลังอัปโหลดรูปอยู่ กรุณารอสักครู่แล้วกดบันทึกอีกครั้ง'); return }
+    setกำลังบันทึกสัตว์(true)
 
     // รูปถูกอัปโหลดเข้า storage ทันทีตอนเลือกแล้ว (ดู เลือกรูปสัตว์ใหม่) — ตรงนี้แค่บันทึก array + cover
     const photos    = Array.isArray(สัตว์ที่แก้ไข.photos) ? สัตว์ที่แก้ไข.photos : []
@@ -1003,6 +1057,7 @@ function VolunteerPage({ หน้า }) {
     } else {
       toastError(ข้อความError(error, 'บันทึกข้อมูลสัตว์'))
     }
+    setกำลังบันทึกสัตว์(false)
   }
 
   // เปิด bottom sheet แก้ไขสัตว์ + ดึงข้อมูลรายงาน/ผู้แจ้ง (ถ้ามาจากรายงาน)
@@ -1601,9 +1656,11 @@ function VolunteerPage({ หน้า }) {
                   })}
                 </select>
               </div>
-              <button onClick={บันทึกสัตว์ใหม่} disabled={!ชื่อสัตว์ || !เพศสัตว์}
-                className="w-full bg-teal-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
-                บันทึกข้อมูลสัตว์
+              <button onClick={บันทึกสัตว์ใหม่} disabled={!ชื่อสัตว์ || !เพศสัตว์ || กำลังบันทึกสัตว์}
+                className="w-full bg-teal-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+                {กำลังบันทึกสัตว์
+                  ? <><Loader2 size={15} className="animate-spin shrink-0" /> กำลังบันทึก...</>
+                  : 'บันทึกข้อมูลสัตว์'}
               </button>
             </div>
           )}
@@ -2938,9 +2995,13 @@ function VolunteerPage({ หน้า }) {
                 )
               })()}
 
-              <button onClick={บันทึกแก้ไขสัตว์}
-                className="md:col-span-2 w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base active:scale-95 transition-all flex items-center justify-center gap-2">
-                <Save size={18} className="shrink-0" /> บันทึกการแก้ไข
+              <button onClick={บันทึกแก้ไขสัตว์} disabled={กำลังบันทึกสัตว์ || กำลังอัปโหลดรูป}
+                className="md:col-span-2 w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2">
+                {กำลังบันทึกสัตว์
+                  ? <><Loader2 size={18} className="animate-spin shrink-0" /> กำลังบันทึก...</>
+                  : กำลังอัปโหลดรูป
+                  ? <><Loader2 size={18} className="animate-spin shrink-0" /> กำลังอัปโหลดรูป...</>
+                  : <><Save size={18} className="shrink-0" /> บันทึกการแก้ไข</>}
               </button>
               </div>
             </div>
