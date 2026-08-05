@@ -18,7 +18,17 @@ import {
 import { supabase } from '../supabase'
 import { หมุดสี } from '../utils/mapMarker'
 import { useToast } from '../components/useToast'
+import LoadFailed from '../components/LoadFailed'
 import { ข้อความError } from '../utils/errorMessage'
+
+// ใส่เครื่องหมาย ' นำหน้าค่าที่ขึ้นต้นด้วย = + - @ (และ tab/CR) ก่อนเขียนลง CSV
+// Excel ตีความช่องที่ขึ้นต้นด้วยอักขระพวกนี้เป็น "สูตร" ถึงจะครอบด้วย " แล้วก็ตาม
+// หน้านี้ export ตาราง users ด้วย (ชื่อ/อีเมล/เบอร์) ซึ่งเป็นข้อความที่ผู้ใช้พิมพ์เองทั้งหมด
+function ช่องCSV(ค่า) {
+  const s = String(ค่า ?? '')
+  const กันสูตร = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+  return `"${กันสูตร.replace(/"/g, '""')}"`
+}
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -84,11 +94,15 @@ function AdminPage({ หน้า, user }) {
   const [สถิติเดือนก่อน, setSถิติเดือนก่อน] = useState({ รายงาน: 0, รับเลี้ยง: 0, ผู้ใช้ใหม่: 0 })
   const [รายงานรอดำเนินการ, setรายงานรอดำเนินการ] = useState(0)
   const [โหลดDashboard, setโหลดDashboard] = useState(true)
+  // ตัวเลขทั้งแดชบอร์ดมาจาก count query ล้วนๆ พอพลาดจะได้ undefined แล้ว || 0 กลืนเป็นศูนย์หมด
+  // ผลคือแอดมินเห็น "ไม่มีรายงานค้างดำเนินการตอนนี้" สีเขียว ทั้งที่จริงคืออ่านข้อมูลไม่ได้
+  const [โหลดDashboardพลาด, setโหลดDashboardพลาด] = useState(false)
 
   // ---- State: Users ----
   const [รายการผู้ใช้, setรายการผู้ใช้] = useState([])
   const [ค้นหาผู้ใช้, setค้นหาผู้ใช้] = useState('')
   const [โหลดผู้ใช้, setโหลดผู้ใช้] = useState(true)
+  const [โหลดผู้ใช้พลาด, setโหลดผู้ใช้พลาด] = useState(false)
 
   // ---- State: ตัวกรอง + แบ่งหน้า + เลือกหลายรายการ (รองรับผู้ใช้จำนวนมาก) ----
   const [กรองRole,     setกรองRole]     = useState('')       // '' = ทั้งหมด
@@ -116,14 +130,19 @@ function AdminPage({ หน้า, user }) {
   // ---- State: แผนที่รายงาน (พื้นที่) ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
   const [โหลดแผนที่, setโหลดแผนที่] = useState(true)
+  const [โหลดแผนที่พลาด, setโหลดแผนที่พลาด] = useState(false)
   const [กลุ่มที่เลือก, setกลุ่มที่เลือก] = useState([])   // ว่าง = แสดงทุกกลุ่ม
   const [จุดโฟกัส, setจุดโฟกัส]         = useState(null) // เคสที่กดจากรายการใต้แผนที่
 
   // ---- ดึงสถิติ Dashboard ----
   useEffect(function () {
     if (หน้า !== 'dashboard') return
-    async function ดึงDashboard() {
+    ดึงDashboard()
+  }, [หน้า])
+
+  async function ดึงDashboard() {
       setโหลดDashboard(true)
+      setโหลดDashboardพลาด(false)
 
       // วันแรกของเดือนนี้ + เดือนก่อน (ไว้เทียบแนวโน้ม)
       const startOfMonth = new Date()
@@ -149,6 +168,16 @@ function AdminPage({ หน้า, user }) {
         supabase.from('users').select('id', { count: 'exact', head: true }).gte('created_at', startOfLastMonth.toISOString()).lt('created_at', startOfMonth.toISOString()),
       ])
 
+      // พลาดแม้แต่ query เดียวถือว่าทั้งแดชบอร์ดเชื่อไม่ได้ — โชว์ตัวเลขบางส่วนอันตรายกว่าบอกตรงๆ ว่าโหลดไม่ได้
+      // (ใช้เกณฑ์เดียวกับหน้าสถิติฝั่งเจ้าหน้าที่ใน VolunteerPage)
+      const พลาด = [ร1, ร2, ร3, ร4, ร5, ร6, ร7, ร8, ร9, ร10, ร11].find(function (r) { return r.error })
+      if (พลาด) {
+        console.error('ดึงข้อมูลแดชบอร์ดไม่สำเร็จ:', พลาด.error.message)
+        setโหลดDashboardพลาด(true)
+        setโหลดDashboard(false)
+        return
+      }
+
       setSถิติ({
         ผู้ใช้:    ร1.count || 0,
         รายงาน:   ร2.count || 0,
@@ -167,9 +196,7 @@ function AdminPage({ หน้า, user }) {
         ผู้ใช้ใหม่: ร11.count || 0,
       })
       setโหลดDashboard(false)
-    }
-    ดึงDashboard()
-  }, [หน้า])
+  }
 
   // ---- ดึงรายชื่อผู้ใช้ ----
   useEffect(function () {
@@ -179,11 +206,18 @@ function AdminPage({ หน้า, user }) {
 
   async function ดึงผู้ใช้() {
     setโหลดผู้ใช้(true)
+    setโหลดผู้ใช้พลาด(false)
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .order('created_at', { ascending: false })
-    if (!error && data) setรายการผู้ใช้(data)
+    if (error) {
+      // เดิมกลืน error เงียบๆ — รายชื่อว่างเปล่าอ่านได้ว่า "ไม่มีผู้ใช้ในระบบ" ซึ่งเป็นไปไม่ได้อยู่แล้ว
+      console.error('ดึงรายชื่อผู้ใช้ไม่สำเร็จ:', error.message)
+      setโหลดผู้ใช้พลาด(true)
+    } else {
+      setรายการผู้ใช้(data || [])
+    }
     setโหลดผู้ใช้(false)
   }
 
@@ -193,9 +227,12 @@ function AdminPage({ หน้า, user }) {
   async function เปลี่ยนRole(id, roleใหม่) {
     const { error } = await supabase.rpc('admin_set_user_role', { target_ids: [id], new_role: roleใหม่ })
     if (!error) {
-      setรายการผู้ใช้(รายการผู้ใช้.map((u) =>
-        u.id === id ? { ...u, role: roleใหม่ } : u
-      ))
+      // ใช้รูปแบบ updater — ค่า รายการผู้ใช้ ที่ปิดทับมาตอนสร้างฟังก์ชันอาจเก่าไปแล้วหลัง await
+      // (ฝั่ง bulk ใช้รูปแบบนี้อยู่แล้ว ตรงนี้เขียนไว้คนละแบบ)
+      setรายการผู้ใช้(function (prev) {
+        return prev.map(function (u) { return u.id === id ? { ...u, role: roleใหม่ } : u })
+      })
+      toast(`เปลี่ยนสิทธิ์เป็น "${เลเบลRole[roleใหม่]}" แล้ว`)
     } else {
       toastError(ข้อความError(error, 'เปลี่ยนสิทธิ์'))
     }
@@ -206,9 +243,11 @@ function AdminPage({ หน้า, user }) {
     const สถานะใหม่ = สถานะปัจจุบัน === 'suspended' ? 'active' : 'suspended'
     const { error } = await supabase.rpc('admin_set_user_status', { target_ids: [id], new_status: สถานะใหม่ })
     if (!error) {
-      setรายการผู้ใช้(รายการผู้ใช้.map((u) =>
-        u.id === id ? { ...u, status: สถานะใหม่ } : u
-      ))
+      setรายการผู้ใช้(function (prev) {
+        return prev.map(function (u) { return u.id === id ? { ...u, status: สถานะใหม่ } : u })
+      })
+      // ระงับบัญชีคือการเตะคนออกจากระบบทันที ต้องมีอะไรยืนยันว่าคำสั่งไปถึงจริง ไม่ใช่แค่ modal ปิดไปเฉยๆ
+      toast(สถานะใหม่ === 'suspended' ? 'ระงับบัญชีแล้ว' : 'ยกเลิกการระงับบัญชีแล้ว')
     } else {
       toastError(ข้อความError(error, 'เปลี่ยนสถานะบัญชี'))
     }
@@ -221,6 +260,7 @@ function AdminPage({ หน้า, user }) {
       setรายการผู้ใช้(function (prev) {
         return prev.map(function (u) { return ids.includes(u.id) ? { ...u, role: roleใหม่ } : u })
       })
+      toast(`เปลี่ยนสิทธิ์ ${ids.length} คน เป็น "${เลเบลRole[roleใหม่]}" แล้ว`)
     } else {
       toastError(ข้อความError(error, 'เปลี่ยนสิทธิ์'))
     }
@@ -233,6 +273,7 @@ function AdminPage({ หน้า, user }) {
       setรายการผู้ใช้(function (prev) {
         return prev.map(function (u) { return ids.includes(u.id) ? { ...u, status: สถานะใหม่ } : u })
       })
+      toast(สถานะใหม่ === 'suspended' ? `ระงับบัญชี ${ids.length} คนแล้ว` : `ยกเลิกการระงับ ${ids.length} คนแล้ว`)
     } else {
       toastError(ข้อความError(error, 'เปลี่ยนสถานะบัญชี'))
     }
@@ -294,18 +335,26 @@ function AdminPage({ หน้า, user }) {
   // ---- ดึงรายงานที่มีพิกัด GPS สำหรับปักหมุดบนแผนที่ ----
   useEffect(function () {
     if (หน้า !== 'areas') return
-    async function ดึงรายงานพิกัด() {
-      setโหลดแผนที่(true)
-      const { data, error } = await supabase
-        .from('reports')
-        .select('id, animal_type, location_text, detail, status, latitude, longitude, created_at')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
-      if (!error && data) setรายงานพิกัด(data)
-      setโหลดแผนที่(false)
-    }
     ดึงรายงานพิกัด()
   }, [หน้า])
+
+  async function ดึงรายงานพิกัด() {
+    setโหลดแผนที่(true)
+    setโหลดแผนที่พลาด(false)
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, animal_type, location_text, detail, status, latitude, longitude, created_at')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+    if (error) {
+      // แผนที่ว่างเปล่าอ่านได้ว่า "ไม่มีเหตุในพื้นที่" — อันตรายพอกับรายการว่าง (เหมือนที่แก้ไว้ฝั่งเจ้าหน้าที่)
+      console.error('ดึงตำแหน่งรายงานไม่สำเร็จ:', error.message)
+      setโหลดแผนที่พลาด(true)
+    } else {
+      setรายงานพิกัด(data || [])
+    }
+    setโหลดแผนที่(false)
+  }
 
   // ---- ดึงจำนวนสำหรับ Export ----
   useEffect(function () {
@@ -317,10 +366,14 @@ function AdminPage({ หน้า, user }) {
         supabase.from('animals').select('id', { count: 'exact', head: true }),
         supabase.from('users').select('id', { count: 'exact', head: true }),
       ])
+      // นับไม่ได้ ≠ ไม่มีข้อมูล — เดิมโชว์ "0 รายการ" ทำให้แอดมินไม่กด export เพราะคิดว่าไม่มีอะไรให้โหลด
+      // ใช้ null แล้วให้ฝั่ง render โชว์ "—" แทน (ปุ่ม export ยังกดได้ เพราะมันยิง query ของตัวเองใหม่อยู่แล้ว)
+      const พลาด = [ร1, ร2, ร3].find(function (r) { return r.error })
+      if (พลาด) console.error('นับจำนวนข้อมูลสำหรับ export ไม่สำเร็จ:', พลาด.error.message)
       setจำนวนExport({
-        รายงาน: ร1.count || 0,
-        สัตว์:   ร2.count || 0,
-        ผู้ใช้:  ร3.count || 0,
+        รายงาน: ร1.error ? null : (ร1.count || 0),
+        สัตว์:   ร2.error ? null : (ร2.count || 0),
+        ผู้ใช้:  ร3.error ? null : (ร3.count || 0),
       })
       setโหลดExport(false)
     }
@@ -338,12 +391,10 @@ function AdminPage({ หน้า, user }) {
     // ไม่มีข้อมูลไม่ใช่ความผิดพลาด — เป็นข้อเท็จจริงที่ต้องบอก จึงใช้ toast กลางไม่ใช่สีแดง
     if (!data || data.length === 0) { toast('ยังไม่มีข้อมูลในตารางนี้'); return }
 
-    const headers = Object.keys(data[0]).join(',')
-    const rows = data.map((row) =>
-      Object.values(row)
-        .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
-        .join(',')
-    )
+    // อ่านค่าตามลำดับคอลัมน์ที่กำหนดไว้ ไม่ใช่ Object.values ของแต่ละแถว — กันคอลัมน์เหลื่อมถ้าแถวไหนคีย์ไม่ครบ
+    const คอลัมน์ = Object.keys(data[0])
+    const headers = คอลัมน์.map(ช่องCSV).join(',')
+    const rows = data.map((row) => คอลัมน์.map((k) => ช่องCSV(row[k])).join(','))
     const csv = '﻿' + [headers, ...rows].join('\n') // BOM สำหรับ Excel ภาษาไทย
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
@@ -478,6 +529,10 @@ function AdminPage({ หน้า, user }) {
               <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-400">กำลังโหลดข้อมูล...</p>
             </div>
+          ) : โหลดDashboardพลาด ? (
+            /* ตัวเลข 0 ทุกช่อง + กล่องเขียว "ไม่มีรายงานค้าง" อ่านได้ว่างานเคลียร์หมดแล้ว
+               ซึ่งตรงข้ามกับความจริงเวลาระบบล่ม — สองสถานะนี้ต้องหน้าตาคนละเรื่องกัน */
+            <LoadFailed onRetry={ดึงDashboard} สิ่งที่โหลด="ภาพรวมระบบ" สี="purple" />
           ) : (
             <>
               {/* งานค้าง — ขึ้นก่อนสถิติย้อนหลังทั้งหมด เพราะเป็นสิ่งที่ต้องรีบดูตอนนี้ ไม่ใช่แค่ตัวเลขสะสม */}
@@ -671,6 +726,10 @@ function AdminPage({ หน้า, user }) {
               <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-400">กำลังโหลด...</p>
             </div>
+          ) : โหลดผู้ใช้พลาด ? (
+            /* ต้องมาก่อน empty state — "ยังไม่มีผู้ใช้ในระบบ" เป็นข้อความที่เป็นไปไม่ได้จริง
+               (อย่างน้อยต้องมีแอดมินที่กำลังดูหน้านี้อยู่) แต่เดิมมันขึ้นได้เวลาโหลดพลาด */
+            <LoadFailed onRetry={ดึงผู้ใช้} สิ่งที่โหลด="รายชื่อผู้ใช้" สี="purple" />
           ) : ผู้ใช้กรอง.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <Users size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
@@ -846,6 +905,8 @@ function AdminPage({ หน้า, user }) {
                 <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                 <p className="text-sm text-gray-400">กำลังโหลดตำแหน่งรายงาน...</p>
               </div>
+            ) : โหลดแผนที่พลาด ? (
+              <LoadFailed onRetry={ดึงรายงานพิกัด} สิ่งที่โหลด="ตำแหน่งรายงาน" สี="purple" />
             ) : (
               <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: 350 }}>
                 <MapContainer center={ศูนย์กลางแผนที่} zoom={13} style={{ height: '100%', width: '100%' }}>
@@ -933,9 +994,9 @@ function AdminPage({ หน้า, user }) {
                 </p>
                 <div className="divide-y divide-gray-100">
                   {[
-                    { ชื่อ: 'รายงานสัตว์จรทั้งหมด', จำนวน: `${จำนวนExport.รายงาน} รายการ`, Icon: FileText, ตาราง: 'reports',  ชื่อไฟล์: 'รายงาน' },
-                    { ชื่อ: 'ข้อมูลสัตว์ในระบบ',    จำนวน: `${จำนวนExport.สัตว์} ตัว`,    Icon: PawPrint, ตาราง: 'animals',  ชื่อไฟล์: 'สัตว์' },
-                    { ชื่อ: 'ข้อมูลผู้ใช้งาน',      จำนวน: `${จำนวนExport.ผู้ใช้} คน`,   Icon: Users,    ตาราง: 'users',    ชื่อไฟล์: 'ผู้ใช้งาน' },
+                    { ชื่อ: 'รายงานสัตว์จรทั้งหมด', จำนวน: จำนวนExport.รายงาน == null ? 'นับจำนวนไม่ได้ — ยังกดโหลดได้' : `${จำนวนExport.รายงาน} รายการ`, Icon: FileText, ตาราง: 'reports',  ชื่อไฟล์: 'รายงาน' },
+                    { ชื่อ: 'ข้อมูลสัตว์ในระบบ',    จำนวน: จำนวนExport.สัตว์ == null  ? 'นับจำนวนไม่ได้ — ยังกดโหลดได้' : `${จำนวนExport.สัตว์} ตัว`,    Icon: PawPrint, ตาราง: 'animals',  ชื่อไฟล์: 'สัตว์' },
+                    { ชื่อ: 'ข้อมูลผู้ใช้งาน',      จำนวน: จำนวนExport.ผู้ใช้ == null ? 'นับจำนวนไม่ได้ — ยังกดโหลดได้' : `${จำนวนExport.ผู้ใช้} คน`,   Icon: Users,    ตาราง: 'users',    ชื่อไฟล์: 'ผู้ใช้งาน' },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center justify-between gap-3 px-4 py-3.5">
                       <div className="flex items-center gap-3 min-w-0">
