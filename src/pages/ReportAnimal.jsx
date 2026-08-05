@@ -934,6 +934,23 @@ function ReportAnimal({ user }) {
                 )
               })}
             </div>
+
+            {/* อันดับ 2-3 ที่ AI คิดว่ามีความเป็นไปได้รองลงมา — ช่วยผู้แจ้งตัดสินใจกรณี AI ลังเลระหว่าง 2-3 สายพันธุ์ */}
+            {Array.isArray(ผลAI.top3) && ผลAI.top3.length > 1 && (
+              <div className="mt-3 pt-3 border-t border-orange-100">
+                <p className="text-xs text-gray-500 mb-1.5">ความเป็นไปได้อื่น</p>
+                <div className="space-y-1">
+                  {ผลAI.top3.slice(1).map(function (r, i) {
+                    return (
+                      <div key={i} className="flex justify-between">
+                        <span className="text-xs text-gray-600">{r.สายพันธุ์}</span>
+                        <span className="text-xs font-semibold text-gray-500">{r.ความมั่นใจ}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
