@@ -1,7 +1,7 @@
 // App.jsx — ใช้ Supabase Auth จริง
 // ฟัง onAuthStateChange แทนการ mock login
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import BottomNav from './components/BottomNav'
@@ -24,6 +24,10 @@ import VolunteerPage    from './pages/VolunteerPage'
 import AdminPage        from './pages/AdminPage'
 import NotFoundPage     from './pages/NotFoundPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import { useToast } from './components/useToast'
+import { ข้อความError } from './utils/errorMessage'
+import { ผูกตัวรับDeepLink } from './utils/googleSignIn'
+import { ลงทะเบียนPush, ยกเลิกPush } from './utils/pushNotifications'
 
 // เว้นที่ว่างด้านล่างเท่าความสูงแถบนำทาง กันเนื้อหาบรรทัดสุดท้ายถูกแถบทับ
 // ต้องแยกเป็น component เพราะ useLocation ใช้ได้เฉพาะข้างใน BrowserRouter
@@ -38,6 +42,19 @@ function Layoutเนื้อหา({ user, children }) {
   )
 }
 
+// พาไปหน้าที่ผู้ใช้แตะมาจากแจ้งเตือนบนมือถือ
+// ต้องแยกเป็น component เพราะ useNavigate ใช้ได้เฉพาะข้างใน BrowserRouter
+// ส่วน listener ของ push อยู่ระดับ App ซึ่งอยู่นอก Router จึงส่งต่อผ่าน prop แทน
+function นำทางจากแจ้งเตือน({ path, onเสร็จ }) {
+  const navigate = useNavigate()
+  useEffect(function () {
+    if (!path) return
+    navigate(path)
+    onเสร็จ()
+  }, [path, navigate, onเสร็จ])
+  return null
+}
+
 function App() {
   const [user, setUser]           = useState(null)
   const [กำลังโหลด, setกำลังโหลด] = useState(true)  // รอเช็ค session ก่อน render
@@ -45,6 +62,9 @@ function App() {
   // role จริงจาก DB โหลดหรือยัง — user เริ่มต้นด้วย role: 'user' เสมอระหว่างรอ (ดู setUser ด้านล่าง)
   // ต้องRole() ใช้เช็คตัวนี้ กัน admin/volunteer ที่ refresh หน้าโดนเด้งออกผิดๆ ก่อน role จริงมาถึง
   const [roleพร้อม, setRoleพร้อม] = useState(false)
+  const { toastError, ToastHost } = useToast()
+  // หน้าที่ต้องพาไปหลังผู้ใช้แตะแจ้งเตือนบนมือถือ (เช่น /track?open=38)
+  const [หน้าจากแจ้งเตือน, setหน้าจากแจ้งเตือน] = useState(null)
 
   // Warmup: ยิง HTTP request ไปยัง Supabase ทันทีที่ app โหลด
   // เพื่อ pre-establish DNS+TCP+TLS connection ก่อนที่ user จะกด Login
@@ -56,6 +76,33 @@ function App() {
     supabase.from('animals').select('id').limit(1).then(function () {}, function () {})
     supabase.auth.getSession().catch(function () {})
   }, [])
+
+  // รับ callback ของ Google Sign-In ที่เด้งกลับเข้าแอปผ่าน custom scheme (Android เท่านั้น)
+  // ต้องผูกที่ระดับ App ไม่ใช่หน้า Login เพราะระหว่างที่ผู้ใช้อยู่ในเบราว์เซอร์ระบบ
+  // Android อาจเก็บแอปเราไว้เบื้องหลังแล้วสร้าง component ใหม่ตอนกลับมา
+  // ตัว session ที่ตั้งสำเร็จจะไปเข้า onAuthStateChange ด้านล่างเองตามปกติ
+  useEffect(function () {
+    return ผูกตัวรับDeepLink(function (err) {
+      if (err) toastError(ข้อความError(err, 'เข้าสู่ระบบด้วย Google'))
+    })
+  }, [toastError])
+
+  // ลงทะเบียนรับแจ้งเตือนเด้งบนมือถือ — ต้องรอให้รู้ก่อนว่าใครล็อกอินอยู่
+  // เพราะ device token ต้องผูกกับ user_id ถึงจะส่งถูกคน
+  // บนเว็บฟังก์ชันนี้จะข้ามทั้งหมดเอง ไม่ต้องเช็คตรงนี้
+  useEffect(function () {
+    if (!user?.id) return
+    let ถอด = function () {}
+    let ยกเลิกแล้ว = false
+
+    ลงทะเบียนPush(function (path) { setหน้าจากแจ้งเตือน(path) })
+      .then(function (f) {
+        if (ยกเลิกแล้ว) f()          // component ถูก unmount ระหว่างรอ — ถอดทิ้งเลย
+        else ถอด = f
+      })
+
+    return function () { ยกเลิกแล้ว = true; ถอด() }
+  }, [user?.id])
 
   useEffect(function () {
     let cancelled = false
@@ -169,6 +216,9 @@ function App() {
 
   // Logout จริงผ่าน Supabase Auth
   async function handleLogout() {
+    // ลบ device token ก่อน signOut — ไม่งั้นเครื่องนี้จะยังได้แจ้งเตือนของคนเดิม
+    // หลังมีคนอื่นมาล็อกอินต่อ (เครื่องที่ใช้ร่วมกันในสำนักงานเจอกรณีนี้ได้จริง)
+    await ยกเลิกPush()
     await supabase.auth.signOut()
     setUser(null)
   }
@@ -211,6 +261,8 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ToastHost />
+      <นำทางจากแจ้งเตือน path={หน้าจากแจ้งเตือน} onเสร็จ={() => setหน้าจากแจ้งเตือน(null)} />
       <Layoutเนื้อหา user={user}>
       <Routes>
 

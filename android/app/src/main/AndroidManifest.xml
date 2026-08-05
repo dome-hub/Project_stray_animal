@@ -22,6 +22,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- รับ callback ของ Google Sign-In กลับเข้าแอป
+                 ต้องมีอันนี้ ไม่งั้นหลังล็อกอินเสร็จเบราว์เซอร์จะพยายามเปิด
+                 com.jaengjorn.app://login-callback แล้วไม่มีแอปไหนรับ → ค้างที่หน้า Not Found
+                 scheme ต้องตรงกับ SCHEME_CALLBACK ใน src/utils/googleSignIn.js เป๊ะ
+                 (launchMode singleTask ด้านบนทำให้กลับเข้า Activity เดิม ไม่เปิดซ้อนใหม่) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.jaengjorn.app" android:host="login-callback" />
+            </intent-filter>
+
         </activity>
 
         <provider
@@ -36,8 +48,28 @@
     </application>
 
     <!-- Permissions -->
+    <!-- Android จะไม่ขอสิทธิ์ที่แอปไม่ได้ประกาศไว้ตรงนี้เลย — เดิมมีแค่ INTERNET
+         ทำให้กล้อง/ตำแหน่ง/แกลเลอรีเงียบสนิท ไม่มีป๊อปอัปขออนุญาตให้ผู้ใช้กด -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- กล้อง — หน้าแจ้งเหตุเปิดกล้องสดผ่าน getUserMedia (ReportAnimal.jsx) -->
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- ตำแหน่ง — ใช้ปักหมุดจุดพบสัตว์ (navigator.geolocation)
+         COARSE ไว้ด้วยเผื่อผู้ใช้เลือกให้ตำแหน่งคร่าวๆ แทนตำแหน่งแม่นยำ -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- เลือกรูปจากแกลเลอรี — Android แบ่งสิทธิ์ตามเวอร์ชัน
+         13+ (API 33) ใช้ READ_MEDIA_IMAGES ส่วนรุ่นเก่ากว่ายังใช้ READ_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- ประกาศว่ากล้องไม่ใช่ของบังคับ ไม่งั้น Play Store จะซ่อนแอปจากเครื่องที่ไม่มีกล้อง
+         และผู้ใช้ที่ไม่ให้สิทธิ์กล้องยังใช้แอปส่วนอื่นได้ตามปกติ -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>
