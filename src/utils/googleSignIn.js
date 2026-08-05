@@ -31,6 +31,17 @@ export function เป็นแอปมือถือ() {
   return Capacitor.isNativePlatform()
 }
 
+// ---- ปลายทางของลิงก์ "ตั้งรหัสผ่านใหม่" ในอีเมล ----
+// บนเว็บใช้ URL จริงได้ตรงๆ แต่ในแอป APK window.location.origin คือ https://localhost
+// ซึ่งไม่มีอยู่จริงนอกแอป — ผู้ใช้ที่ลืมรหัสจะได้อีเมลที่กดแล้วขึ้น "Not Found" เปิดต่อไม่ได้เลย
+// (ปัญหาเดียวกับ Google OAuth ที่แก้ไปแล้วด้านบน แต่เส้นทางลืมรหัสยังใช้ของเดิมอยู่)
+//
+// ใช้ host เดิม (login-callback) ซ้ำ เพราะ AndroidManifest มี intent-filter แค่ host นี้
+// แล้วไปแยกทีหลังว่าเป็นลิงก์ประเภทไหนจาก type=recovery ที่ Supabase ใส่มาให้
+export function ปลายทางตั้งรหัสใหม่() {
+  return เป็นแอปมือถือ() ? SCHEME_CALLBACK : `${window.location.origin}/reset-password`
+}
+
 // ---- เริ่มขั้นตอนล็อกอิน ----
 export async function เข้าสู่ระบบGoogle() {
   const บนมือถือ = เป็นแอปมือถือ()
@@ -66,7 +77,14 @@ export function ผูกตัวรับDeepLink(onผลลัพธ์) {
       // แต่บางการตั้งค่ายังเป็น implicit flow ที่ส่ง token มาใน #fragment รองรับทั้งสองแบบ
       const u = new URL(url)
       const code = u.searchParams.get('code')
+      const hashParams = new URLSearchParams((u.hash || '').replace(/^#/, ''))
       const ข้อผิดพลาด = u.searchParams.get('error_description') || u.searchParams.get('error')
+        || hashParams.get('error_description') || hashParams.get('error')
+
+      // ลิงก์รีเซ็ตรหัสผ่านใช้ scheme เดียวกับล็อกอิน แยกกันตรง type=recovery
+      // (Supabase ใส่มาให้ทั้งใน query และ hash แล้วแต่ flow ที่ใช้)
+      const เป็นลิงก์ตั้งรหัสใหม่ =
+        u.searchParams.get('type') === 'recovery' || hashParams.get('type') === 'recovery'
 
       if (ข้อผิดพลาด) throw new Error(ข้อผิดพลาด)
 
@@ -74,15 +92,16 @@ export function ผูกตัวรับDeepLink(onผลลัพธ์) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (error) throw error
       } else {
-        const hash = new URLSearchParams((u.hash || '').replace(/^#/, ''))
-        const access_token  = hash.get('access_token')
-        const refresh_token = hash.get('refresh_token')
+        const access_token  = hashParams.get('access_token')
+        const refresh_token = hashParams.get('refresh_token')
         if (!access_token || !refresh_token) throw new Error('ลิงก์ที่ส่งกลับมาไม่มีข้อมูลเข้าสู่ระบบ')
         const { error } = await supabase.auth.setSession({ access_token, refresh_token })
         if (error) throw error
       }
 
-      if (onผลลัพธ์) onผลลัพธ์(null)
+      // มาจากลิงก์ลืมรหัสผ่าน → พาไปหน้าตั้งรหัสใหม่ ไม่ใช่ปล่อยเข้าหน้าแรกเฉยๆ
+      // (ตอนนี้มี session แล้ว ResetPasswordPage จึงทำงานได้ทันที)
+      if (onผลลัพธ์) onผลลัพธ์(null, เป็นลิงก์ตั้งรหัสใหม่ ? '/reset-password' : null)
     } catch (err) {
       if (onผลลัพธ์) onผลลัพธ์(err)
     } finally {

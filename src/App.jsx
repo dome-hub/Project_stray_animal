@@ -82,8 +82,11 @@ function App() {
   // Android อาจเก็บแอปเราไว้เบื้องหลังแล้วสร้าง component ใหม่ตอนกลับมา
   // ตัว session ที่ตั้งสำเร็จจะไปเข้า onAuthStateChange ด้านล่างเองตามปกติ
   useEffect(function () {
-    return ผูกตัวรับDeepLink(function (err) {
+    return ผูกตัวรับDeepLink(function (err, path) {
       if (err) toastError(ข้อความError(err, 'เข้าสู่ระบบด้วย Google'))
+      // ลิงก์ลืมรหัสผ่านจากอีเมลจะส่ง path มาด้วย — พาไปหน้าตั้งรหัสใหม่
+      // ใช้กลไกเดียวกับตอนแตะแจ้งเตือน (ดู นำทางจากแจ้งเตือน ด้านบน)
+      else if (path) setหน้าจากแจ้งเตือน(path)
     })
   }, [toastError])
 

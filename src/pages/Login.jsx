@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom'
 import { Mail, MailOpen, CheckCircle2, Eye, EyeOff, Loader2, Info, KeyRound, ArrowLeft } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ข้อความError } from '../utils/errorMessage'
-import { เข้าสู่ระบบGoogle, เป็นแอปมือถือ } from '../utils/googleSignIn'
+import { เข้าสู่ระบบGoogle, เป็นแอปมือถือ, ปลายทางตั้งรหัสใหม่ } from '../utils/googleSignIn'
 
 // ความยาวรหัสผ่านขั้นต่ำ — ตามแนวทางสากล (NIST/OWASP) ความยาวสำคัญกว่าการบังคับใส่อักขระพิเศษ
 const ความยาวรหัสผ่านขั้นต่ำ = 8
@@ -33,6 +33,10 @@ function Login() {
   const [อีเมลLogin,    setอีเมลLogin]    = useState('')
   const [รหัสผ่านLogin, setรหัสผ่านLogin] = useState('')
   const [แสดงรหัส,      setแสดงรหัส]      = useState(false)
+  // ฟอร์มสมัครมีปุ่มดูรหัสของตัวเอง — ตั้งรหัสยาว 8 ตัวโดยมองไม่เห็นแล้วพิมพ์ผิด
+  // = สมัครสำเร็จแต่เข้าไม่ได้ ต้องไปกู้รหัสทันทีทั้งที่เพิ่งสมัครเสร็จ
+  // (ฟอร์มเข้าสู่ระบบและหน้าตั้งรหัสใหม่มีปุ่มนี้อยู่แล้ว ขาดแค่ฟอร์มสมัคร)
+  const [แสดงรหัสสมัคร, setแสดงรหัสสมัคร] = useState(false)
 
   // ---- Register ----
   const [ชื่อ,             setชื่อ]             = useState('')
@@ -66,8 +70,10 @@ function Login() {
     setกำลังโหลด(true)
     setข้อผิดพลาด('')
 
+    // ปลายทางต่างกันระหว่างเว็บกับแอป — ดู ปลายทางตั้งรหัสใหม่ ใน utils/googleSignIn.js
+    // เดิมใช้ window.location.origin ตรงๆ ซึ่งในแอปคือ https://localhost ที่กดแล้วเปิดไม่ได้
     const { error } = await supabase.auth.resetPasswordForEmail(อีเมลลืมรหัส.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: ปลายทางตั้งรหัสใหม่(),
     })
     setกำลังโหลด(false)
 
@@ -428,17 +434,25 @@ function Login() {
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
               />
             </div>
-            <div>
+            <div className="relative">
               <label htmlFor="รหัสผ่านสมัคร" className="sr-only">รหัสผ่าน</label>
               <input
                 id="รหัสผ่านสมัคร"
-                type="password"
+                type={แสดงรหัสสมัคร ? 'text' : 'password'}
                 value={รหัสผ่านRegister}
                 onChange={(e) => setรหัสผ่านRegister(e.target.value)}
                 placeholder={`รหัสผ่าน (อย่างน้อย ${ความยาวรหัสผ่านขั้นต่ำ} ตัวอักษร)`}
                 autoComplete="new-password"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 pr-12"
               />
+              <button
+                type="button"
+                onClick={() => setแสดงรหัสสมัคร(!แสดงรหัสสมัคร)}
+                aria-label={แสดงรหัสสมัคร ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 w-11 h-11 flex items-center justify-center transition-colors"
+              >
+                {แสดงรหัสสมัคร ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
             <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-start gap-2">
