@@ -673,7 +673,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
                 ? <img src={พรีวิว} alt="พรีวิว" className="w-full h-full object-contain" />
                 : <AnimalIcon ชนิด={ชนิด} size={48} className="text-rose-300" />}
             </div>
-            <input ref={inputรูป} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูป} />
+            <input ref={inputรูป} type="file" accept="image/*" className="hidden" onChange={เลือกรูป} />
             <button onClick={() => inputรูป.current.click()}
               className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-rose-300 rounded-xl py-2.5 text-sm font-medium text-rose-600 bg-rose-50/50">
               <Camera size={16} /> {พรีวิว ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
@@ -975,7 +975,7 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
                     <AnimalIcon ชนิด={ชนิด} size={56} className="text-rose-300" />
                   )}
                 </div>
-                <input ref={inputรูป} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูป} />
+                <input ref={inputรูป} type="file" accept="image/*" className="hidden" onChange={เลือกรูป} />
                 <button onClick={() => inputรูป.current.click()}
                   className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-rose-300 rounded-xl py-2.5 text-sm font-medium text-rose-600 bg-rose-50/50">
                   <Camera size={16} className="shrink-0" /> {พรีวิว || โพสต์.photo_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}

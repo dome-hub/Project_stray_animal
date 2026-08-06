@@ -988,7 +988,11 @@ function ReportAnimal({ user }) {
             </div>
           )}
 
-          <input ref={inputGallery} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปภาพ} />
+          {/* accept ต้องเป็น image/* ไม่ใช่ MIME เจาะจงหลายตัว — บน Android WebView การระบุ
+              "image/jpeg,image/png,image/webp" ทำให้ตัวเลือกไฟล์ของระบบเปิดไม่ขึ้น หรือเปิดแล้วไม่มีรูปให้เลือกเลย
+              ชนิดไฟล์ยังถูกบังคับเหมือนเดิมทุกประการผ่าน ตรวจสอบไฟล์รูปภาพ() (นามสกุล + MIME + magic bytes)
+              และที่ตัว bucket เองซึ่งตั้ง allowed_mime_types ไว้ฝั่งเซิร์ฟเวอร์ */}
+          <input ref={inputGallery} type="file" accept="image/*" className="hidden" onChange={เลือกรูปภาพ} />
         </div>
 
         {กำลังวิเคราะห์ && (
