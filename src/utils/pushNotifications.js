@@ -28,9 +28,14 @@ import { supabase } from '../supabase'
 // ใครก็ตามที่รัน `npx cap sync` (ซึ่งเป็นขั้นตอนปกติในคู่มือทุกเจ้า) จะได้แอปที่ดับทันที
 // สวิตช์นี้จึงกันไว้ที่ชั้น JavaScript ให้ปลอดภัยไม่ว่า native จะมี plugin หรือไม่
 //
-// เปิดใช้เมื่อตั้ง Firebase ครบแล้วเท่านั้น: ใส่ VITE_ENABLE_PUSH=true ใน .env
-// (ต้องมี google-services.json วางที่ android/app/ ก่อน แล้ว build ใหม่)
-const เปิดใช้Push = import.meta.env.VITE_ENABLE_PUSH === 'true'
+// ตอนนี้ google-services.json ถูก commit เข้ารีโปแล้ว (android/app/google-services.json)
+// เงื่อนไขที่ทำให้ดับจึงหมดไปสำหรับทุกคนที่ build จากรีโปนี้ ค่าเริ่มต้นจึงเป็น "เปิด"
+// ตั้ง VITE_ENABLE_PUSH=false ใน .env เมื่อต้องการปิดชั่วคราวเท่านั้น
+//
+// ⚠️ ค่านี้ผูกกับการมีอยู่ของ google-services.json โดยตรง
+// ถ้าไฟล์นั้นถูกลบออกจากรีโปเมื่อไหร่ ต้องกลับมาเปลี่ยนค่าเริ่มต้นตรงนี้เป็นปิดด้วย
+// ไม่งั้นแอปจะกลับไปดับตอนผู้ใช้กด "อนุญาต" เหมือนเดิม
+const เปิดใช้Push = import.meta.env.VITE_ENABLE_PUSH !== 'false'
 
 function ใช้ได้ไหม() {
   if (!เปิดใช้Push) return false
