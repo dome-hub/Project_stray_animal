@@ -24,7 +24,7 @@ print(f"✅ โหลดสำเร็จ | {len(CLASS_NAMES)} สายพั�
 CONFIDENCE_THRESHOLD = 40.0
 
 # ── FastAPI ───────────────────────────────────────────────────────────────────
-app = FastAPI(title="Stray Animal Analyzer API", version="4.0-onnx-31breeds")
+app = FastAPI(title="Stray Animal Analyzer API", version="4.1-onnx-31breeds")
 
 # โดเมนที่อนุญาตให้เรียก API นี้ได้ — เดิมเปิดกว้าง ["*"] คือใครก็เอาไปฝังในเว็บตัวเองได้
 # ต้องมีครบทั้งเว็บที่ deploy และ origin ของแอปมือถือ (Capacitor) ไม่งั้นฟีเจอร์วิเคราะห์รูปจะพัง
