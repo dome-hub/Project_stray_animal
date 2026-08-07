@@ -1,11 +1,16 @@
 package com.jaengjorn.app;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
@@ -13,14 +18,18 @@ import com.getcapacitor.BridgeActivity;
 // Capacitor เองไม่ได้ผูก WebView เข้ากับระบบขอสิทธิ์ของ Android ให้อัตโนมัติ
 // หน้าเว็บในแอปที่เรียก navigator.mediaDevices.getUserMedia() (เช่นหน้าถ่ายรูปแจ้งสัตว์)
 // หรือ navigator.geolocation (เช่นหน้าปักหมุดจุดพบสัตว์บนแผนที่ Leaflet)
-// จะโดนปฏิเสธเงียบๆ ถ้าไม่ override onPermissionRequest / onGeolocationPermissionsShowPrompt
-// ตรงนี้ให้ส่งต่อไปขอสิทธิ์จริงจาก Android
+// หรือ <input type="file"> (เช่นปุ่ม "เลือกจากคลัง" เปิดแกลลอรี — ทดสอบแล้วแค่แก้ accept
+// ฝั่งเว็บอย่างเดียวไม่พอ ต้องมี onShowFileChooser ผูกไว้ฝั่ง native ด้วยจริงๆ)
+// จะโดนปฏิเสธ/ไม่มีอะไรเกิดขึ้นเลยเงียบๆ ถ้าไม่ override onPermissionRequest /
+// onGeolocationPermissionsShowPrompt / onShowFileChooser ตรงนี้ให้ส่งต่อไปขอสิทธิ์จริงจาก Android
 public class MainActivity extends BridgeActivity {
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1002;
+    private static final int FILE_CHOOSER_REQUEST_CODE = 1003;
     private PermissionRequest pendingCameraRequest;
     private GeolocationPermissions.Callback pendingGeoCallback;
     private String pendingGeoOrigin;
+    private ValueCallback<Uri[]> pendingFileChooserCallback;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -74,7 +83,46 @@ public class MainActivity extends BridgeActivity {
                     }
                 });
             }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                // ถ้ามี request ค้างอยู่จากรอบก่อน (ผู้ใช้กดเลือกไฟล์ซ้อนกัน) ยกเลิกอันเก่าทิ้งก่อน
+                if (pendingFileChooserCallback != null) {
+                    pendingFileChooserCallback.onReceiveValue(null);
+                    pendingFileChooserCallback = null;
+                }
+                pendingFileChooserCallback = filePathCallback;
+
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("image/*");
+                try {
+                    startActivityForResult(Intent.createChooser(intent, "เลือกรูปภาพ"), FILE_CHOOSER_REQUEST_CODE);
+                } catch (ActivityNotFoundException e) {
+                    pendingFileChooserCallback = null;
+                    return false;
+                }
+                return true;
+            }
         });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            if (pendingFileChooserCallback == null) {
+                super.onActivityResult(requestCode, resultCode, data);
+                return;
+            }
+            Uri[] results = null;
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                results = new Uri[]{data.getData()};
+            }
+            pendingFileChooserCallback.onReceiveValue(results);
+            pendingFileChooserCallback = null;
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     @Override
