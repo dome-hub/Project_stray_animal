@@ -2602,7 +2602,7 @@ function VolunteerPage({ หน้า }) {
                         </button>
                       </div>
 
-                      <input ref={inputรูปสัตว์} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
+                      <input ref={inputรูปสัตว์} type="file" multiple accept="image/*" className="hidden" onChange={เลือกรูปสัตว์ใหม่} />
                       <p className="text-xs text-gray-400 mt-1.5">
                         เพิ่มได้หลายรูปให้ผู้สนใจรับเลี้ยงเห็นน้องหลายมุม • แตะรูปดาวเพื่อตั้งเป็นรูปหลัก • แตะกากบาทเพื่อลบรูป
                       </p>

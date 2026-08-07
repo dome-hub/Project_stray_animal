@@ -252,13 +252,23 @@ function ProfilePage({ user }) {
     }
     setกำลังอัปโหลดรูป(true)
     try {
+      // ตั้งชื่อไฟล์ใหม่ทุกครั้ง ไม่ใช้ upsert เขียนทับไฟล์เดิม
+      //
+      // เดิมใช้ชื่อคงที่ avatars/<user-id>.<ext> + upsert:true ซึ่งพังตั้งแต่การเปลี่ยนรูปครั้งที่สอง:
+      // upsert ที่เขียนทับไฟล์เดิมต้องใช้สิทธิ์ UPDATE แต่ bucket มีแค่ policy INSERT กับ SELECT
+      // ครั้งแรกจึงผ่าน (ยังไม่มีไฟล์ = INSERT) ครั้งต่อไปโดน RLS ปฏิเสธทุกครั้ง
+      //
+      // เลือกแก้ทางนี้แทนการเพิ่ม policy UPDATE เพราะ policy นั้นต้องเขียนเป็น
+      // bucket_id = 'report-images' ซึ่งจะเปิดให้ผู้ใช้คนใดก็ได้เขียนทับไฟล์ของคนอื่นทั้ง bucket
+      // รวมถึงรูปหลักฐานในรายงานของคนอื่นด้วย — แลกไม่คุ้มกับการประหยัดพื้นที่ไม่กี่ KB
+      // ไฟล์เก่าที่ค้างใน storage ไม่มีผลเสีย (ไม่มีใครอ้างถึงแล้ว) เหมือนที่คลังรูปสัตว์ทำอยู่
       const นามสกุล = ไฟล์.name.split('.').pop()
-      const ชื่อไฟล์ = `avatars/${user?.id || 'user'}.${นามสกุล}`
+      const ชื่อไฟล์ = `avatars/${user?.id || 'user'}_${Date.now()}.${นามสกุล}`
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('report-images').upload(ชื่อไฟล์, ไฟล์, { upsert: true })
+        .from('report-images').upload(ชื่อไฟล์, ไฟล์)
       if (uploadError) throw new Error(uploadError.message)
       const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
-      const publicUrl = urlData.publicUrl + '?t=' + Date.now()
+      const publicUrl = urlData.publicUrl
       const { error: updateError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', user.id)
       if (updateError) throw new Error(updateError.message)
       setรูปโปรไฟล์(publicUrl)
@@ -337,7 +347,7 @@ function ProfilePage({ user }) {
             <Camera size={15} className="text-white" />
           </button>
         </div>
-        <input ref={inputรูป} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปโปรไฟล์} />
+        <input ref={inputรูป} type="file" accept="image/*" className="hidden" onChange={เลือกรูปโปรไฟล์} />
 
         <h2 className="text-xl font-bold text-gray-800">{displayName}</h2>
         <p className="text-gray-500 text-sm mt-1">{user?.email || ''}</p>

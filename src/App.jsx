@@ -3,6 +3,8 @@
 
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { supabase } from './supabase'
 import BottomNav from './components/BottomNav'
 import { แสดงแถบนำทาง, ความสูงแถบนำทาง } from './utils/navVisibility'
@@ -75,6 +77,32 @@ function App() {
     // ยิงทั้ง REST endpoint และ Auth endpoint พร้อมกัน
     supabase.from('animals').select('id').limit(1).then(function () {}, function () {})
     supabase.auth.getSession().catch(function () {})
+  }, [])
+
+  // ต่ออายุ session ทุกครั้งที่กลับเข้าแอป (Android เท่านั้น)
+  //
+  // ปัญหา: token ของ Supabase อายุ 1 ชั่วโมง ตัวต่ออายุอัตโนมัติทำงานด้วย timer
+  // แต่ Android หยุด/หน่วง timer เมื่อแอปถูกพักไว้เบื้องหลังเพื่อประหยัดแบต
+  // พอผู้ใช้กลับมาแล้วกดส่งรายงาน token หมดอายุไปแล้ว เซิร์ฟเวอร์จึงมองเป็นคนที่ยังไม่ล็อกอิน
+  // → RLS ปฏิเสธ ขึ้นข้อความ "คุณไม่มีสิทธิ์ทำรายการนี้" ทั้งที่ผู้ใช้ล็อกอินอยู่แท้ๆ
+  //
+  // เจอจริงตอนทดสอบภาคสนาม: เซิร์ฟเวอร์ AI ตื่นจาก sleep ใช้เวลานาน ผู้ใช้สลับไปทำอย่างอื่น
+  // พอกลับมากดส่ง อัปโหลดรูปไม่ผ่าน ทั้งที่สิทธิ์ใน storage ตั้งไว้ถูกต้องทุกอย่าง
+  useEffect(function () {
+    if (!Capacitor.isNativePlatform()) return
+    let ตัวฟัง
+    CapApp.addListener('appStateChange', function ({ isActive }) {
+      if (isActive) {
+        // กลับเข้าแอป — ต่ออายุทันที ไม่รอ timer ที่อาจถูก Android แช่แข็งไว้
+        supabase.auth.startAutoRefresh()
+        supabase.auth.refreshSession().catch(function () { /* ไม่มี session ก็ไม่ต้องทำอะไร */ })
+      } else {
+        supabase.auth.stopAutoRefresh()
+      }
+    }).then(function (h) { ตัวฟัง = h })
+
+    supabase.auth.startAutoRefresh()
+    return function () { ตัวฟัง?.remove?.() }
   }, [])
 
   // รับ callback ของ Google Sign-In ที่เด้งกลับเข้าแอปผ่าน custom scheme (Android เท่านั้น)

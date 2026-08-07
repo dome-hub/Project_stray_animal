@@ -590,7 +590,7 @@ function TrackReport({ user }) {
                       </span>
                     )}
                   </div>
-                  <input ref={inputรูปแก้ไข} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={เลือกรูปแก้ไข} />
+                  <input ref={inputรูปแก้ไข} type="file" accept="image/*" className="hidden" onChange={เลือกรูปแก้ไข} />
                   <button onClick={() => inputรูปแก้ไข.current.click()}
                     className="w-full mt-2 flex items-center justify-center gap-2 border-2 border-dashed border-orange-300 rounded-xl py-2.5 text-sm font-medium text-orange-600 bg-orange-50/50">
                     <Camera size={16} className="shrink-0" /> {รายงานที่เปิด.image_url || พรีวิวรูปแก้ไข ? 'เปลี่ยนรูปภาพ' : 'อัปโหลดรูปภาพ'}
