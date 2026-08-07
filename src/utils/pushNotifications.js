@@ -15,7 +15,30 @@ import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { supabase } from '../supabase'
 
+// ---- สวิตช์เปิด/ปิดทั้งฟีเจอร์ ปิดไว้เป็นค่าเริ่มต้น ----
+//
+// ทำไมต้องมี: ตัว plugin ของ Capacitor เรียก FirebaseMessaging.getInstance() ตรงๆ
+// โดยไม่มี try/catch (ดู PushNotificationsPlugin.java บรรทัด 103)
+// ถ้าไม่มีไฟล์ android/app/google-services.json → ไม่มี FirebaseApp
+// → โยน IllegalStateException ในฝั่ง Java ซึ่ง try/catch ฝั่ง JavaScript ดักไม่ได้
+// → แอปดับทันทีที่ผู้ใช้กด "อนุญาต" การแจ้งเตือน แล้วดับซ้ำทุกครั้งที่เปิดใหม่
+//   เพราะ session ยังอยู่ โค้ดจึงวิ่งมาถึงจุดเดิมตลอด = เข้าแอปไม่ได้อีกเลย
+//
+// อันตรายเป็นพิเศษเพราะ android/ ในรีโปยังไม่มี plugin นี้ แต่ package.json มี
+// ใครก็ตามที่รัน `npx cap sync` (ซึ่งเป็นขั้นตอนปกติในคู่มือทุกเจ้า) จะได้แอปที่ดับทันที
+// สวิตช์นี้จึงกันไว้ที่ชั้น JavaScript ให้ปลอดภัยไม่ว่า native จะมี plugin หรือไม่
+//
+// ตอนนี้ google-services.json ถูก commit เข้ารีโปแล้ว (android/app/google-services.json)
+// เงื่อนไขที่ทำให้ดับจึงหมดไปสำหรับทุกคนที่ build จากรีโปนี้ ค่าเริ่มต้นจึงเป็น "เปิด"
+// ตั้ง VITE_ENABLE_PUSH=false ใน .env เมื่อต้องการปิดชั่วคราวเท่านั้น
+//
+// ⚠️ ค่านี้ผูกกับการมีอยู่ของ google-services.json โดยตรง
+// ถ้าไฟล์นั้นถูกลบออกจากรีโปเมื่อไหร่ ต้องกลับมาเปลี่ยนค่าเริ่มต้นตรงนี้เป็นปิดด้วย
+// ไม่งั้นแอปจะกลับไปดับตอนผู้ใช้กด "อนุญาต" เหมือนเดิม
+const เปิดใช้Push = import.meta.env.VITE_ENABLE_PUSH !== 'false'
+
 function ใช้ได้ไหม() {
+  if (!เปิดใช้Push) return false
   return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('PushNotifications')
 }
 

@@ -3,6 +3,7 @@ package com.jaengjorn.app;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import androidx.core.app.ActivityCompat;
@@ -11,14 +12,23 @@ import com.getcapacitor.BridgeActivity;
 
 // Capacitor เองไม่ได้ผูก WebView เข้ากับระบบขอสิทธิ์ของ Android ให้อัตโนมัติ
 // หน้าเว็บในแอปที่เรียก navigator.mediaDevices.getUserMedia() (เช่นหน้าถ่ายรูปแจ้งสัตว์)
-// จะโดนปฏิเสธเงียบๆ ถ้าไม่ override onPermissionRequest ตรงนี้ให้ส่งต่อไปขอสิทธิ์กล้องจริงจาก Android
+// หรือ navigator.geolocation (เช่นหน้าปักหมุดจุดพบสัตว์บนแผนที่ Leaflet)
+// จะโดนปฏิเสธเงียบๆ ถ้าไม่ override onPermissionRequest / onGeolocationPermissionsShowPrompt
+// ตรงนี้ให้ส่งต่อไปขอสิทธิ์จริงจาก Android
 public class MainActivity extends BridgeActivity {
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1002;
     private PermissionRequest pendingCameraRequest;
+    private GeolocationPermissions.Callback pendingGeoCallback;
+    private String pendingGeoOrigin;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // WebView ปิด geolocation ไว้เป็นค่าเริ่มต้น ต้องเปิดเองก่อน ไม่งั้น onGeolocationPermissionsShowPrompt
+        // จะไม่ถูกเรียกเลยแม้จะ override ไว้แล้วก็ตาม
+        this.bridge.getWebView().getSettings().setGeolocationEnabled(true);
 
         this.bridge.getWebView().setWebChromeClient(new WebChromeClient() {
             @Override
@@ -39,12 +49,38 @@ public class MainActivity extends BridgeActivity {
                     }
                 });
             }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(final String origin, final GeolocationPermissions.Callback callback) {
+                runOnUiThread(() -> {
+                    boolean มีสิทธิ์แล้ว =
+                        ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED
+                        || ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED;
+
+                    if (มีสิทธิ์แล้ว) {
+                        callback.invoke(origin, true, false);
+                    } else {
+                        // ยังไม่เคยขอสิทธิ์ตำแหน่งจาก Android มาก่อน — เก็บ callback ไว้ก่อน
+                        // แล้วเด้ง dialog ขอสิทธิ์ ผลลัพธ์จะกลับมาที่ onRequestPermissionsResult ด้านล่าง
+                        pendingGeoCallback = callback;
+                        pendingGeoOrigin = origin;
+                        ActivityCompat.requestPermissions(
+                            MainActivity.this,
+                            new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                            LOCATION_PERMISSION_REQUEST_CODE
+                        );
+                    }
+                });
+            }
         });
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         if (requestCode == CAMERA_PERMISSION_REQUEST_CODE && pendingCameraRequest != null) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 pendingCameraRequest.grant(pendingCameraRequest.getResources());
@@ -52,6 +88,19 @@ public class MainActivity extends BridgeActivity {
                 pendingCameraRequest.deny();
             }
             pendingCameraRequest = null;
+        }
+
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE && pendingGeoCallback != null) {
+            boolean granted = false;
+            for (int result : grantResults) {
+                if (result == PackageManager.PERMISSION_GRANTED) {
+                    granted = true;
+                    break;
+                }
+            }
+            pendingGeoCallback.invoke(pendingGeoOrigin, granted, false);
+            pendingGeoCallback = null;
+            pendingGeoOrigin = null;
         }
     }
 }
