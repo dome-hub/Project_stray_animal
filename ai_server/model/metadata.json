@@ -1,7 +1,5 @@
 {
-  "version": "stray_model_v4.1",
-  "img_size": 300,
-  "num_classes": 31,
+  "version": "stray_model_v4.3",
   "classes": [
     "american_bulldog",
     "american_pit_bull_terrier",
@@ -35,7 +33,8 @@
     "tortoiseshell",
     "yorkshire_terrier"
   ],
-  "test_accuracy": 0.9242718446601942,
+  "img_size": 300,
+  "test_accuracy": 0.9339805825242719,
   "breed_info": {
     "american_bulldog": {
       "ชื่อไทย": "อเมริกัน บูลด็อก",
