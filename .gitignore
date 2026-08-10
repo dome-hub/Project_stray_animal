@@ -39,6 +39,11 @@ tortoiseshell/
 thai_mixed_breed_dog/
 *.zip
 
+# ไฟล์ประกอบการทำเล่มรายงาน (ไดอะแกรม ERD/DFD/Flowchart, ภาพหน้าจอแอป, ไฟล์ Word)
+# ไม่ใช่ส่วนหนึ่งของโค้ดหรือการ deploy — และภาพหน้าจอบางรูปมีอีเมล/เบอร์โทรของผู้ใช้ทดสอบติดมาด้วย
+# ซึ่งไม่ควรอยู่ใน repo สาธารณะ ให้เก็บไว้ในเครื่อง/สำรองขึ้น Google Drive แทน
+docs/
+
 # Impeccable design skill — ติดตั้งผ่าน `npx impeccable install`, เป็นเครื่องมือ dev เฉพาะเครื่อง ไม่ต้อง commit (ไฟล์เยอะมาก ~60k บรรทัด)
 .claude/skills/
 
