@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 import onnxruntime as ort
 import numpy as np
 from PIL import Image
-import io, json, os, time
+import io, json, os, time, logging
 
 # ── โหลดโมเดล (ONNX Runtime — เบากว่า TensorFlow เต็มตัว รองรับ op ได้กว้างกว่า TFLite) ──
 print("กำลังโหลดโมเดล (ONNX)...")
@@ -50,6 +50,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Security logging (OWASP A09) ──────────────────────────────────────────────
+# เดิมไม่มีการบันทึกเลย ถ้ามีคนยิง API รัวหรือส่งไฟล์แปลกๆ เข้ามา จะไม่เหลือร่องรอย
+# ให้ตรวจย้อนหลังได้เลย ตอนนี้เขียนลง stdout ซึ่ง Render เก็บให้อัตโนมัติ
+# (ดูได้ที่ Render Dashboard → บริการ project-stray-animal-ai → แท็บ Logs)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+security_log = logging.getLogger('security')
+
+
+def บันทึกเหตุการณ์(เหตุการณ์: str, request: Request, รายละเอียด: str = ''):
+    """บันทึกเหตุการณ์ด้านความปลอดภัยพร้อม IP และ origin ผู้เรียก"""
+    security_log.warning(
+        'SECURITY event=%s ip=%s origin=%s ua=%s %s',
+        เหตุการณ์,
+        ไอพีผู้เรียก(request),
+        request.headers.get('origin', '-'),
+        (request.headers.get('user-agent', '-'))[:80],
+        รายละเอียด,
+    )
+
+
+# ป้องกันหน้าเว็บ/เอกสาร API ของเซิร์ฟเวอร์นี้ถูกฝัง iframe และถูกเดาชนิดไฟล์
+@app.middleware('http')
+async def เพิ่มSecurityHeaders(request: Request, call_next):
+    response = await call_next(request)
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
+
 # ── Rate limit: กันยิงรัวจนกินทรัพยากรเซิร์ฟเวอร์ (endpoint นี้เปิดสาธารณะ ไม่มี auth) ──
 # นับแบบ sliding window เก็บในหน่วยความจำ — รีเซ็ตเมื่อเซิร์ฟเวอร์ restart ซึ่งรับได้
 # สำหรับจุดประสงค์นี้ (กันสแปม ไม่ใช่กันคนตั้งใจโจมตีจริงจัง)
@@ -75,6 +108,8 @@ def เช็คRateLimit(request: Request):
         คิว.popleft()
 
     if len(คิว) >= RATE_LIMIT_MAX:
+        บันทึกเหตุการณ์('rate_limit_exceeded', request,
+                        f'calls={len(คิว)} window={RATE_LIMIT_WINDOW}s')
         raise HTTPException(429, "เรียกใช้ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่")
 
     คิว.append(ตอนนี้)
@@ -180,13 +215,16 @@ def health():
     return {"status": "healthy", "model_loaded": True}
 
 @app.post("/analyze")
-async def analyze(file: UploadFile = File(...), _rate = Depends(เช็คRateLimit)):
+async def analyze(request: Request, file: UploadFile = File(...), _rate = Depends(เช็คRateLimit)):
     # ตรวจสอบไฟล์
     if not file.content_type.startswith('image/'):
+        บันทึกเหตุการณ์('rejected_file_type', request,
+                        f'content_type={file.content_type} name={(file.filename or "")[:60]}')
         raise HTTPException(400, "กรุณาส่งไฟล์รูปภาพเท่านั้น")
 
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
+        บันทึกเหตุการณ์('rejected_file_too_large', request, f'bytes={len(contents)}')
         raise HTTPException(400, "ไฟล์ใหญ่เกินไป (max 10MB)")
 
     try:
@@ -202,4 +240,6 @@ async def analyze(file: UploadFile = File(...), _rate = Depends(เช็คRate
         result      = วิเคราะห์ผล(predictions)
         return {"success": True, "result": result}
     except Exception as e:
-        raise HTTPException(500, f"วิเคราะห์ไม่สำเร็จ: {str(e)}")
+        # อาจเป็นไฟล์ที่อ้างว่าเป็นรูปแต่เนื้อในไม่ใช่ (ปลอม content-type) — บันทึกไว้ตรวจย้อนหลัง
+        บันทึกเหตุการณ์('analyze_failed', request, f'error={type(e).__name__}')
+        raise HTTPException(500, "วิเคราะห์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง")

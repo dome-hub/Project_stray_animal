@@ -11,6 +11,50 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    # ── Security headers ──────────────────────────────────────────────────────
+    # เดิมไม่มี header กลุ่มนี้เลย เว็บจึงถูกฝังใน iframe ของเว็บอื่นได้ (clickjacking)
+    # และเบราว์เซอร์ไม่มีข้อจำกัดว่าหน้าเว็บโหลด script/เชื่อมต่อไปที่ไหนได้บ้าง
+    headers:
+      # ห้ามเว็บอื่นเอาหน้านี้ไปฝังใน iframe — กัน clickjacking (หลอกให้ผู้ใช้กดปุ่มโดยไม่รู้ตัว)
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      # ห้ามเบราว์เซอร์เดาชนิดไฟล์เอง — กันไฟล์ที่อัปโหลดมาถูกตีความเป็น script
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      # บังคับ HTTPS ทุกครั้งเป็นเวลา 1 ปี (กันถูกดักกลางทางตอนพิมพ์ http://)
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      # ส่ง referrer ข้ามโดเมนแค่ชื่อโดเมน ไม่ส่ง path ที่อาจมีข้อมูลอ่อนไหว
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      # ปิดสิทธิ์อุปกรณ์ที่แอปไม่ได้ใช้บนเว็บ (กล้อง/ตำแหน่ง ใช้ผ่าน Capacitor ฝั่งมือถือ)
+      - path: /*
+        name: Permissions-Policy
+        value: microphone=(), payment=(), usb=()
+      # CSP — จำกัดว่าโหลด/เชื่อมต่ออะไรได้บ้าง โดเมนทั้งหมดด้านล่างมาจากที่โค้ดเรียกใช้จริง
+      #   connect-src : Supabase (REST+realtime ต้องมี wss:) / เซิร์ฟเวอร์ AI / Nominatim (แปลงพิกัดเป็นชื่อสถานที่)
+      #   img-src     : https: ทั้งหมด เพราะรูปสัตว์มาจาก Supabase Storage และ tile แผนที่ OSM
+      #   style-src   : ต้องมี unsafe-inline เพราะ React ใส่ style ผ่าน attribute + Google Fonts
+      - path: /*
+        name: Content-Security-Policy
+        value: >-
+          default-src 'self';
+          script-src 'self';
+          style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+          font-src 'self' data: https://fonts.gstatic.com;
+          img-src 'self' data: blob: https:;
+          connect-src 'self' https://ipvidrxuajcpuqzevpnj.supabase.co
+          wss://ipvidrxuajcpuqzevpnj.supabase.co
+          https://project-stray-animal-ai.onrender.com
+          https://nominatim.openstreetmap.org;
+          frame-ancestors 'none';
+          base-uri 'self';
+          form-action 'self';
+          object-src 'none'
 
   - type: web
     name: project-stray-animal-ai

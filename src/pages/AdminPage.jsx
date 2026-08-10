@@ -13,7 +13,7 @@ import {
   Shield, Users, FileText, PawPrint, Heart, User, HardHat, Map,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
   CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2,
-  ChevronLeft, ChevronRight, X,
+  ChevronLeft, ChevronRight, X, ScrollText, Trash2, RefreshCw,
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { หมุดสี } from '../utils/mapMarker'
@@ -84,6 +84,30 @@ const เลเบลRole = {
   admin:     'ผู้ดูแลระบบ (Admin)',
 }
 
+// ---- บันทึกการใช้งาน (audit log) ----
+// action ที่ trigger ฝั่งฐานข้อมูลเขียนเข้ามา (ดู supabase-audit-log.sql)
+// แต่ละแบบมีสีตามระดับความอ่อนไหว — เปลี่ยนสิทธิ์/ลบข้อมูล ต้องสะดุดตาที่สุด
+const ชนิดLog = {
+  role_changed:          { ป้าย: 'เปลี่ยนสิทธิ์ผู้ใช้', สี: 'bg-purple-50 text-purple-700', Icon: UserCog },
+  user_suspended:        { ป้าย: 'ระงับบัญชี',          สี: 'bg-red-50 text-red-700',       Icon: Ban },
+  user_unsuspended:      { ป้าย: 'ปลดระงับบัญชี',       สี: 'bg-green-50 text-green-700',   Icon: CheckCircle2 },
+  report_status_changed: { ป้าย: 'เปลี่ยนสถานะรายงาน',  สี: 'bg-blue-50 text-blue-700',     Icon: FileText },
+  reports_deleted:       { ป้าย: 'ลบรายงาน',            สี: 'bg-red-50 text-red-700',       Icon: Trash2 },
+  animals_deleted:       { ป้าย: 'ลบข้อมูลสัตว์',        สี: 'bg-red-50 text-red-700',       Icon: Trash2 },
+  lost_pets_deleted:     { ป้าย: 'ลบประกาศสัตว์หาย',     สี: 'bg-red-50 text-red-700',       Icon: Trash2 },
+}
+
+function ข้อมูลLog(action) {
+  return ชนิดLog[action] || { ป้าย: action, สี: 'bg-gray-100 text-gray-600', Icon: ScrollText }
+}
+
+// สรุปค่าที่เปลี่ยนให้อ่านง่าย เช่น {"role":"user"} → user
+function ย่อค่า(v) {
+  if (v === null || v === undefined) return null
+  const ค่า = Object.values(v)[0]
+  return ค่า === null || ค่า === undefined ? null : String(ค่า)
+}
+
 function AdminPage({ หน้า, user }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -136,6 +160,12 @@ function AdminPage({ หน้า, user }) {
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
   const [โหลดExport, setโหลดExport] = useState(true)
+
+  // ---- State: บันทึกการใช้งาน (audit log) ----
+  const [รายการLog, setรายการLog]     = useState([])
+  const [โหลดLog, setโหลดLog]         = useState(true)
+  const [โหลดLogพลาด, setโหลดLogพลาด] = useState(false)
+  const [กรองLog, setกรองLog]         = useState('')   // '' = ทุกประเภท
 
   // ---- State: แผนที่รายงาน (พื้นที่) ----
   const [รายงานพิกัด, setรายงานพิกัด] = useState([])
@@ -206,6 +236,32 @@ function AdminPage({ หน้า, user }) {
         ผู้ใช้ใหม่: ร11.count || 0,
       })
       setโหลดDashboard(false)
+  }
+
+  // ---- ดึงบันทึกการใช้งาน (audit log) ----
+  // ตาราง audit_logs ให้ select ได้เฉพาะ admin (RLS) และไม่มี policy insert/update/delete
+  // เลย แปลว่าแก้/ลบ log ผ่าน API ไม่ได้ มีแค่ trigger ฝั่ง DB ที่เขียนเข้ามาได้
+  useEffect(function () {
+    if (หน้า !== 'logs') return
+    ดึงLog()
+    ดึงผู้ใช้()   // log เก็บแค่ uuid — ต้องมีรายชื่อไว้แปลงเป็นชื่อคนให้อ่านออก
+  }, [หน้า])
+
+  async function ดึงLog() {
+    setโหลดLog(true)
+    setโหลดLogพลาด(false)
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) {
+      console.error('ดึงบันทึกการใช้งานไม่สำเร็จ:', error.message)
+      setโหลดLogพลาด(true)
+    } else {
+      setรายการLog(data || [])
+    }
+    setโหลดLog(false)
   }
 
   // ---- ดึงรายชื่อผู้ใช้ ----
@@ -512,7 +568,15 @@ function AdminPage({ หน้า, user }) {
     areas:     'จัดการพื้นที่',
     export:    'Export รายงาน',
     settings:  'ตั้งค่าระบบ',
+    logs:      'บันทึกการใช้งาน',
   }
+
+  // รายชื่อผู้ใช้ที่โหลดไว้แล้ว ใช้แปลง actor_id / record_id ใน log เป็นชื่อคน
+  const ชื่อจากId = new Map(รายการผู้ใช้.map(function (u) { return [u.id, u.name || u.email] }))
+
+  const logที่กรอง = กรองLog
+    ? รายการLog.filter(function (l) { return l.action === กรองLog })
+    : รายการLog
 
   return (
     <div className="min-h-screen bg-purple-50 pb-8">
@@ -649,6 +713,15 @@ function AdminPage({ หน้า, user }) {
                 >
                   <span className="flex items-center gap-3 text-sm font-medium text-gray-800">
                     <Download size={16} className="text-gray-500 shrink-0" /> ไปหน้า Export รายงาน
+                  </span>
+                  <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                </button>
+                <button
+                  onClick={() => navigate('/admin/logs')}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  <span className="flex items-center gap-3 text-sm font-medium text-gray-800">
+                    <ScrollText size={16} className="text-gray-500 shrink-0" /> บันทึกการใช้งานระบบ
                   </span>
                   <ChevronRight size={16} className="text-gray-300 shrink-0" />
                 </button>
@@ -1059,6 +1132,98 @@ function AdminPage({ หน้า, user }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ======== บันทึกการใช้งาน (audit log) ======== */}
+      {หน้า === 'logs' && (
+        <div className="px-4 pt-4 space-y-4">
+
+          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <Lock size={16} className="text-purple-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-gray-500 leading-relaxed">
+                บันทึกโดยฐานข้อมูลโดยตรง ไม่ผ่านหน้าเว็บ จึงลบหรือแก้ไขไม่ได้
+                แสดง 200 รายการล่าสุด
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <select
+                value={กรองLog}
+                onChange={(e) => setกรองLog(e.target.value)}
+                className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 bg-white"
+              >
+                <option value="">ทุกประเภท ({รายการLog.length})</option>
+                {Object.keys(ชนิดLog).map(function (k) {
+                  const n = รายการLog.filter(function (l) { return l.action === k }).length
+                  return n > 0 ? <option key={k} value={k}>{ชนิดLog[k].ป้าย} ({n})</option> : null
+                })}
+              </select>
+              <button
+                onClick={ดึงLog}
+                aria-label="โหลดใหม่"
+                className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              >
+                <RefreshCw size={16} className={โหลดLog ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {โหลดLog ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-sm text-gray-400">กำลังโหลดบันทึก...</p>
+            </div>
+          ) : โหลดLogพลาด ? (
+            <LoadFailed onRetry={ดึงLog} สิ่งที่โหลด="บันทึกการใช้งาน" สี="purple" />
+          ) : logที่กรอง.length === 0 ? (
+            <div className="text-center py-16 px-4">
+              <ScrollText size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
+              <p className="font-medium text-gray-600">ยังไม่มีบันทึกการใช้งาน</p>
+              <p className="text-xs text-gray-400 mt-1">
+                เมื่อมีการเปลี่ยนสิทธิ์ ระงับบัญชี หรือลบข้อมูล จะแสดงที่นี่
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100 overflow-hidden">
+              {logที่กรอง.map(function (l) {
+                const ชนิด = ข้อมูลLog(l.action)
+                const เก่า  = ย่อค่า(l.old_value)
+                const ใหม่  = ย่อค่า(l.new_value)
+                const ผู้ทำ = l.actor_id ? (ชื่อจากId.get(l.actor_id) || 'ผู้ใช้ที่ถูกลบแล้ว') : 'ระบบ'
+                const เป้าหมาย = l.table_name === 'users' ? ชื่อจากId.get(l.record_id) : null
+                return (
+                  <div key={l.id} className="px-4 py-3.5 flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${ชนิด.สี}`}>
+                      <ชนิด.Icon size={15} className="shrink-0" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-800 truncate">{ชนิด.ป้าย}</p>
+                        <span className="text-xs text-gray-400 shrink-0">
+                          {new Date(l.created_at).toLocaleString('th-TH', {
+                            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 break-all">
+                        โดย {ผู้ทำ}
+                        {เป้าหมาย && <> · ต่อ {เป้าหมาย}</>}
+                        {!เป้าหมาย && l.record_id && <> · {l.table_name} #{l.record_id}</>}
+                      </p>
+                      {(เก่า || ใหม่) && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {เก่า || '-'} <span className="text-gray-300">→</span>{' '}
+                          <span className="font-medium text-gray-600">{ใหม่ || 'ถูกลบ'}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

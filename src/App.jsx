@@ -340,6 +340,8 @@ function App() {
         <Route path="/admin/areas"     element={ต้องRole(<AdminPage หน้า="areas"     user={user} />, 'admin')} />
         <Route path="/admin/export"    element={ต้องRole(<AdminPage หน้า="export"    user={user} />, 'admin')} />
         <Route path="/admin/settings"  element={ต้องRole(<AdminPage หน้า="settings"  user={user} />, 'admin')} />
+        {/* บันทึกการใช้งาน (audit log) — ข้อมูลจาก trigger ฝั่ง DB ดูได้เฉพาะ admin */}
+        <Route path="/admin/logs"      element={ต้องRole(<AdminPage หน้า="logs"      user={user} />, 'admin')} />
 
         {/* ต้องอยู่ท้ายสุดเสมอ — URL ที่ไม่ตรง route ไหนเลยเคยได้หน้าขาวไม่มีตัวอักษรสักตัว */}
         <Route path="*" element={<NotFoundPage user={user} />} />
