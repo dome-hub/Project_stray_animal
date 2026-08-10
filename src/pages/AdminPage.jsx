@@ -10,10 +10,13 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
-  Shield, Users, FileText, PawPrint, Heart, User, HardHat, Map,
+  Shield, Users, FileText, PawPrint, Heart, User, HardHat,
   Download, Lightbulb, Bell, Globe, Settings, Database, Save, Ban,
   CheckCircle2, Home, Lock, ArrowLeft, UserCog, Loader2,
   ChevronLeft, ChevronRight, X, ScrollText, Trash2, RefreshCw,
+  // ต้อง alias — ชื่อ Map ตรงกับ Map ของ JavaScript พอ import ตรงๆ จะบังทับทั้งไฟล์
+  // ทำให้ new Map() กลายเป็นการ new ตัวไอคอนแล้วพังทั้งหน้า (เคยเกิดมาแล้ว)
+  Map as MapIcon,
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { หมุดสี } from '../utils/mapMarker'
@@ -936,7 +939,7 @@ function AdminPage({ หน้า, user }) {
           {/* แผนที่ภาพรวมรายงาน — ขอบเขตพื้นที่ย้ายมารวมเป็นบรรทัดรองใต้หัวข้อ แทนกล่องสีแยกต่างหาก (เดิมใช้ indigo ซึ่งไม่ตรงกับโทนม่วงที่ใช้ทั้งฝั่ง admin) */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-0.5">
-              <p className="font-bold text-gray-800 flex items-center gap-2"><Map size={18} className="text-gray-500 shrink-0" /> แผนที่รายงานทั้งหมด</p>
+              <p className="font-bold text-gray-800 flex items-center gap-2"><MapIcon size={18} className="text-gray-500 shrink-0" /> แผนที่รายงานทั้งหมด</p>
               {!โหลดแผนที่ && (
                 <span className="text-xs text-gray-400">
                   {รายงานที่กรอง.length === รายงานพิกัด.length
