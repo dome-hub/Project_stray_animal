@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /volunteer
+Disallow: /admin
+Allow: /

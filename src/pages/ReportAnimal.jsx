@@ -561,21 +561,15 @@ function ReportAnimal({ user }) {
       }
     }
 
-    // ดึงคลังรูปล่าสุดของเคสเดิมมาต่อท้าย (photos เก็บรูปเพิ่มเติมจากผู้แจ้งคนอื่น)
-    const { data: เดิม } = await supabase
-      .from('reports').select('photos, detail').eq('id', เคสซ้ำ.id).single()
-
-    const รูปเดิม  = Array.isArray(เดิม?.photos) ? เดิม.photos : []
-    const รูปใหม่  = imageUrl ? [...รูปเดิม, imageUrl] : รูปเดิม
-    const หมายเหตุ = รายละเอียด.trim()
-      ? [เดิม?.detail, `[แจ้งเพิ่มเติม] ${รายละเอียด.trim()}`].filter(Boolean).join('\n')
-      : เดิม?.detail
-
-    const { error } = await supabase.from('reports').update({
-      photos:     รูปใหม่.length > 0 ? รูปใหม่ : null,
-      detail:     หมายเหตุ,
-      updated_at: new Date().toISOString(),
-    }).eq('id', เคสซ้ำ.id)
+    // เพิ่มรูป/รายละเอียดเข้าเคสของคนอื่นผ่าน RPC เท่านั้น (ไม่ใช่ .update() ตรงๆ)
+    // เพราะ RLS ของ reports จำกัดให้แก้ได้แค่รายงานของตัวเองหรือของ staff แล้ว
+    // ฟังก์ชันนี้เป็นทางเดียวที่คนอื่นแตะรายงานที่ไม่ใช่ของตัวเองได้ และถูกจำกัด
+    // ไว้แค่ photos/detail/updated_at เท่านั้น (ดู supabase-fix-reports-update.sql)
+    const { error } = await supabase.rpc('แนบข้อมูลเข้าเคสซ้ำ', {
+      id_เคส: เคสซ้ำ.id,
+      รูปใหม่: imageUrl,
+      รายละเอียดเพิ่ม: รายละเอียด.trim() || null,
+    })
 
     setกำลังรวมเคส(false)
     if (error) { toastError(ข้อความError(error, 'แนบข้อมูลเข้าเคสเดิม')); return }

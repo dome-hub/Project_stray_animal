@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- allowBackup="false" — เดิมเป็น true ซึ่งทำให้ session token (เก็บใน WebView
+         localStorage โดย supabase-js) ถูกดึงออกได้ตรงๆ ผ่าน `adb backup` หรือระบบสำรอง
+         ข้อมูลของ Android โดยไม่ต้องมี XSS เลย ปิดไว้เพราะแอปนี้ไม่มีเหตุผลต้องให้
+         Android สำรอง/กู้คืนข้อมูลแอปอัตโนมัติ -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
