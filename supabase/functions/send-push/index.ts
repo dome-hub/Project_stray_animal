@@ -102,9 +102,28 @@ Deno.serve(async (req) => {
 
     const accessToken = await ขอAccessToken(sa)
 
+    // ── ตัดสินว่าแตะแจ้งเตือนแล้วควรเปิดหน้าไหน ──────────────────────────────────
+    // แจ้งเตือน "เคสใหม่รอรับเรื่อง" ที่ส่งหาเจ้าหน้าที่ (สร้างโดย RPC แจ้งเตือนเจ้าหน้าที่เคสใหม่
+    // ดู supabase-notify-staff-new-report.sql) ต้องพาไปหน้ารายการเคสของเจ้าหน้าที่
+    // ไม่ใช่ /track ซึ่งเป็นหน้าติดตามรายงาน "ของผู้แจ้งเอง" — เจ้าหน้าที่ไม่ใช่เจ้าของเคสนั้น
+    // ถ้าพาไป /track?open=<id> จะไม่เจอรายงานในลิสต์ กลายเป็นเปิดมาแล้วไม่มีอะไรขึ้น
+    //
+    // เช็ค role ด้วย ไม่ใช่ดูหัวข้ออย่างเดียว เพราะเจ้าหน้าที่ก็เป็นชาวบ้านที่แจ้งเคสเองได้
+    // การ์ด "ส่งรายงานสำเร็จ" ของเขาต้องยังพาไป /track เหมือนผู้ใช้ทั่วไป
+    const { data: ผู้รับ } = await admin
+      .from('users')
+      .select('role')
+      .eq('id', noti.user_id)
+      .maybeSingle()
+
+    const เป็นเคสใหม่ของเจ้าหน้าที่ =
+      ผู้รับ?.role === 'volunteer' && String(noti.title || '').includes('เคสใหม่')
+
     // เลขรายงานอยู่ใน title หรือ body — ดึงมาทำลิงก์เปิดหน้าติดตามเคสนั้นตรงๆ
     const m = String(`${noti.title || ''} ${noti.body || ''}`).match(/#(\d+)/)
-    const path = m ? `/track?open=${parseInt(m[1], 10)}` : '/notifications'
+    const path = เป็นเคสใหม่ของเจ้าหน้าที่
+      ? '/volunteer/reports'
+      : (m ? `/track?open=${parseInt(m[1], 10)}` : '/notifications')
 
     const ผล = await Promise.all(tokens.map(async ({ token }) => {
       const res = await fetch(

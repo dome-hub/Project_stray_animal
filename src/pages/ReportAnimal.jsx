@@ -506,6 +506,19 @@ function ReportAnimal({ user }) {
           type:    'report_update',
           is_read: false,
         })
+
+        // แจ้งเตือนเจ้าหน้าที่ว่ามีเคสใหม่เข้ามา
+        // ต้องผ่าน RPC เพราะ policy notifications_insert ยอมให้ผู้ใช้ทั่วไป insert ได้
+        // เฉพาะแถวที่ user_id เป็นตัวเอง — insert หา user_id ของเจ้าหน้าที่ตรงๆ จะโดน RLS ปฏิเสธ
+        // (ดู supabase-notify-staff-new-report.sql)
+        //
+        // ถ้าพลาดให้ log เงียบๆ ห้าม toastError เด็ดขาด เพราะรายงานถูกบันทึกสำเร็จไปแล้ว
+        // ถ้าเด้ง error ตรงนี้ผู้แจ้งจะเข้าใจผิดว่าส่งรายงานไม่สำเร็จแล้วกดส่งซ้ำ
+        const { error: แจ้งเจ้าหน้าที่พลาด } = await supabase
+          .rpc('แจ้งเตือนเจ้าหน้าที่เคสใหม่', { id_รายงาน: data.id })
+        if (แจ้งเจ้าหน้าที่พลาด) {
+          console.error('แจ้งเตือนเจ้าหน้าที่ไม่สำเร็จ:', แจ้งเจ้าหน้าที่พลาด.message, แจ้งเจ้าหน้าที่พลาด.code)
+        }
       }
       setรหัสรายงาน(data.id)
       setส่งสำเร็จ(true)
