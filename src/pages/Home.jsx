@@ -96,56 +96,87 @@ function Home({ user, onLogout }) {
   useEffect(function () {
     if (!user?.id) return
 
-    const lsDelKey  = `noti_deleted_${user.id}`
-    const lsReadKey = `noti_read_${user.id}`
-    let deletedSet = new Set()
-    let readSet    = new Set()
-    try {
-      const d = localStorage.getItem(lsDelKey)
-      const r = localStorage.getItem(lsReadKey)
-      if (d) deletedSet = new Set(JSON.parse(d))
-      if (r) readSet    = new Set(JSON.parse(r))
-    } catch {}
+    // อ่านรายการที่เคยกดอ่าน/ลบใหม่ทุกครั้งที่นับ ไม่ใช่อ่านครั้งเดียวตอน mount
+    // เพราะผู้ใช้อาจเพิ่งไปกดอ่านที่หน้า /notifications แล้วกดย้อนกลับมา
+    // ถ้าใช้ค่าเก่าที่อ่านไว้ตอน mount ตัวเลขบนกระดิ่งจะไม่ลดลงตาม
+    function อ่านรายการLocal() {
+      let deletedSet = new Set()
+      let readSet    = new Set()
+      try {
+        const d = localStorage.getItem(`noti_deleted_${user.id}`)
+        const r = localStorage.getItem(`noti_read_${user.id}`)
+        if (d) deletedSet = new Set(JSON.parse(d))
+        if (r) readSet    = new Set(JSON.parse(r))
+      } catch {}
+      return { deletedSet, readSet }
+    }
+
+    let ถูกยกเลิกแล้ว = false
+    function ตั้งค่า(n) { if (!ถูกยกเลิกแล้ว) setยังไม่อ่าน(n) }
+
+    async function นับใหม่() {
+      const { deletedSet, readSet } = อ่านรายการLocal()
+
+      if (role === 'user') {
+        // นับจาก notifications table โดยตรง
+        const { count } = await supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+        ตั้งค่า(count || 0)
+        return
+      }
+
+      // เจ้าหน้าที่และแอดมิน: unread = เคส "รอดำเนินการ" ที่ยังไม่ถูกอ่านหรือลบ
+      // แอดมินเก็บ key ใน localStorage โดยเติม 'r' นำหน้า id (คนละชุดกับเจ้าหน้าที่)
+      const เติมPrefix = role === 'admin' ? function (id) { return 'r' + id } : function (id) { return id }
+      const { data } = await supabase
+        .from('reports')
+        .select('id')
+        .eq('status', 'รอดำเนินการ')
+      const n = (data || []).filter(function (r) {
+        const key = เติมPrefix(r.id)
+        return !deletedSet.has(key) && !readSet.has(key)
+      }).length
+      ตั้งค่า(n)
+    }
+
+    นับใหม่()
+
+    // ── ทำให้ตัวเลขบนกระดิ่งขยับเองโดยไม่ต้องรีเฟรชหน้า ──────────────────────────
+    // เดิมนับแค่ครั้งเดียวตอนเปิดหน้า Home พอมีคนแจ้งเคสเข้ามาระหว่างที่เจ้าหน้าที่
+    // ค้างอยู่ในแอป ตัวเลขจึงไม่ขึ้น ต้องกดเข้าไปหน้าแจ้งเตือนถึงจะเห็นว่ามีเคสใหม่
+    //
+    // ฟังทั้ง 2 ตาราง เพราะแต่ละ role นับคนละแหล่ง:
+    //   user            -> ตาราง notifications (แถวของตัวเอง)
+    //   volunteer/admin -> ตาราง reports (เคสที่สถานะ 'รอดำเนินการ')
+    // ฟัง UPDATE ของ reports ด้วย ไม่ใช่แค่ INSERT เพราะพอเจ้าหน้าที่กดรับเรื่อง
+    // สถานะจะเปลี่ยนจาก 'รอดำเนินการ' เป็นอย่างอื่น ตัวเลขต้องลดลงตามด้วย
+    // ชื่อ channel ใช้อักษรอังกฤษ เพราะชื่อนี้ถูกส่งเป็น topic ของ WebSocket
+    // ภาษาไทยอาจมีปัญหาการเข้ารหัสกับ proxy บางตัว (โค้ดเดิมใน App.jsx ก็ใช้อังกฤษ)
+    const ช่อง = supabase.channel(`bell-${user.id}`)
 
     if (role === 'user') {
-      // นับจาก notifications table โดยตรง
-      supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-        .then(function ({ count }) { setยังไม่อ่าน(count || 0) })
-      return
+      ช่อง.on('postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        นับใหม่)
+    } else {
+      ช่อง.on('postgres_changes',
+        { event: '*', schema: 'public', table: 'reports' },
+        นับใหม่)
     }
+    ช่อง.subscribe()
 
-    if (role === 'volunteer') {
-      // unread = รอดำเนินการ ที่ยังไม่ถูกอ่านหรือลบ
-      supabase
-        .from('reports')
-        .select('id')
-        .eq('status', 'รอดำเนินการ')
-        .then(function ({ data }) {
-          const n = (data || []).filter(function (r) {
-            return !deletedSet.has(r.id) && !readSet.has(r.id)
-          }).length
-          setยังไม่อ่าน(n)
-        })
-      return
-    }
+    // กลับมาที่แท็บ/เปิดแอปขึ้นมาใหม่ ให้นับใหม่ด้วย
+    // กันกรณีที่ realtime หลุดตอนแอปอยู่เบื้องหลัง (มือถือตัดการเชื่อมต่อเพื่อประหยัดแบต)
+    function เมื่อกลับมาดู() { if (document.visibilityState === 'visible') นับใหม่() }
+    document.addEventListener('visibilitychange', เมื่อกลับมาดู)
 
-    if (role === 'admin') {
-      // unread = รอดำเนินการ ที่ยังไม่ถูกอ่านหรือลบ (id prefix 'r')
-      supabase
-        .from('reports')
-        .select('id')
-        .eq('status', 'รอดำเนินการ')
-        .then(function ({ data }) {
-          const n = (data || []).filter(function (r) {
-            return !deletedSet.has('r' + r.id) && !readSet.has('r' + r.id)
-          }).length
-          setยังไม่อ่าน(n)
-        })
-      return
+    return function () {
+      ถูกยกเลิกแล้ว = true
+      document.removeEventListener('visibilitychange', เมื่อกลับมาดู)
+      supabase.removeChannel(ช่อง)
     }
   }, [user?.id, role])
 
