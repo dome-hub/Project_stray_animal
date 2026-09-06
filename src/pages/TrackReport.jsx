@@ -32,6 +32,7 @@ const สีสถานะTR = {
   'ยุติการค้นหา':        'text-gray-600 bg-gray-100',
   'เคสซ้ำซ้อน':          'text-gray-600 bg-gray-100',
   'ยกเลิกโดยผู้แจ้ง':    'text-gray-600 bg-gray-100',
+  'ปฏิเสธ (ไม่เกี่ยวข้อง)': 'text-gray-600 bg-gray-100',
 }
 function สีจากสถานะTR(status) {
   return สีสถานะTR[status] || 'text-gray-600 bg-gray-50'
@@ -100,7 +101,7 @@ function จัดกลุ่มตามวันที่TR(รายกา�
 // ================================================================
 
 // สถานะปิดเคสร่วมทุกประเภท
-const สถานะปิดเคสร่วมTR = ['ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง', 'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต', 'เคสซ้ำซ้อน', 'ยกเลิกโดยผู้แจ้ง']
+const สถานะปิดเคสร่วมTR = ['ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง', 'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต', 'เคสซ้ำซ้อน', 'ยกเลิกโดยผู้แจ้ง', 'ปฏิเสธ (ไม่เกี่ยวข้อง)']
 
 // ป้ายจุดที่ 3 ต่อประเภท
 const ป้ายจุด3TR = {
@@ -689,6 +690,12 @@ function TrackReport({ user }) {
                   <Ban size={28} className="text-gray-400 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-gray-600">คุณได้ยกเลิกรายงานนี้แล้ว</p>
                   <p className="text-xs text-gray-400 mt-1">หากยังพบสัตว์ตัวนี้อยู่ สามารถแจ้งใหม่ได้ทุกเมื่อ</p>
+                </div>
+              ) : รายงานที่เปิด.status === 'ปฏิเสธ (ไม่เกี่ยวข้อง)' ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
+                  <Ban size={28} className="text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-gray-600">เจ้าหน้าที่ปิดรายงานนี้แล้ว</p>
+                  <p className="text-xs text-gray-400 mt-1">พิจารณาแล้วว่าไม่เกี่ยวข้องกับการแจ้งเหตุสัตว์จรจัด หากเป็นความเข้าใจผิด กรุณาติดต่อเจ้าหน้าที่</p>
                 </div>
               ) : สถานะที่รับเรื่อง.includes(รายงานที่เปิด.status) ? (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">

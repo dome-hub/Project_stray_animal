@@ -89,6 +89,7 @@ const ขั้นตอนตามสถานะ = {
   'ยุติการค้นหา':        3,
   'เคสซ้ำซ้อน':          3,
   'ยกเลิกโดยผู้แจ้ง':    3,
+  'ปฏิเสธ (ไม่เกี่ยวข้อง)': 3,
 }
 const ขั้นตอนทั้งหมด = ['แจ้งเข้า', 'รับเรื่อง', 'ลงพื้นที่', 'ปิดเคส']
 
@@ -110,6 +111,7 @@ const สีสถานะ = {
   'ยุติการค้นหา':        'text-gray-600 bg-gray-100 border-gray-200',
   'เคสซ้ำซ้อน':          'text-gray-600 bg-gray-100 border-gray-200',
   'ยกเลิกโดยผู้แจ้ง':    'text-gray-600 bg-gray-100 border-gray-200',
+  'ปฏิเสธ (ไม่เกี่ยวข้อง)': 'text-gray-600 bg-gray-100 border-gray-200',
 }
 
 // สถานะปิดเคส (terminal) เริ่มต้น — ใช้กับสัตว์บาดเจ็บ/พลัดหลง
@@ -161,7 +163,7 @@ const เวิร์กโฟลว์ตามประเภท = {
 // เคสถือว่า "ปิด" (จบภารกิจฝั่ง dispatch) แล้ว → หมุดหายจากแผนที่ + ออกจากหน้าอัปเดตสถานะ + ย้ายไปแท็บประวัติ
 // "อยู่ศูนย์พักพิง" นับเป็นปิดภารกิจภาคสนามของ "ทุกประเภท" (ไม่ใช่แค่สัตว์ดุร้าย) — พอสัตว์มาถึงศูนย์แล้ว
 // การดูแลต่อ (รักษา / พักฟื้น / หาบ้าน) จะย้ายไปทำที่หน้า "จัดการข้อมูลสัตว์" ซึ่งสร้าง profile ให้อัตโนมัติแล้ว
-const สถานะปิดร่วม = ['อยู่ศูนย์พักพิง', 'ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง', 'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต', 'เคสซ้ำซ้อน', 'ยกเลิกโดยผู้แจ้ง']
+const สถานะปิดร่วม = ['อยู่ศูนย์พักพิง', 'ส่งคืนเจ้าของสำเร็จ', 'มีผู้รับเลี้ยง', 'ยุติการค้นหา', 'ปล่อยกลับถิ่นเดิม', 'เสียชีวิต', 'เคสซ้ำซ้อน', 'ยกเลิกโดยผู้แจ้ง', 'ปฏิเสธ (ไม่เกี่ยวข้อง)']
 function เป็นเคสปิด(report) {
   return สถานะปิดร่วม.includes(report.status)
 }
@@ -215,7 +217,13 @@ function ตัวเลือกอัปเดตสถานะ(report) {
   if (stepIdx < 1) progress.push({ value: 'รับเรื่องแล้ว', label: 'รับเรื่องแล้ว' })
   if (stepIdx < 2) progress.push({ value: 'ลงพื้นที่แล้ว', label: 'ลงพื้นที่แล้ว' })
   if (ถึงลงพื้นที่) progress.push(...wf.dynamic)
-  return { progress, close: ถึงลงพื้นที่ ? (wf.close || สถานะปิดเคสเริ่มต้น) : [] }
+  return {
+    progress,
+    close: ถึงลงพื้นที่ ? (wf.close || สถานะปิดเคสเริ่มต้น) : [],
+    // ปฏิเสธเคสสแปม/ไม่เกี่ยวข้อง — ต้องกดได้ทุกขั้นตอน ไม่รอให้ถึงลงพื้นที่ก่อนเหมือน close
+    // เพราะบังคับให้เจ้าหน้าที่ "รับเรื่อง" + "ลงพื้นที่" ปลอมๆ ก่อนจะปิดเคสสแปมได้ ไม่มีประโยชน์อะไร
+    reject: [{ value: 'ปฏิเสธ (ไม่เกี่ยวข้อง)', label: 'ปฏิเสธ (ไม่เกี่ยวข้อง) / สแปม' }],
+  }
 }
 
 const สีสถานะสัตว์ = {
@@ -446,6 +454,7 @@ function VolunteerPage({ หน้า }) {
   const [ข้อมูลผู้แจ้ง,  setข้อมูลผู้แจ้ง]  = useState(null)   // { name, phone, email }
   const [โหลดผู้แจ้ง,   setโหลดผู้แจ้ง]   = useState(false)
   const [กำลังรับเรื่อง, setกำลังรับเรื่อง] = useState(false)
+  const [กำลังปฏิเสธ,   setกำลังปฏิเสธ]   = useState(false)
 
   // ---- อัปเดตสถานะ ----
   const [สถานะใหม่,   setSถานะใหม่]   = useState('')
@@ -819,6 +828,62 @@ function VolunteerPage({ หน้า }) {
     setกำลังรับเรื่อง(false)
   }
 
+  // ปฏิเสธเคสตั้งแต่หน้า Inbox (ก่อนรับเรื่อง) — สำหรับเคสสแปม/ไม่เกี่ยวข้องที่เห็นได้ชัดตั้งแต่แรก
+  // ไม่ต้องบังคับกด "รับเรื่อง" ก่อนเหมือนสถานะปิดเคสอื่นๆ ในหน้าอัปเดต (ดู ตัวเลือกอัปเดตสถานะ)
+  async function ปฏิเสธจากInbox() {
+    if (!รายงานที่เปิด || กำลังปฏิเสธ) return
+    setกำลังปฏิเสธ(true)
+
+    const report = รายงานที่เปิด
+    // เงื่อนไข .eq('status','รอดำเนินการ') เดียวกับรับเรื่อง — กันเพื่อนร่วมงานปฏิเสธเคสที่มีคนรับไปแล้วพอดี
+    const { data: อัปเดตแล้ว, error } = await supabase
+      .from('reports')
+      .update({ status: 'ปฏิเสธ (ไม่เกี่ยวข้อง)', updated_at: new Date().toISOString() })
+      .eq('id', report.id)
+      .eq('status', 'รอดำเนินการ')
+      .select('id')
+
+    if (error) {
+      toastError(ข้อความError(error, 'ปฏิเสธเคส'))
+      setกำลังปฏิเสธ(false)
+      return
+    }
+
+    if (!อัปเดตแล้ว || อัปเดตแล้ว.length === 0) {
+      toastError('เคสนี้มีเจ้าหน้าที่คนอื่นดำเนินการไปแล้ว กรุณารีเฟรชรายการ')
+      setกำลังปฏิเสธ(false)
+      ปิดรายละเอียด()
+      ดึงรายงาน()
+      return
+    }
+
+    let แจ้งเตือนพลาด = false
+    if (report.reporter_id) {
+      const { error: notiErr } = await supabase.from('notifications').insert({
+        user_id: report.reporter_id,
+        title:   `อัปเดตรายงาน #${String(report.id).padStart(6, '0')}`,
+        body:    `รายงาน #${String(report.id).padStart(6, '0')} ถูกปิดเนื่องจากไม่เกี่ยวข้องกับการแจ้งเหตุสัตว์จรจัด หากเป็นความเข้าใจผิด กรุณาติดต่อเจ้าหน้าที่`,
+        type:    'report_update',
+        is_read: false,
+      })
+      if (notiErr) {
+        console.error('ส่ง notification ไม่สำเร็จ:', notiErr.message, notiErr.code)
+        แจ้งเตือนพลาด = true
+      }
+    }
+
+    setรายงานทั้งหมด(function (prev) {
+      return prev.map(function (r) {
+        return r.id === report.id ? { ...r, status: 'ปฏิเสธ (ไม่เกี่ยวข้อง)' } : r
+      })
+    })
+
+    if (แจ้งเตือนพลาด) toastError('ปฏิเสธเคสแล้ว แต่แจ้งเตือนผู้แจ้งไม่สำเร็จ')
+    else toast('ปฏิเสธเคสแล้ว')
+    setกำลังปฏิเสธ(false)
+    ปิดรายละเอียด()
+  }
+
   // ================================================================
   // บันทึกการอัปเดตสถานะ (จาก update workflow)
   // ================================================================
@@ -898,6 +963,7 @@ function VolunteerPage({ หน้า }) {
       'มีผู้รับเลี้ยง':       `สัตว์ที่คุณแจ้ง (#${รหัส}) ได้รับการรับเลี้ยงแล้ว ขอบคุณที่ช่วยเหลือ 🎉`,
       'ยุติการค้นหา':        `รายงาน #${รหัส} ได้ยุติการดำเนินการแล้ว ขอบคุณที่ช่วยแจ้งเหตุ`,
       'เคสซ้ำซ้อน':          `รายงาน #${รหัส} ถูกรวมกับเคสที่มีผู้แจ้งไว้ก่อนแล้ว เจ้าหน้าที่กำลังดำเนินการอยู่ ขอบคุณที่ช่วยแจ้งเหตุ 🔗`,
+      'ปฏิเสธ (ไม่เกี่ยวข้อง)': `รายงาน #${รหัส} ถูกปิดเนื่องจากไม่เกี่ยวข้องกับการแจ้งเหตุสัตว์จรจัด หากเป็นความเข้าใจผิด กรุณาติดต่อเจ้าหน้าที่`,
     }
     if (report.reporter_id && msgMap[สถานะใหม่]) {
       const { error: notiErr } = await supabase.from('notifications').insert({
@@ -2232,10 +2298,18 @@ function VolunteerPage({ หน้า }) {
 
               {/* ปุ่มหลัก */}
               {รายงานที่เปิด.status === 'รอดำเนินการ' ? (
-                <button onClick={รับเรื่อง} disabled={กำลังรับเรื่อง}
-                  className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-2">
-                  {กำลังรับเรื่อง ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังรับเรื่อง...</> : <><CheckCircle2 size={16} className="shrink-0" /> รับเรื่อง (แจ้งเตือนผู้แจ้งอัตโนมัติ)</>}
-                </button>
+                <div className="space-y-2">
+                  <button onClick={รับเรื่อง} disabled={กำลังรับเรื่อง || กำลังปฏิเสธ}
+                    className="w-full bg-teal-600 text-white rounded-2xl py-4 font-bold text-base disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    {กำลังรับเรื่อง ? <><Loader2 size={16} className="animate-spin shrink-0" /> กำลังรับเรื่อง...</> : <><CheckCircle2 size={16} className="shrink-0" /> รับเรื่อง (แจ้งเตือนผู้แจ้งอัตโนมัติ)</>}
+                  </button>
+                  {/* ปฏิเสธตั้งแต่ตรงนี้ได้เลย — สำหรับเคสสแปม/ไม่เกี่ยวข้องที่ชัดเจนตั้งแต่แรกเห็น
+                      ไม่ต้องกด "รับเรื่อง" ไปก่อนแล้วค่อยไปหาทางปฏิเสธในหน้าอัปเดตทีหลัง */}
+                  <button onClick={ปฏิเสธจากInbox} disabled={กำลังรับเรื่อง || กำลังปฏิเสธ}
+                    className="w-full bg-white border-2 border-gray-200 text-gray-600 rounded-2xl py-3.5 font-medium text-sm disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    {กำลังปฏิเสธ ? <><Loader2 size={15} className="animate-spin shrink-0" /> กำลังปฏิเสธ...</> : <><XCircle size={15} className="shrink-0" /> ปฏิเสธ (ไม่เกี่ยวข้อง) / สแปม</>}
+                  </button>
+                </div>
               ) : (
                 <div className="bg-gray-50 rounded-2xl p-4 text-center">
                   <p className="text-sm text-gray-500 mb-2">รับเรื่องแล้ว — ไปอัปเดตความคืบหน้า</p>
@@ -2334,7 +2408,7 @@ function VolunteerPage({ หน้า }) {
 
               {/* เลือกสถานะใหม่ — ตัวเลือกแปรผันตามประเภทการแจ้ง แบ่งกลุ่ม "อัปเดตความคืบหน้า" / "ปิดเคส" */}
               {(function () {
-                const { progress, close } = ตัวเลือกอัปเดตสถานะ(รายงานที่เปิด)
+                const { progress, close, reject } = ตัวเลือกอัปเดตสถานะ(รายงานที่เปิด)
                 function ปุ่มสถานะ(opt) {
                   const isCurrent  = รายงานที่เปิด.status === opt.value
                   const isSelected = สถานะใหม่ === opt.value
@@ -2392,6 +2466,15 @@ function VolunteerPage({ หน้า }) {
                         </button>
                       </>
                     )}
+
+                    {/* ปฏิเสธเคส (ไม่เกี่ยวข้อง/สแปม) — แสดงเสมอทุกขั้นตอน ไม่ต้องรอรับเรื่อง/ลงพื้นที่ก่อน
+                        ต่างจากกลุ่ม "ปิดเคส" ด้านบนที่โผล่เฉพาะหลังลงพื้นที่แล้ว เพราะเคสสแปมควรปิดได้ทันทีที่เห็น
+                        ไม่ต้องเสแสร้งรับเรื่อง/ลงพื้นที่ปลอมๆ ก่อน */}
+                    <hr className="my-3 border-gray-100" />
+                    <p className="text-xs font-semibold text-gray-400 mb-1.5">อื่นๆ</p>
+                    <div className="space-y-2">
+                      {reject.map(ปุ่มสถานะ)}
+                    </div>
                   </div>
                 )
               })()}
