@@ -33,7 +33,11 @@ function BreedInput({ value, onChange, onSelect, placeholder, สี = 'teal', c
   const ที่ตรงกัน = คำค้น === ''
     ? []
     : สายพันธุ์ทั้งหมด
-        .filter((b) => b.ชื่อไทย.toLowerCase().includes(คำค้น) || b.id.toLowerCase().includes(คำค้น))
+        // ค้นด้วยชื่ออื่นได้ด้วย — เดิมชื่อเล่นอยู่ในวงเล็บของชื่อไทย (เช่น 'โคราช (สีสวาด)') จึงค้นเจอ
+        // พอย้ายไปเป็นฟิลด์ ชื่ออื่น แยกต่างหาก ต้องเติมเงื่อนไขนี้ ไม่งั้นพิมพ์ 'สีสวาด' จะหาไม่เจอ
+        .filter((b) => b.ชื่อไทย.toLowerCase().includes(คำค้น)
+          || b.id.toLowerCase().includes(คำค้น)
+          || (b.ชื่ออื่น || '').toLowerCase().includes(คำค้น))
         .slice(0, จำนวนตัวเลือกสูงสุด)
 
   return (
