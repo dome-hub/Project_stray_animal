@@ -12,6 +12,7 @@ import {
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
+import { ชื่อประเภทการแจ้ง } from '../utils/reportTypes'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import BreedInput from '../components/BreedInput'
 import { useSheet } from '../components/useSheet'
@@ -32,9 +33,9 @@ const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://project-stray-ani
 
 // ตัวเลือกประเภทการแจ้ง — เรียงจากเร่งด่วนมากไปน้อย ใช้กำหนดความเร่งด่วน (urgency) ของรายงาน
 const เหตุผลตัวเลือก = [
-  { label: 'สัตว์ดุร้าย / เสี่ยงก่ออันตราย', Icon: ShieldAlert, urgency: 'ด่วนมาก' },
-  { label: 'สัตว์บาดเจ็บ',                 Icon: HeartPulse,  urgency: 'ด่วน' },
-  { label: 'พบสัตว์พลัดหลง / สัตว์จรจัด', Icon: Footprints,  urgency: 'ปานกลาง' },
+  { label: ชื่อประเภทการแจ้ง['ด่วนมาก'].เต็ม, Icon: ShieldAlert, urgency: 'ด่วนมาก' },
+  { label: ชื่อประเภทการแจ้ง['ด่วน'].เต็ม,    Icon: HeartPulse,  urgency: 'ด่วน' },
+  { label: ชื่อประเภทการแจ้ง['ปานกลาง'].เต็ม, Icon: Footprints,  urgency: 'ปานกลาง' },
 ]
 
 // สีตามระดับความเร่งด่วน — ใช้เฉพาะตอนตัวเลือกถูกเลือก (active state)
