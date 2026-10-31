@@ -137,15 +137,14 @@ function PetDetail() {
   // ปุ่ม back ของ Android / Escape / โฟกัส — ดู components/useSheet.js
   const ชีตติดต่อ = useSheet(แสดงContact, function () { setแสดงContact(false) })
 
+  // ผ่าน RPC เพราะ RLS ของตาราง users ไม่ให้ผู้ใช้ทั่วไปอ่านแถวของคนอื่น (query ตรงจะได้ [] เงียบๆ
+  // แล้วหน้านี้ขึ้นว่า "ยังไม่มีข้อมูลศูนย์พักพิง") — ต้องรัน supabase-fix-shelter-contact.sql ก่อน
   useEffect(function () {
     supabase
-      .from('users')
-      .select('name, phone, shelter_name, shelter_location, service_area')
-      .eq('role', 'volunteer')
-      .not('shelter_name', 'is', null)
-      .limit(1)
-      .then(function ({ data }) {
-        if (data && data.length > 0) setศูนย์(data[0])
+      .rpc('get_shelter_contact')
+      .then(function ({ data, error }) {
+        if (error) console.error('get_shelter_contact:', error.message)
+        else if (data && data.length > 0) setศูนย์(data[0])
         setโหลดศูนย์(false)
       }, function () { setโหลดศูนย์(false) })
   }, [])
