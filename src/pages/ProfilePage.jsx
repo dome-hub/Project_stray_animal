@@ -10,6 +10,7 @@ import {
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
+import { เบอร์ถูกต้อง } from '../utils/phone'
 import AnimalIcon from '../components/AnimalIcon'
 import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
@@ -222,7 +223,7 @@ function ProfilePage({ user }) {
   // ---- บันทึกเบอร์ลง DB (บังคับ 10 หลัก) ----
   async function บันทึกเบอร์() {
     const tel = เบอร์ชั่วคราว.trim()
-    if (!/^0[0-9]{9}$/.test(tel)) {
+    if (!เบอร์ถูกต้อง(tel)) {
       setErrorเบอร์('ต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0')
       return
     }
