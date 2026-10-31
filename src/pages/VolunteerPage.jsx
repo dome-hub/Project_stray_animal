@@ -259,8 +259,9 @@ function แสดงสายพันธุ์สัตว์(breed) {
 }
 function แสดงชื่อสัตว์(สัตว์) {
   if (สัตว์.name && สัตว์.name !== 'ยังไม่ตั้งชื่อ') return สัตว์.name
-  if (สัตว์.report_id) return `ยังไม่ตั้งชื่อ (รหัส #${String(สัตว์.report_id).padStart(6, '0')})`
-  return `${สัตว์.breed?.includes('แมว') ? 'แมว' : 'สุนัข'} รอระบุชื่อ`
+  // รหัสสัตว์ = animals.id ตัวเดียวกับที่ผู้ใช้เห็นในหน้ารายละเอียดสัตว์ (ผู้ใช้อ่านรหัสนี้ให้ฟังตอนโทรขอรับเลี้ยง)
+  // เดิมใช้รหัสรายงาน ซึ่งสัตว์ที่เจ้าหน้าที่เพิ่มเองไม่มี และไม่ตรงกับรหัสที่ผู้ใช้เห็น
+  return `ยังไม่ตั้งชื่อ (รหัสสัตว์ #${สัตว์.id})`
 }
 
 // ---- Helper: คลังรูปสัตว์ (multi-image) — คืน array เสมอ ----
@@ -2731,7 +2732,9 @@ function VolunteerPage({ หน้า }) {
             {/* จำกัดความกว้างและจัดกึ่งกลาง กันฟอร์มยืดเต็มจอตอนเปิดบนหน้าจอกว้าง (desktop) */}
             <div className="max-w-4xl mx-auto w-full">
               <div className="flex items-center justify-between px-5 md:px-6 py-3">
-                <p className="font-bold text-gray-800">แก้ไขข้อมูลสัตว์</p>
+                <p className="font-bold text-gray-800">
+                  แก้ไขข้อมูลสัตว์ <span className="text-xs font-normal text-gray-400 ml-1">รหัสสัตว์ #{สัตว์ที่แก้ไข.id}</span>
+                </p>
                 <button onClick={ปิดแก้ไขสัตว์} aria-label="ปิด"
                   className="w-10 h-10 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                   <X size={20} />

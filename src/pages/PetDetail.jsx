@@ -12,6 +12,7 @@ import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
 import { สถานะสัตว์ออกไปแล้ว } from '../utils/animalStatus'
+import { ชื่อแสดงสัตว์, รหัสสัตว์, มีสายพันธุ์ที่ใช้ได้ } from '../utils/animalDisplay'
 
 // แปลงแถวจากตาราง animals เป็นรูปแบบที่หน้านี้ใช้ — ต้องตรงกับที่ FindPet ส่งมาทาง router state
 // เพราะหน้านี้รับข้อมูลได้ 2 ทาง: กดมาจากการ์ด (มี state) หรือเปิด URL ตรงๆ (ต้องดึงเอง)
@@ -199,6 +200,10 @@ function PetDetail() {
     )
   }
 
+  // ชื่อที่แสดง — สัตว์ที่ยังไม่ตั้งชื่อใช้สายพันธุ์/ประเภทแทน และมีรหัสสัตว์ไว้อ้างอิงตอนโทรหาศูนย์ (ดู utils/animalDisplay.js)
+  const ป้าย = ชื่อแสดงสัตว์(สัตว์)
+  const รหัส = รหัสสัตว์(สัตว์.id)
+
   // คลังรูปสำหรับ carousel — ใช้ รูปทั้งหมด (ส่งมาจาก FindPet) ถ้าไม่มีก็ fallback เป็น [รูป] เดี่ยว
   const รูปทั้งหมด = (Array.isArray(สัตว์.รูปทั้งหมด) && สัตว์.รูปทั้งหมด.length > 0)
     ? สัตว์.รูปทั้งหมด
@@ -218,10 +223,16 @@ function PetDetail() {
 
       {/* การ์ดรูปสัตว์และชื่อ — Image Carousel เลื่อนดูได้หลายรูป */}
       <div className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden shadow-sm">
-        <ImageCarousel รูป={รูปทั้งหมด} ชนิด={สัตว์.ชนิด || สัตว์.สายพันธุ์} ชื่อ={สัตว์.ชื่อ} />
+        <ImageCarousel รูป={รูปทั้งหมด} ชนิด={สัตว์.ชนิด || สัตว์.สายพันธุ์} ชื่อ={ป้าย.ชื่อ} />
         <div className="p-5 text-center">
-          <h2 className="text-2xl font-bold text-gray-800">{สัตว์.ชื่อ}</h2>
-          <p className="text-gray-500 text-sm mt-1">{สัตว์.สายพันธุ์}</p>
+          <h2 className="text-2xl font-bold text-gray-800">{ป้าย.ชื่อ}</h2>
+          {/* บรรทัดใต้หัวข้อ: มีชื่อ → สายพันธุ์ / ไม่มีชื่อ → บอกว่ายังไม่มีชื่อ (สายพันธุ์ถูกยกไปเป็นหัวข้อแล้ว) */}
+          <p className="text-gray-500 text-sm mt-1">
+            {ป้าย.ไม่มีชื่อ
+              ? (ป้าย.ไม่ทราบสายพันธุ์ ? 'ไม่ทราบสายพันธุ์ • ยังไม่มีชื่อ' : 'ยังไม่มีชื่อ')
+              : (มีสายพันธุ์ที่ใช้ได้(สัตว์.สายพันธุ์) ? สัตว์.สายพันธุ์ : 'ไม่ทราบสายพันธุ์')}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">รหัสสัตว์ {รหัส}</p>
         </div>
       </div>
 
@@ -383,7 +394,7 @@ function PetDetail() {
           className="w-full bg-green-500 text-white rounded-xl py-4 font-bold text-base flex items-center justify-center gap-2"
         >
           <Phone size={18} className="shrink-0" />
-          ติดต่อขอรับเลี้ยง{สัตว์.ชื่อ !== 'ยังไม่ตั้งชื่อ' ? ` ${สัตว์.ชื่อ}` : ''}
+          ติดต่อขอรับเลี้ยง{!ป้าย.ไม่มีชื่อ ? ` ${ป้าย.ชื่อ}` : ''}
         </button>
         <p className="text-center text-xs text-gray-400 mt-2">
           ติดต่อศูนย์พักพิง — เจ้าหน้าที่จะเป็นผู้ยืนยันการรับเลี้ยง
@@ -410,13 +421,13 @@ function PetDetail() {
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-2xl overflow-hidden bg-green-100 flex items-center justify-center shrink-0">
                   {สัตว์.รูป
-                    ? <img src={สัตว์.รูป} alt={สัตว์.ชื่อ} className="w-full h-full object-cover" />
+                    ? <img src={สัตว์.รูป} alt={ป้าย.ชื่อ} className="w-full h-full object-cover" />
                     : <AnimalIcon ชนิด={สัตว์.ชนิด || สัตว์.สายพันธุ์} size={28} className="text-green-600" />
                   }
                 </div>
                 <div>
-                  <p className="font-bold text-gray-800">ขอรับเลี้ยง {สัตว์.ชื่อ}</p>
-                  <p className="text-xs text-gray-500">{สัตว์.สายพันธุ์}</p>
+                  <p className="font-bold text-gray-800">ขอรับเลี้ยง {ป้าย.ชื่อ}</p>
+                  <p className="text-xs text-gray-500">รหัสสัตว์ {รหัส}{!ป้าย.ไม่มีชื่อ && !ป้าย.ไม่ทราบสายพันธุ์ ? ` • ${สัตว์.สายพันธุ์}` : ''}</p>
                 </div>
               </div>
 
@@ -427,7 +438,7 @@ function PetDetail() {
                 </p>
                 <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside leading-relaxed">
                   <li>โทรติดต่อศูนย์พักพิงด้านล่าง</li>
-                  <li>แจ้งชื่อสัตว์ที่ต้องการรับเลี้ยง</li>
+                  <li>แจ้งรหัสสัตว์ {รหัส}{!ป้าย.ไม่มีชื่อ ? ` (${ป้าย.ชื่อ})` : ''} ที่ต้องการรับเลี้ยง</li>
                   <li>เจ้าหน้าที่จะนัดหมายและดำเนินการต่อ</li>
                 </ol>
               </div>
