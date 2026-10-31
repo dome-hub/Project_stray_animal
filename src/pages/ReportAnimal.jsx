@@ -207,6 +207,11 @@ function ReportAnimal({ user }) {
   const [latitude,        setLatitude]        = useState(null)
   const [longitude,       setLongitude]       = useState(null)
   const [กำลังส่ง,     setกำลังส่ง]     = useState(false)
+  // ช่วง "ก่อนส่งจริง" (เช็คเบอร์โทร + เช็คเคสซ้ำ = หลายรอบเครือข่าย) กำลังส่ง ยังเป็น false อยู่
+  // เดิมแตะปุ่มซ้ำในช่วงนี้ได้ จึงเริ่มกระบวนการส่งซ้อนกัน 2 รอบ → รายงานซ้ำ 2 ใบ
+  // ref กันซ้ำทันที (ไม่ต้องรอ render) / state ไว้ปิดปุ่มและโชว์ว่ากำลังตรวจสอบ
+  const กำลังตรวจRef = useRef(false)
+  const [กำลังตรวจก่อนส่ง, setกำลังตรวจก่อนส่ง] = useState(false)
   const [ส่งสำเร็จ,    setส่งสำเร็จ]    = useState(false)
   const [รหัสรายงาน,  setรหัสรายงาน]  = useState(null)
   // หน้าสำเร็จใช้ร่วมกัน 2 กรณี — สร้างใบใหม่ กับ แนบเข้าเคสที่คนอื่นแจ้งไว้แล้ว
@@ -700,6 +705,7 @@ function ReportAnimal({ user }) {
   // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นเช็คเคสซ้ำแล้วส่ง ----
   async function ส่งรายงาน() {
     if (!ตำแหน่ง || !เหตุผลแจ้ง) return
+    if (กำลังตรวจRef.current) return
     // ยังไม่มีพิกัดจริง (ไม่เคยกด GPS/ปักหมุดบนแผนที่) → โชว์ error + สั่นเตือน แล้วหยุดไม่ส่ง
     if (!latitude || !longitude) {
       setErrorไม่มีGPS(true)
@@ -708,14 +714,22 @@ function ReportAnimal({ user }) {
     }
     // ถ้ารู้แล้วว่าต้องกรอกเบอร์ → เปิด modal โดยไม่ query DB ซ้ำ
     if (ต้องกรอกเบอร์) { setแสดงModalโทรศัพท์(true); return }
-    const { data: userData } = await supabase
-      .from('users').select('phone').eq('id', user.id).single()
-    if (!userData?.phone || userData.phone.trim() === '') {
-      setต้องกรอกเบอร์(true)
-      setแสดงModalโทรศัพท์(true)
-      return
+
+    กำลังตรวจRef.current = true
+    setกำลังตรวจก่อนส่ง(true)
+    try {
+      const { data: userData } = await supabase
+        .from('users').select('phone').eq('id', user.id).single()
+      if (!userData?.phone || userData.phone.trim() === '') {
+        setต้องกรอกเบอร์(true)
+        setแสดงModalโทรศัพท์(true)
+        return
+      }
+      await ตรวจซ้ำแล้วส่ง()
+    } finally {
+      กำลังตรวจRef.current = false
+      setกำลังตรวจก่อนส่ง(false)
     }
-    await ตรวจซ้ำแล้วส่ง()
   }
 
   // ---- บันทึกเบอร์โทรศัพท์ → แล้วส่งรายงานต่อเลย ----
@@ -1255,9 +1269,11 @@ function ReportAnimal({ user }) {
         </div>
 
         {/* ส่ง */}
-        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !เหตุผลแจ้ง || กำลังส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
+        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !เหตุผลแจ้ง || กำลังส่ง || กำลังตรวจก่อนส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
           className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-          {กำลังส่ง ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin shrink-0" /> กำลังอัปโหลดและบันทึก...</span> : 'ส่งรายงานให้เจ้าหน้าที่'}
+          {กำลังส่ง ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin shrink-0" /> กำลังอัปโหลดและบันทึก...</span>
+            : กำลังตรวจก่อนส่ง ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin shrink-0" /> กำลังตรวจสอบ...</span>
+            : 'ส่งรายงานให้เจ้าหน้าที่'}
         </button>
 
         {/* แสดงเมื่อปิด modal โดยไม่กรอกเบอร์ */}
