@@ -21,10 +21,10 @@ import { Search, PawPrint, MapPin, ArrowLeft, SlidersHorizontal, ChevronDown, X 
 import { supabase } from '../supabase'   // นำเข้า supabase client
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
+import { เงื่อนไขตัดสัตว์ที่ออกไปแล้ว } from '../utils/animalStatus'
 
-// สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว — ต้องไม่โผล่ในหน้าหาบ้านไม่ว่ากรณีใด
-// (ตรงกับ สถานะสัตว์ออกไปแล้ว ใน VolunteerPage ที่บังคับ publish_mode = 'none' ให้อยู่แล้ว)
-const สถานะออกไปแล้ว = ['มีผู้รับเลี้ยง', 'ส่งคืนเจ้าของสำเร็จ']
+// สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว (มีผู้รับเลี้ยง / ส่งคืนเจ้าของ / หลุดหาย / เสียชีวิต)
+// ต้องไม่โผล่ในหน้าหาบ้านไม่ว่ากรณีใด — ใช้รายการกลาง utils/animalStatus.js ตัวเดียวกับฝั่งเจ้าหน้าที่
 
 // ช่วงอายุที่เจ้าหน้าที่เลือกได้ตอนกรอกข้อมูลสัตว์ (VolunteerPage) — ใช้ map เป็นกลุ่ม "เด็ก/โต" ตอนกรอง
 const อายุกลุ่มเด็ก = ['น้อยกว่า 1 ปี', '1–2 ปี']
@@ -84,7 +84,7 @@ function FindPet() {
         .from('animals')
         .select('*')
         .eq('publish_mode', 'adoption')
-        .not('status', 'in', `(${สถานะออกไปแล้ว.map(function (s) { return `"${s}"` }).join(',')})`)
+        .not('status', 'in', เงื่อนไขตัดสัตว์ที่ออกไปแล้ว)
         .order('created_at', { ascending: false })
 
       if (error) {

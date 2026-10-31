@@ -20,6 +20,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import { วันที่สั้นไทย, วันเวลาเต็มไทย } from '../utils/dateTime'
+import { เงื่อนไขตัดสัตว์ที่ออกไปแล้ว } from '../utils/animalStatus'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
@@ -59,6 +60,9 @@ async function โหลดรายการ() {
       .from('animals')
       .select('*')
       .eq('publish_mode', 'lost_and_found')
+      // สัตว์ที่ออกจากศูนย์ไปแล้ว (ส่งคืนเจ้าของ / มีผู้รับเลี้ยง / หลุดหาย / เสียชีวิต) ต้องไม่ถูกประกาศตามหาเจ้าของอีก
+      // แม้ข้อมูลเก่าจะยังค้าง publish_mode ไว้
+      .not('status', 'in', เงื่อนไขตัดสัตว์ที่ออกไปแล้ว)
       .order('created_at', { ascending: false }),
     supabase
       .from('reports')
