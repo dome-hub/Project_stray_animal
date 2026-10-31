@@ -19,6 +19,14 @@ export function แปลงเป็นDate(str) {
   return new Date(str + 'Z')
 }
 
+// วันนี้ตามเวลาไทยในรูป "2026-10-31" (ใช้กับ <input type="date"> และเทียบว่าเป็นวันในอนาคตไหม)
+// ห้ามใช้ new Date().toISOString().slice(0, 10) — นั่นคือวันที่ UTC ซึ่งช้ากว่าไทย 7 ชม.
+// ช่วง 00:00–06:59 น. วันที่ UTC ยังเป็นเมื่อวาน ผู้ใช้เลือก "วันนี้" แล้วโดนว่าเป็นวันในอนาคต
+// en-CA ให้รูปแบบ ปปปป-ดด-วว พอดี ไม่ต้องประกอบเอง
+export function วันนี้ไทย() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: เขตเวลา })
+}
+
 // "31 ต.ค. 2569"
 export function วันที่สั้นไทย(str) {
   if (!str) return ''

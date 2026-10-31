@@ -20,16 +20,15 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
-import { วันที่สั้นไทย, วันเวลาเต็มไทย } from '../utils/dateTime'
+import { วันที่สั้นไทย, วันเวลาเต็มไทย, วันนี้ไทย } from '../utils/dateTime'
 import { เงื่อนไขตัดสัตว์ที่ออกไปแล้ว } from '../utils/animalStatus'
+import { รูปแบบเบอร์โทร } from '../utils/phone'
 import { อายุประกาศวัน, วันที่เหลือของประกาศ, ประกาศหมดอายุแล้ว } from '../utils/lostPetExpiry'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
 
-// เบอร์ไทย 10 หลักขึ้นต้น 0 — เกณฑ์เดียวกับหน้าโปรไฟล์และตอนแจ้งสัตว์จร
-// สำคัญกว่าที่อื่นด้วยซ้ำ เพราะเบอร์นี้คือช่องทางเดียวที่คนพบสัตว์จะติดต่อเจ้าของได้
-const รูปแบบเบอร์โทร = /^0[0-9]{9}$/
+// เบอร์ติดต่อในประกาศสำคัญเป็นพิเศษ เพราะเป็นช่องทางเดียวที่คนพบสัตว์จะติดต่อเจ้าของได้ — เกณฑ์เบอร์อยู่ที่ utils/phone.js
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite (idempotent — เรียกซ้ำได้)
 delete L.Icon.Default.prototype._getIconUrl
@@ -618,7 +617,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
     if (เงินรางวัล && (isNaN(Number(เงินรางวัล)) || Number(เงินรางวัล) < 0)) {
       setError('กรุณากรอกเงินรางวัลเป็นตัวเลขที่ถูกต้อง'); return
     }
-    if (วันที่หาย && วันที่หาย > new Date().toISOString().slice(0, 10)) {
+    if (วันที่หาย && วันที่หาย > วันนี้ไทย()) {
       setError('วันที่หายเป็นวันในอนาคตไม่ได้'); return
     }
     setError('')
@@ -737,7 +736,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
 
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-1.5">วันที่หาย</p>
-            <input type="date" value={วันที่หาย} max={new Date().toISOString().slice(0, 10)}
+            <input type="date" value={วันที่หาย} max={วันนี้ไทย()}
               onChange={(e) => setวันที่หาย(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-rose-400" />
           </div>
@@ -888,7 +887,7 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
     if (เงินรางวัล && (isNaN(Number(เงินรางวัล)) || Number(เงินรางวัล) < 0)) {
       setError('กรุณากรอกเงินรางวัลเป็นตัวเลขที่ถูกต้อง'); return
     }
-    if (วันที่หาย && วันที่หาย > new Date().toISOString().slice(0, 10)) {
+    if (วันที่หาย && วันที่หาย > วันนี้ไทย()) {
       setError('วันที่หายเป็นวันในอนาคตไม่ได้'); return
     }
     setError('')

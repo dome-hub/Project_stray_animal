@@ -14,6 +14,7 @@ import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
 import { ชื่อประเภทการแจ้ง } from '../utils/reportTypes'
 import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
+import { เบอร์ถูกต้อง, ข้อความเบอร์ไม่ถูกต้อง } from '../utils/phone'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import BreedInput from '../components/BreedInput'
 import { useSheet } from '../components/useSheet'
@@ -721,7 +722,7 @@ function ReportAnimal({ user }) {
     try {
       const { data: userData } = await supabase
         .from('users').select('phone').eq('id', user.id).single()
-      if (!userData?.phone || userData.phone.trim() === '') {
+      if (!เบอร์ถูกต้อง(userData?.phone)) {
         setต้องกรอกเบอร์(true)
         setแสดงModalโทรศัพท์(true)
         return
@@ -737,7 +738,7 @@ function ReportAnimal({ user }) {
   async function บันทึกโทรศัพท์() {
     const tel = inputโทรศัพท์.trim()
     if (!tel) { setErrorโทรศัพท์('กรุณากรอกเบอร์โทรศัพท์'); return }
-    if (!/^0[0-9]{8,9}$/.test(tel)) { setErrorโทรศัพท์('รูปแบบเบอร์ไม่ถูกต้อง (เช่น 0812345678)'); return }
+    if (!เบอร์ถูกต้อง(tel)) { setErrorโทรศัพท์(ข้อความเบอร์ไม่ถูกต้อง); return }
     setกำลังบันทึกโทรศัพท์(true)
     setErrorโทรศัพท์('')
     const { error } = await supabase.from('users').update({ phone: tel }).eq('id', user.id)
