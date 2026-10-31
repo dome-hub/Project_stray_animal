@@ -273,6 +273,71 @@ function TrackReport({ user }) {
     ดึงรายงาน()
   }, [user?.id])
 
+  // ---- อัปเดตหน้าจอแบบเรียลไทม์ ----
+  // เจ้าหน้าที่กดเปลี่ยนสถานะ → แถวใน reports ของผู้แจ้งเปลี่ยน → รับเหตุการณ์ผ่าน Supabase Realtime
+  // แล้วขยับแถบความคืบหน้าทันที ไม่ต้องกดออกแล้วเข้าใหม่
+  // ต้องเปิด realtime ให้ตาราง reports ก่อน (supabase-enable-realtime-bell.sql) ไม่งั้นต่อติดแต่ไม่มีเหตุการณ์ส่งมา
+  // RLS ยังคุมอยู่ — ผู้ใช้ได้รับเหตุการณ์เฉพาะแถวที่ตัวเองมีสิทธิ์อ่าน และ filter ตัดเหลือแต่ของตัวเอง
+  useEffect(function () {
+    if (!user?.id) return
+    let เลิกแล้ว = false
+
+    // ดึงใหม่แบบเงียบ — ไม่เปิดสปินเนอร์ ถ้าพลาดก็คงรายการเดิมไว้ ใช้กู้เหตุการณ์ที่ตกหล่นตอน realtime หลุด
+    // (มือถือตัดการเชื่อมต่อตอนแอปอยู่เบื้องหลัง) เหมือนที่ Home.jsx ทำกับตัวเลขบนกระดิ่ง
+    async function รีเฟรชเงียบ() {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('reporter_id', user.id)
+        .order('created_at', { ascending: false })
+      if (เลิกแล้ว || error || !data) return
+      setรายการรายงาน(data)
+      setรายงานที่เปิด(function (prev) {
+        return prev ? (data.find(function (r) { return r.id === prev.id }) || prev) : prev
+      })
+    }
+
+    // ชื่อ channel ใช้อักษรอังกฤษ เพราะถูกส่งเป็น topic ของ WebSocket
+    const ช่อง = supabase
+      .channel(`track-reports-${user.id}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'reports', filter: `reporter_id=eq.${user.id}` },
+        function (payload) {
+          if (payload.eventType === 'DELETE') {
+            const id = payload.old?.id
+            if (id == null) return
+            setรายการรายงาน(function (prev) { return prev.filter(function (r) { return r.id !== id }) })
+            setรายงานที่เปิด(function (prev) { return prev && prev.id === id ? null : prev })
+            setโหมดแก้ไข(false)
+            return
+          }
+          const แถว = payload.new
+          if (!แถว?.id) return
+          // รวมเข้ากับของเดิม ไม่ทับทั้งแถว เพราะคอลัมน์ขนาดใหญ่ที่ไม่ได้เปลี่ยนอาจไม่ถูกส่งมาใน payload
+          setรายการรายงาน(function (prev) {
+            return prev.some(function (r) { return r.id === แถว.id })
+              ? prev.map(function (r) { return r.id === แถว.id ? { ...r, ...แถว } : r })
+              : [แถว, ...prev]
+          })
+          setรายงานที่เปิด(function (prev) { return prev && prev.id === แถว.id ? { ...prev, ...แถว } : prev })
+        })
+      .subscribe(function (สถานะการเชื่อมต่อ) {
+        // ต่อสำเร็จ (รวมถึงต่อใหม่หลังหลุด) → ดึงล่าสุดทันที กันพลาดสิ่งที่เปลี่ยนไปช่วงที่ยังไม่ได้ต่อ
+        if (สถานะการเชื่อมต่อ === 'SUBSCRIBED') รีเฟรชเงียบ()
+      })
+
+    function เมื่อกลับมาดู() {
+      if (document.visibilityState === 'visible') รีเฟรชเงียบ()
+    }
+    document.addEventListener('visibilitychange', เมื่อกลับมาดู)
+
+    return function () {
+      เลิกแล้ว = true
+      document.removeEventListener('visibilitychange', เมื่อกลับมาดู)
+      supabase.removeChannel(ช่อง)
+    }
+  }, [user?.id])
+
   // ดึงข้อมูลศูนย์/เจ้าหน้าที่ครั้งเดียวตอนโหลด
   useEffect(function () {
     supabase
