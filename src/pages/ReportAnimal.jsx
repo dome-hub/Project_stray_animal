@@ -602,7 +602,6 @@ function ReportAnimal({ user }) {
   // ---- ตรวจว่ามีคนแจ้งเคสนี้ไปแล้วหรือยัง (ในรัศมี 100 ม. และยังไม่ปิดเคส) ----
   // กรองด้วยกรอบสี่เหลี่ยมก่อนเพื่อลดจำนวนแถวที่ดึง แล้วค่อยวัดระยะจริงด้วย Haversine
   async function หาเคสใกล้เคียง() {
-    const เผื่อ = 0.002 // ~220 ม. ครอบคลุมรัศมี 100 ม. แน่นอน
     // ทางหลัก: RPC (supabase-fix-duplicate-check.sql) — RLS ของ reports ให้ผู้ใช้ทั่วไปอ่านได้แค่ของตัวเอง
     // query ตรงด้านล่างจึงเห็นแต่เคสที่ตัวเองแจ้ง ไม่เตือนเมื่อคนอื่นแจ้งไว้ก่อน
     // ฟังก์ชันคืนเฉพาะเคสที่ยังไม่ปิดที่ใกล้ที่สุด พร้อมระยะ
@@ -616,6 +615,7 @@ function ReportAnimal({ user }) {
     // ยังไม่ได้รัน SQL / RPC พลาด → ถอยไปใช้ query ตรง (เห็นเฉพาะเคสของตัวเอง) ดีกว่าไม่เช็คเลย
     console.error('find_nearby_open_report:', errorRpc.message)
 
+    const เผื่อ = 0.002 // ~220 ม. ครอบคลุมรัศมี 100 ม. แน่นอน
     const { data } = await supabase
       .from('reports')
       .select('id, animal_type, image_url, detail, status, latitude, longitude, created_at')
