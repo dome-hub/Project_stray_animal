@@ -127,6 +127,12 @@ function เป็นเคสปิดTR(status) {
 
 // คำนวณ label 4 จุด + activeIndex (จำนวนจุดสีเขียว) จากประเภทการแจ้งและสถานะปัจจุบัน
 function getTimelineConfig(reportType, currentStatus) {
+  // เจ้าหน้าที่ปฏิเสธตั้งแต่ยังไม่รับเรื่อง (ปุ่มปฏิเสธทำได้เฉพาะ รอดำเนินการ) จึงไม่เคยมีการรับเรื่อง/ลงพื้นที่
+  // แสดงแค่ 2 จุด ไม่ใช้แถบ 4 ขั้นปกติ ไม่งั้นผู้แจ้งจะเข้าใจว่ามีคนลงพื้นที่ไปแล้ว
+  if (currentStatus === 'ปฏิเสธ (ไม่เกี่ยวข้อง)') {
+    return { labels: ['แจ้งรายงาน', currentStatus], activeIndex: 2 }
+  }
+
   const ปิดแล้ว = เป็นเคสปิดTR(currentStatus)
 
   // ทุกสถานะที่ไม่ใช่ PENDING/ACCEPTED และยังไม่ปิดเคส ถือว่า "กำลังทำงาน" (จุดที่ 3)
@@ -227,6 +233,7 @@ function TrackReport({ user }) {
   // Bottom sheet
   const [รายงานที่เปิด,   setรายงานที่เปิด]   = useState(null)
   const [ข้อมูลศูนย์,     setข้อมูลศูนย์]     = useState(null)   // volunteer + shelter info
+  const [โหลดข้อมูลศูนย์เสร็จ, setโหลดข้อมูลศูนย์เสร็จ] = useState(false)  // แยก "ยังโหลดอยู่" ออกจาก "โหลดแล้วไม่พบ"
 
   // แก้ไข/ยกเลิก — ทำได้เฉพาะตอนสถานะยัง "รอดำเนินการ" (เจ้าหน้าที่ยังไม่รับเรื่อง)
   const [โหมดแก้ไข,       setโหมดแก้ไข]       = useState(false)
@@ -339,15 +346,15 @@ function TrackReport({ user }) {
   }, [user?.id])
 
   // ดึงข้อมูลศูนย์/เจ้าหน้าที่ครั้งเดียวตอนโหลด
+  // ผ่าน RPC เพราะ RLS ของตาราง users ไม่ให้ผู้ใช้ทั่วไปอ่านแถวของคนอื่น (query ตรงจะได้ [] เงียบๆ)
+  // ฟังก์ชันนี้คืนเฉพาะข้อมูลติดต่อที่ให้ผู้แจ้งเห็นได้ — ต้องรัน supabase-fix-shelter-contact.sql ก่อน
   useEffect(function () {
     supabase
-      .from('users')
-      .select('name, phone, shelter_name, shelter_location, service_area, avatar_url')
-      .eq('role', 'volunteer')
-      .not('shelter_name', 'is', null)
-      .limit(1)
-      .then(function ({ data }) {
+      .rpc('get_shelter_contact')
+      .then(function ({ data, error }) {
+        if (error) { console.error('get_shelter_contact:', error.message); setโหลดข้อมูลศูนย์เสร็จ(true); return }
         if (data && data.length > 0) setข้อมูลศูนย์(data[0])
+        setโหลดข้อมูลศูนย์เสร็จ(true)
       })
   }, [])
 
@@ -832,6 +839,8 @@ function TrackReport({ user }) {
                         </a>
                       )}
                     </>
+                  ) : โหลดข้อมูลศูนย์เสร็จ ? (
+                    <p className="text-sm text-gray-500">ยังไม่พบข้อมูลติดต่อเจ้าหน้าที่ในขณะนี้ กรุณาลองใหม่อีกครั้งภายหลัง</p>
                   ) : (
                     <p className="text-sm text-gray-500 italic">กำลังโหลดข้อมูลเจ้าหน้าที่...</p>
                   )}
