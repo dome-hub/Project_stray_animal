@@ -22,6 +22,7 @@ import { supabase } from '../supabase'   // นำเข้า supabase client
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { เงื่อนไขตัดสัตว์ที่ออกไปแล้ว } from '../utils/animalStatus'
+import { ชื่อแสดงสัตว์, รหัสสัตว์ } from '../utils/animalDisplay'
 
 // สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว (มีผู้รับเลี้ยง / ส่งคืนเจ้าของ / หลุดหาย / เสียชีวิต)
 // ต้องไม่โผล่ในหน้าหาบ้านไม่ว่ากรณีใด — ใช้รายการกลาง utils/animalStatus.js ตัวเดียวกับฝั่งเจ้าหน้าที่
@@ -460,6 +461,13 @@ function FindPet() {
 
 // Component การ์ดสัตว์ — ใช้ซ้ำได้
 function การ์ดสัตว์({ สัตว์, onClick }) {
+  // สัตว์ที่ยังไม่ตั้งชื่อใช้สายพันธุ์ (ไม่มีสายพันธุ์ก็ใช้ประเภท) เป็นหัวข้อแทน — ดู utils/animalDisplay.js
+  const ป้าย = ชื่อแสดงสัตว์(สัตว์)
+  // บรรทัดรองไม่ซ้ำกับหัวข้อ: ถ้าสายพันธุ์ถูกยกไปเป็นหัวข้อแล้วไม่ต้องใส่ซ้ำ
+  const บรรทัดรอง = (ป้าย.ไม่มีชื่อ
+    ? (ป้าย.ไม่ทราบสายพันธุ์ ? [สัตว์.เพศ, สัตว์.อายุ, สัตว์.ขนาด] : [สัตว์.อายุ, สัตว์.เพศ])
+    : [สัตว์.สายพันธุ์, สัตว์.อายุ, สัตว์.เพศ]
+  ).filter(function (x) { return x && x !== 'ไม่ระบุ' }).join(' • ')
   return (
     <button
       onClick={onClick}
@@ -475,11 +483,16 @@ function การ์ดสัตว์({ สัตว์, onClick }) {
         </div>
 
         <div className="flex-1">
-          <h3 className="font-bold text-gray-800 mb-1">{สัตว์.ชื่อ}</h3>
+          <h3 className="font-bold text-gray-800 mb-1 flex items-center gap-1.5 flex-wrap">
+            {ป้าย.ชื่อ}
+            {ป้าย.ไม่มีชื่อ && (
+              <span className="text-[10px] font-medium bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                {ป้าย.ไม่ทราบสายพันธุ์ ? 'ไม่ทราบสายพันธุ์' : 'ยังไม่มีชื่อ'}
+              </span>
+            )}
+          </h3>
 
-          <p className="text-gray-500 text-xs mb-2">
-            {สัตว์.สายพันธุ์} • {สัตว์.อายุ} • {สัตว์.เพศ}
-          </p>
+          <p className="text-gray-500 text-xs mb-2">{บรรทัดรอง || 'ยังไม่มีรายละเอียด'}</p>
 
           {/* Tag นิสัย */}
           <div className="flex flex-wrap gap-1">
@@ -492,6 +505,7 @@ function การ์ดสัตว์({ สัตว์, onClick }) {
 
           <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
             <MapPin size={12} className="shrink-0" /> {สัตว์.สถานที่}
+            <span className="ml-auto shrink-0">รหัส {รหัสสัตว์(สัตว์.id)}</span>
           </p>
         </div>
       </div>
