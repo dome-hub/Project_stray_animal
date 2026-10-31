@@ -52,7 +52,7 @@ function BottomNav({ user }) {
       className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100 shadow-[0_-1px_6px_rgba(0,0,0,0.04)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex">
+      <div className="flex max-w-[430px] mx-auto">
         {แท็บ.map(function (t) {
           const active = location.pathname === t.path
           return (

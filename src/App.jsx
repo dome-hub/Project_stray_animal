@@ -37,8 +37,20 @@ import { ลงทะเบียนPush, ยกเลิกPush } from './utils
 function Layoutเนื้อหา({ user, children }) {
   const location = useLocation()
   const มีแถบ = แสดงแถบนำทาง(user, location.pathname)
+
+  // หน้าเจ้าหน้าที่/ผู้ดูแลระบบใช้พื้นที่จอกว้างได้ (ทำงานบนคอมเป็นหลัก)
+  // ส่วนหน้าผู้ใช้ทั่วไปคุมที่ 430px เหมือนเดิม เพราะออกแบบมาสำหรับมือถือ
+  const หน้าทำงาน =
+    location.pathname.startsWith('/volunteer') ||
+    location.pathname.startsWith('/admin')
+
   return (
-    <div style={{ paddingBottom: มีแถบ ? `calc(${ความสูงแถบนำทาง}px + env(safe-area-inset-bottom))` : 0 }}>
+    <div
+      className={หน้าทำงาน
+        ? 'w-full max-w-6xl mx-auto'
+        : 'w-full max-w-[430px] mx-auto'}
+      style={{ paddingBottom: มีแถบ ? `calc(${ความสูงแถบนำทาง}px + env(safe-area-inset-bottom))` : 0 }}
+    >
       {children}
     </div>
   )
