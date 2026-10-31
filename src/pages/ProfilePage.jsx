@@ -18,8 +18,24 @@ import { วันที่สั้นไทย } from '../utils/dateTime'
 // Role display config
 const roleMap = {
   admin:     { ชื่อ: 'ผู้ดูแลระบบ',            Icon: Shield,  สี: 'text-purple-700 bg-purple-50' },
-  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', Icon: HardHat, สี: 'text-orange-700 bg-orange-50' },
+  volunteer: { ชื่อ: 'เจ้าหน้าที่ / อาสาสมัคร', Icon: HardHat, สี: 'text-teal-700 bg-teal-50' },
   user:      { ชื่อ: 'ผู้ใช้งานทั่วไป',          Icon: User,    สี: 'text-blue-700 bg-blue-50' },
+}
+
+// โทนสีหน้าโปรไฟล์ตาม role — ให้ตรงกับธีมของ Home / Notification (ผู้ใช้ = ฟ้า, เจ้าหน้าที่ = เทียล, แอดมิน = ม่วง)
+const ธีมโปรไฟล์ = {
+  user: {
+    พื้นหลัง: 'bg-blue-50', วงรูป: 'bg-blue-100', ไอคอนรูป: 'text-blue-400', สปินเนอร์: 'border-blue-400',
+    ปุ่ม: 'bg-blue-500', ลิงก์: 'text-blue-500', ขอบช่อง: 'border-blue-300', แท็บ: 'text-blue-700',
+  },
+  volunteer: {
+    พื้นหลัง: 'bg-teal-50', วงรูป: 'bg-teal-100', ไอคอนรูป: 'text-teal-500', สปินเนอร์: 'border-teal-500',
+    ปุ่ม: 'bg-teal-600', ลิงก์: 'text-teal-600', ขอบช่อง: 'border-teal-300', แท็บ: 'text-teal-700',
+  },
+  admin: {
+    พื้นหลัง: 'bg-purple-50', วงรูป: 'bg-purple-100', ไอคอนรูป: 'text-purple-400', สปินเนอร์: 'border-purple-400',
+    ปุ่ม: 'bg-purple-600', ลิงก์: 'text-purple-600', ขอบช่อง: 'border-purple-300', แท็บ: 'text-purple-700',
+  },
 }
 
 // Tab config แยกตาม role
@@ -44,6 +60,7 @@ function ProfilePage({ user }) {
 
   const currentRole = user?.role || 'user'
   const roleInfo    = roleMap[currentRole] || roleMap.user
+  const ธีม         = ธีมโปรไฟล์[currentRole] || ธีมโปรไฟล์.user
   const tabs        = tabsPerRole[currentRole] || tabsPerRole.user
 
   const [แท็บ, setแท็บ] = useState('info')
@@ -312,7 +329,7 @@ function ProfilePage({ user }) {
   }
 
   return (
-    <div className="min-h-screen bg-blue-50 pb-8">
+    <div className={`min-h-screen ${ธีม.พื้นหลัง} pb-8`}>
       <ToastHost />
 
       {/* Header */}
@@ -331,19 +348,19 @@ function ProfilePage({ user }) {
         <div className="relative inline-block mb-3">
           <div
             onClick={() => inputรูป.current.click()}
-            className="w-24 h-24 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center cursor-pointer mx-auto border-4 border-white shadow-md"
+            className={`w-24 h-24 rounded-full overflow-hidden ${ธีม.วงรูป} flex items-center justify-center cursor-pointer mx-auto border-4 border-white shadow-md`}
           >
             {กำลังอัปโหลดรูป ? (
-              <div className="w-7 h-7 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <div className={`w-7 h-7 border-4 ${ธีม.สปินเนอร์} border-t-transparent rounded-full animate-spin`} />
             ) : รูปโปรไฟล์ ? (
               <img src={รูปโปรไฟล์} alt="โปรไฟล์" className="w-full h-full object-cover" />
             ) : (
-              <User size={48} strokeWidth={1.5} className="text-blue-400" />
+              <User size={48} strokeWidth={1.5} className={ธีม.ไอคอนรูป} />
             )}
           </div>
           <button
             onClick={() => inputรูป.current.click()}
-            className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-md border-2 border-white"
+            className={`absolute bottom-0 right-0 w-8 h-8 ${ธีม.ปุ่ม} rounded-full flex items-center justify-center shadow-md border-2 border-white`}
           >
             <Camera size={15} className="text-white" />
           </button>
@@ -364,7 +381,7 @@ function ProfilePage({ user }) {
             key={t.key}
             onClick={() => setแท็บ(t.key)}
             className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-              แท็บ === t.key ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'
+              แท็บ === t.key ? `bg-white ${ธีม.แท็บ} shadow-sm` : 'text-gray-500'
             }`}
           >
             {t.ชื่อ}
@@ -388,11 +405,11 @@ function ProfilePage({ user }) {
                       value={ชื่อชั่วคราว}
                       onChange={(e) => setชื่อชั่วคราว(e.target.value)}
                       placeholder="ชื่อ-นามสกุล"
-                      className="border border-blue-300 rounded-lg px-2 py-1 text-sm text-right w-40 focus:outline-none"
+                      className={`border ${ธีม.ขอบช่อง} rounded-lg px-2 py-1 text-sm text-right w-40 focus:outline-none`}
                       autoFocus
                     />
                     <button onClick={บันทึกชื่อ} disabled={กำลังบันทึกชื่อ}
-                      className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg disabled:opacity-60">
+                      className={`text-xs text-white ${ธีม.ปุ่ม} px-2 py-1 rounded-lg disabled:opacity-60`}>
                       {กำลังบันทึกชื่อ ? '...' : 'บันทึก'}
                     </button>
                     <button onClick={() => setกำลังแก้ไขชื่อ(false)} className="text-xs text-gray-400">ยกเลิก</button>
@@ -401,7 +418,7 @@ function ProfilePage({ user }) {
                   <>
                     <span className="text-sm font-medium text-gray-800">{displayName}</span>
                     <button onClick={() => { setชื่อชั่วคราว(displayName); setกำลังแก้ไขชื่อ(true) }}
-                      className="text-xs text-blue-500">แก้ไข</button>
+                      className={`text-xs ${ธีม.ลิงก์}`}>แก้ไข</button>
                   </>
                 )}
               </div>
@@ -440,7 +457,7 @@ function ProfilePage({ user }) {
                         }}
                         placeholder="0XXXXXXXXX"
                         className={`border rounded-lg px-2 py-1 text-sm text-right w-32 focus:outline-none tracking-widest ${
-                          errorเบอร์ ? 'border-red-400 bg-red-50' : 'border-blue-300'
+                          errorเบอร์ ? 'border-red-400 bg-red-50' : ธีม.ขอบช่อง
                         }`}
                         maxLength={10}
                         autoFocus
@@ -448,7 +465,7 @@ function ProfilePage({ user }) {
                       <button
                         onClick={บันทึกเบอร์}
                         disabled={กำลังบันทึกเบอร์ || เบอร์ชั่วคราว.length < 10}
-                        className="text-xs text-white bg-blue-500 px-2 py-1 rounded-lg disabled:opacity-40">
+                        className={`text-xs text-white ${ธีม.ปุ่ม} px-2 py-1 rounded-lg disabled:opacity-40`}>
                         {กำลังบันทึกเบอร์ ? '...' : 'บันทึก'}
                       </button>
                       <button onClick={() => { setกำลังแก้ไขเบอร์(false); setErrorเบอร์('') }}
@@ -460,7 +477,7 @@ function ProfilePage({ user }) {
                         {เบอร์ติดต่อ}
                       </span>
                       <button onClick={() => { setเบอร์ชั่วคราว(เบอร์ติดต่อ === 'กดแก้ไขเพื่อเพิ่มเบอร์' ? '' : เบอร์ติดต่อ); setกำลังแก้ไขเบอร์(true) }}
-                        className="text-xs text-blue-500">แก้ไข</button>
+                        className={`text-xs ${ธีม.ลิงก์}`}>แก้ไข</button>
                     </>
                   )}
                 </div>
@@ -646,7 +663,7 @@ function ProfilePage({ user }) {
         <div className="px-4 mt-4 space-y-3">
           {กำลังโหลดแจ้ง ? (
             <div className="text-center py-12">
-              <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className={`w-8 h-8 border-4 ${ธีม.สปินเนอร์} border-t-transparent rounded-full animate-spin mx-auto mb-2`} />
               <p className="text-sm text-gray-400">กำลังโหลด...</p>
             </div>
           ) : ประวัติแจ้ง.length === 0 ? (

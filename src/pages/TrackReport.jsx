@@ -9,6 +9,7 @@ import {
   Map, Phone, CheckCircle2, Hourglass, ArrowLeft, ChevronRight, Check
 } from 'lucide-react'
 import { supabase } from '../supabase'
+import { ชื่อประเภทการแจ้ง } from '../utils/reportTypes'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
@@ -64,9 +65,9 @@ function เวลาTR(dateString) {
 
 // ---- ประเภทการแจ้ง (จาก urgency) — สีของ badge บนการ์ด ----
 const ประเภทแจ้งTR = {
-  'ด่วนมาก': { dot: 'bg-red-500',    label: 'ดุร้าย/อันตราย', badge: 'bg-red-50 text-red-700' },
-  'ด่วน':    { dot: 'bg-orange-500', label: 'บาดเจ็บ',        badge: 'bg-orange-50 text-orange-700' },
-  'ปานกลาง': { dot: 'bg-yellow-500', label: 'พลัดหลง/จรจัด',  badge: 'bg-yellow-50 text-yellow-700' },
+  'ด่วนมาก': { dot: 'bg-red-500',    label: ชื่อประเภทการแจ้ง['ด่วนมาก'].สั้น, badge: 'bg-red-50 text-red-700' },
+  'ด่วน':    { dot: 'bg-orange-500', label: ชื่อประเภทการแจ้ง['ด่วน'].สั้น,    badge: 'bg-orange-50 text-orange-700' },
+  'ปานกลาง': { dot: 'bg-yellow-500', label: ชื่อประเภทการแจ้ง['ปานกลาง'].สั้น,  badge: 'bg-yellow-50 text-yellow-700' },
 }
 function ประเภทจากTR(urgency) {
   return ประเภทแจ้งTR[urgency] || ประเภทแจ้งTR['ปานกลาง']
