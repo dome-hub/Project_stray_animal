@@ -30,6 +30,7 @@ import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 import { หมุดสี } from '../utils/mapMarker'
 import { ชั่วโมงที่ผ่านมา, วันเวลาสั้นไทย, วันที่สั้นไทย, ป้ายวันที่กลุ่มไทย } from '../utils/dateTime'
+import { สถานะสัตว์ในความดูแล, สถานะสัตว์ออกไปแล้ว, ตัวเลือกนำสัตว์ออก } from '../utils/animalStatus'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -240,7 +241,11 @@ const สีสถานะสัตว์ = {
   'อยู่ศูนย์พักพิง':  'text-blue-600 bg-blue-50',
   'รอการรับเลี้ยง':   'text-green-600 bg-green-50',
   'อยู่ระหว่างรักษา': 'text-orange-600 bg-orange-50',
-  'มีผู้รับเลี้ยง':    'text-gray-500 bg-gray-100',
+  // กลุ่มที่นำออกจากศูนย์แล้ว ใช้สีเดียวกับตัวเลือกในหน้าต่างแก้ไข (ดู ตัวเลือกนำสัตว์ออก ใน utils/animalStatus.js)
+  'มีผู้รับเลี้ยง':    'text-teal-700 bg-teal-50',
+  'ส่งคืนเจ้าของสำเร็จ': 'text-rose-700 bg-rose-50',
+  'สัตว์หลุดหาย':      'text-amber-800 bg-amber-50',
+  'เสียชีวิต':         'text-red-700 bg-red-50',
 }
 
 // ตัวเลือกช่วงอายุ (ใช้ทั้งฟอร์มเพิ่ม/แก้ไข) — ต้องเป็นชุดค่าคงที่เดียวกันเสมอ
@@ -299,7 +304,7 @@ const โหมดเผยแพร่ = [
 ]
 
 // สถานะที่แปลว่าสัตว์ออกจากความดูแลไปแล้ว → ประกาศต่อไม่ได้ ต้องบังคับเป็น 'none'
-const สถานะสัตว์ออกไปแล้ว = ['มีผู้รับเลี้ยง', 'ส่งคืนเจ้าของสำเร็จ']
+// (รายการอยู่ที่ utils/animalStatus.js ใช้ร่วมกับหน้าหาบ้านใหม่/ตามหาเจ้าของฝั่งสาธารณะ)
 
 function โหมดจาก(สัตว์) {
   return สัตว์?.publish_mode || 'none'
@@ -494,6 +499,8 @@ function VolunteerPage({ หน้า }) {
   const [สายพันธุ์,      setSายพันธุ์]      = useState('')
   const [อายุสัตว์,      setอายุสัตว์]      = useState('')
   const [สุขภาพสัตว์,    setSุขภาพสัตว์]    = useState('ปกติ')
+  const [รูปสัตว์เพิ่ม,   setรูปสัตว์เพิ่ม]   = useState([])   // url รูปที่อัปโหลดแล้วของฟอร์มเพิ่มสัตว์ (รูปแรก = รูปหลัก)
+  const inputรูปสัตว์เพิ่ม = useRef(null)
 
   // ---- Stats ----
   const [สถิติ, setSถิติ] = useState({ รายงาน: 0, รอดำเนินการ: 0, สัตว์: 0, รับเลี้ยงแล้ว: 0 })
@@ -524,6 +531,9 @@ function VolunteerPage({ หน้า }) {
   })
   const ชีตแก้ไขสัตว์ = useSheet(!!สัตว์ที่แก้ไข, function () {
     if (!กำลังบันทึกสัตว์ && !กำลังอัปโหลดรูป) ปิดแก้ไขสัตว์()
+  })
+  const ชีตเพิ่มสัตว์ = useSheet(หน้า === 'animals' && แสดงฟอร์มเพิ่ม, function () {
+    if (!กำลังบันทึกสัตว์) setแสดงฟอร์มเพิ่ม(false)
   })
 
   // ================================================================
@@ -1066,6 +1076,8 @@ function VolunteerPage({ หน้า }) {
   // ================================================================
   async function บันทึกสัตว์ใหม่() {
     if (!ชื่อสัตว์ || !เพศสัตว์ || กำลังบันทึกสัตว์) return
+    // กดบันทึกระหว่างรูปยังอัปโหลดไม่เสร็จ สัตว์จะถูกสร้างโดยไม่มีรูปที่เพิ่งเลือก
+    if (กำลังอัปโหลดรูป) { toastError('กำลังอัปโหลดรูปอยู่ กรุณารอสักครู่แล้วกดบันทึกอีกครั้ง'); return }
     setกำลังบันทึกสัตว์(true)
     const { error } = await supabase.from('animals').insert({
       name:     ชื่อสัตว์,
@@ -1075,10 +1087,13 @@ function VolunteerPage({ หน้า }) {
       health:   สุขภาพสัตว์ || 'ปกติ',
       status:   'อยู่ศูนย์พักพิง',
       location: 'กำแพงแสน นครปฐม',
+      // photos[0] = รูปหลักเสมอ และ sync ลง photo_url ให้โค้ตเก่าที่อ่าน photo_url ใช้ได้ (เหมือนตอนแก้ไขสัตว์)
+      photos:    รูปสัตว์เพิ่ม.length > 0 ? รูปสัตว์เพิ่ม : null,
+      photo_url: รูปสัตว์เพิ่ม[0] || null,
     })
     if (!error) {
       setชื่อสัตว์(''); setเพศสัตว์(''); setSายพันธุ์('')
-      setอายุสัตว์(''); setSุขภาพสัตว์('ปกติ')
+      setอายุสัตว์(''); setSุขภาพสัตว์('ปกติ'); setรูปสัตว์เพิ่ม([])
       setแสดงฟอร์มเพิ่ม(false)
       ดึงสัตว์()
       toast('เพิ่มสัตว์สำเร็จ!')
@@ -1174,25 +1189,49 @@ function VolunteerPage({ หน้า }) {
   // เลือกไฟล์รูปโปรไฟล์ใหม่สำหรับสัตว์ (ยังไม่อัปโหลดจนกว่าจะกดบันทึก)
   // เลือกได้หลายไฟล์พร้อมกัน — validate + อัปโหลดขึ้น storage ทันที แล้วต่อ url เข้าคลังรูป (photos[])
   // (อัปโหลดตอนเลือกเลย ทำให้ set-cover/ลบ ทำงานกับ url จริงทั้งหมด ไม่ต้องจัดการไฟล์ค้างที่ยังไม่อัปโหลด)
+  // ตรวจ + อัปโหลดไฟล์รูปขึ้น storage ทีละไฟล์ คืน url ของไฟล์ที่ผ่านทั้งหมด (ไฟล์ที่พลาดแจ้ง toast แล้วข้ามไป)
+  // ใช้ร่วมกันทั้งฟอร์มแก้ไขสัตว์และฟอร์มเพิ่มสัตว์
+  async function อัปโหลดรูปสัตว์(ไฟล์ทั้งหมด) {
+    if (ไฟล์ทั้งหมด.length === 0) return []
+    setกำลังอัปโหลดรูป(true)
+    const urlใหม่ = []
+    try {
+      for (const ไฟล์ of ไฟล์ทั้งหมด) {
+        const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
+        if (!ผลตรวจ.ok) { toastError(`${ไฟล์.name}: ${ผลตรวจ.error}`); continue }
+        const ชื่อไฟล์ = `animal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${ไฟล์.name.replace(/\s/g, '_')}`
+        const { data, error } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์)
+        if (error) { toastError(`${ไฟล์.name}: ${ข้อความError(error, 'อัปโหลดรูป')}`); continue }
+        const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(data.path)
+        urlใหม่.push(urlData.publicUrl)
+      }
+    } finally {
+      setกำลังอัปโหลดรูป(false)
+    }
+    return urlใหม่
+  }
+
   async function เลือกรูปสัตว์ใหม่(event) {
     const ไฟล์ทั้งหมด = Array.from(event.target.files || [])
     event.target.value = ''
-    if (ไฟล์ทั้งหมด.length === 0) return
-    setกำลังอัปโหลดรูป(true)
-    const urlใหม่ = []
-    for (const ไฟล์ of ไฟล์ทั้งหมด) {
-      const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
-      if (!ผลตรวจ.ok) { toastError(`${ไฟล์.name}: ${ผลตรวจ.error}`); continue }
-      const ชื่อไฟล์ = `animal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${ไฟล์.name.replace(/\s/g, '_')}`
-      const { data, error } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์)
-      if (error) { toastError(`${ไฟล์.name}: ${ข้อความError(error, 'อัปโหลดรูป')}`); continue }
-      const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(data.path)
-      urlใหม่.push(urlData.publicUrl)
-    }
+    const urlใหม่ = await อัปโหลดรูปสัตว์(ไฟล์ทั้งหมด)
     if (urlใหม่.length > 0) {
       setSัตว์ที่แก้ไข((prev) => ({ ...prev, photos: [...(prev.photos || []), ...urlใหม่] }))
     }
-    setกำลังอัปโหลดรูป(false)
+  }
+
+  // ---- รูปในฟอร์มเพิ่มสัตว์ใหม่ (ทำงานเหมือนคลังรูปของฟอร์มแก้ไข: อัปโหลดทันทีที่เลือก รูปแรก = รูปหลัก) ----
+  async function เลือกรูปสัตว์เพิ่ม(event) {
+    const ไฟล์ทั้งหมด = Array.from(event.target.files || [])
+    event.target.value = ''
+    const urlใหม่ = await อัปโหลดรูปสัตว์(ไฟล์ทั้งหมด)
+    if (urlใหม่.length > 0) setรูปสัตว์เพิ่ม((prev) => [...prev, ...urlใหม่])
+  }
+  function ตั้งรูปหลักเพิ่ม(url) {
+    setรูปสัตว์เพิ่ม((prev) => [url, ...prev.filter((u) => u !== url)])
+  }
+  function ลบรูปเพิ่ม(url) {
+    setรูปสัตว์เพิ่ม((prev) => prev.filter((u) => u !== url))
   }
 
   // ตั้งรูปนี้เป็นรูปหลัก (cover) — ย้ายมาไว้หน้าสุดของ array (photos[0])
@@ -1204,6 +1243,15 @@ function VolunteerPage({ หน้า }) {
   // กันเผลอลบรูปที่ report ต้นทางยังใช้ร่วมอยู่; ไฟล์กำพร้าใน storage ไม่มีผลเสีย)
   function ลบรูปสัตว์(url) {
     setSัตว์ที่แก้ไข((prev) => ({ ...prev, photos: (prev.photos || []).filter((u) => u !== url) }))
+  }
+
+  // ตั้งสถานะของสัตว์ที่กำลังแก้ไข (ยังไม่บันทึกจนกว่าจะกด "บันทึกการแก้ไข")
+  // สถานะบอกแค่ที่อยู่ ไม่ยุ่งกับการประกาศ ยกเว้นสถานะที่แปลว่าน้องออกจากศูนย์ไปแล้ว → ประกาศต่อไม่ได้ ปิดให้อัตโนมัติ
+  function ตั้งสถานะสัตว์(สถานะ) {
+    setSัตว์ที่แก้ไข(function (prev) {
+      const publish_mode = สถานะสัตว์ออกไปแล้ว.includes(สถานะ) ? 'none' : โหมดจาก(prev)
+      return { ...prev, status: สถานะ, publish_mode }
+    })
   }
 
   // ปิด bottom sheet แก้ไขสัตว์
@@ -1676,72 +1724,18 @@ function VolunteerPage({ หน้า }) {
       {หน้า === 'animals' && (
         <div className="px-4 pt-4 space-y-4 pb-20">
 
-          {/* FAB — เพิ่มสัตว์ใหม่ */}
-          <button onClick={() => setแสดงฟอร์มเพิ่ม(!แสดงฟอร์มเพิ่ม)}
+          {/* FAB — เพิ่มสัตว์ใหม่ (เปิดฟอร์มเป็นหน้าต่างเด้งทับหน้าจอ ไม่ว่าจะเลื่อนรายการลงไปไกลแค่ไหน) */}
+          <button onClick={() => setแสดงฟอร์มเพิ่ม(true)}
             className="fixed bottom-20 right-5 z-30 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-all"
-            title={แสดงฟอร์มเพิ่ม ? 'ปิดฟอร์ม' : 'เพิ่มสัตว์ใหม่'}
-            aria-label={แสดงฟอร์มเพิ่ม ? 'ปิดฟอร์ม' : 'เพิ่มสัตว์ใหม่'}
+            title="เพิ่มสัตว์ใหม่"
+            aria-label="เพิ่มสัตว์ใหม่"
           >
-            {แสดงฟอร์มเพิ่ม ? <X size={24} /> : <Plus size={24} />}
+            <Plus size={24} />
           </button>
 
-          {แสดงฟอร์มเพิ่ม && (
-            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-              <p className="font-bold text-gray-800">เพิ่มสัตว์เข้าศูนย์พักพิง</p>
-              {[
-                { key: 'name',   label: 'ชื่อสัตว์', val: ชื่อสัตว์, set: setชื่อสัตว์, placeholder: 'เช่น มะม่วง, ขาว', required: true },
-                { key: 'breed',  label: 'สายพันธุ์', val: สายพันธุ์, set: setSายพันธุ์, placeholder: 'พิมพ์ชื่อสายพันธุ์ เช่น ไทยหลังอาน, วิเชียรมาศ', required: false },
-                { key: 'health', label: 'สุขภาพ',   val: สุขภาพสัตว์, set: setSุขภาพสัตว์, placeholder: 'เช่น ปกติ, บาดเจ็บ', required: false },
-              ].map(function (f) {
-                return (
-                  <div key={f.label}>
-                    <p className="text-xs font-semibold text-gray-600 mb-1">
-                      {f.label} {f.required && <span className="text-red-400">*</span>}
-                    </p>
-                    {/* สายพันธุ์ใช้ช่อง autocomplete ตัวเดียวกับหน้าแจ้งเหตุ ชื่อพันธุ์จะได้ตรงกันทั้งระบบ */}
-                    {f.key === 'breed' ? (
-                      <BreedInput value={f.val} onChange={f.set} placeholder={f.placeholder} สี="teal" />
-                    ) : (
-                      <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.placeholder}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
-                    )}
-                  </div>
-                )
-              })}
-              <div>
-                <p className="text-xs font-semibold text-gray-600 mb-2">เพศ <span className="text-red-400">*</span></p>
-                <div className="flex gap-2">
-                  {['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].map(function (เพศ) {
-                    return (
-                      <button key={เพศ} onClick={() => setเพศสัตว์(เพศ)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-medium border-2 ${
-                          เพศสัตว์ === เพศ ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-700'
-                        }`}>{เพศ}</button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-600 mb-1">อายุ</p>
-                <select value={อายุสัตว์} onChange={(e) => setอายุสัตว์(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white">
-                  <option value="">-- เลือก --</option>
-                  {ตัวเลือกอายุสัตว์.map(function (a) {
-                    return <option key={a}>{a}</option>
-                  })}
-                </select>
-              </div>
-              <button onClick={บันทึกสัตว์ใหม่} disabled={!ชื่อสัตว์ || !เพศสัตว์ || กำลังบันทึกสัตว์}
-                className="w-full bg-teal-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                {กำลังบันทึกสัตว์
-                  ? <><Loader2 size={15} className="animate-spin shrink-0" /> กำลังบันทึก...</>
-                  : 'บันทึกข้อมูลสัตว์'}
-              </button>
-            </div>
-          )}
-
           <div>
-            <p className="text-sm font-semibold text-gray-700">สัตว์ในความดูแล ({สัตว์จากDB.length} ตัว)</p>
+            {/* นับเฉพาะตัวที่ยังอยู่ในความดูแล — ตัวที่ออกจากศูนย์ไปแล้ว (ได้บ้านใหม่ / คืนเจ้าของ / หลุดหาย / เสียชีวิต) ไม่นับ */}
+            <p className="text-sm font-semibold text-gray-700">สัตว์ในความดูแล ({สัตว์จากDB.filter(function (s) { return สถานะสัตว์ในความดูแล.includes(s.status) }).length} ตัว)</p>
             <p className="text-xs text-gray-400 mt-0.5">รวมสัตว์ที่มาจากรายงาน (สถานะ อยู่ศูนย์พักพิง)</p>
           </div>
 
@@ -1758,10 +1752,13 @@ function VolunteerPage({ หน้า }) {
 
           {(function () {
             // Tabs กรองสถานะ — อยู่ศูนย์พักพิง (รวมอยู่ระหว่างรักษา) / รอหาบ้าน / รับเลี้ยงแล้ว
+            // แท็บ "ออกจากศูนย์" = สัตว์ที่ไม่ได้อยู่ในความดูแลแล้วแต่ไม่ใช่ได้บ้านใหม่ (เจ้าของมารับ / หลุดหาย / เสียชีวิต)
+            // ไว้ดูย้อนหลังและกู้คืนได้ ถ้าไม่มีแท็บนี้ สัตว์ที่นำออกแล้วจะหายไปจากทุกรายการ
             const กลุ่มสถานะตามแท็บ = {
               shelter: ['อยู่ศูนย์พักพิง', 'อยู่ระหว่างรักษา'],
               waiting: ['รอการรับเลี้ยง'],
               adopted: ['มีผู้รับเลี้ยง'],
+              left:    ['ส่งคืนเจ้าของสำเร็จ', 'สัตว์หลุดหาย', 'เสียชีวิต'],
             }
             const นับตามแท็บ = function (key) {
               return สัตว์จากDB.filter(function (s) { return กลุ่มสถานะตามแท็บ[key].includes(s.status) }).length
@@ -1770,6 +1767,7 @@ function VolunteerPage({ หน้า }) {
               { key: 'shelter', label: 'อยู่ศูนย์พักพิง', count: นับตามแท็บ('shelter') },
               { key: 'waiting', label: 'รอหาบ้าน',        count: นับตามแท็บ('waiting') },
               { key: 'adopted', label: 'รับเลี้ยงแล้ว',    count: นับตามแท็บ('adopted') },
+              { key: 'left',    label: 'ออกจากศูนย์',      count: นับตามแท็บ('left') },
             ]
             const สัตว์ตามแท็บ = สัตว์จากDB.filter(function (s) {
               return กลุ่มสถานะตามแท็บ[แท็บสัตว์].includes(s.status)
@@ -1786,17 +1784,19 @@ function VolunteerPage({ หน้า }) {
               shelter: 'ไม่มีสัตว์ในศูนย์ตอนนี้',
               waiting: 'ยังไม่มีสัตว์ที่รอหาบ้าน',
               adopted: 'ยังไม่มีสัตว์ที่มีผู้รับเลี้ยง',
+              left:    'ยังไม่มีสัตว์ที่ออกจากศูนย์ (ส่งคืนเจ้าของ / หลุดหาย / เสียชีวิต)',
             }
 
             return (
               <>
                 {/* Tabs */}
-                <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                {/* 4 แท็บ: จอมือถือแคบเรียง 2×2 ให้เห็นครบทุกแท็บ (แถวเดียวจะล้นจนแท็บสุดท้ายถูกตัด) จอกว้างขึ้นเรียงแถวเดียว */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 bg-gray-100 rounded-xl p-1 gap-1">
                   {แท็บทั้งหมด.map(function (tab) {
                     const isActive = แท็บสัตว์ === tab.key
                     return (
                       <button key={tab.key} onClick={() => setแท็บสัตว์(tab.key)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
+                        className={`py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
                           isActive ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-500'
                         }`}
                       >
@@ -2609,6 +2609,116 @@ function VolunteerPage({ หน้า }) {
       })()}
 
       {/* ============================================================
+          BOTTOM SHEET: เพิ่มสัตว์ใหม่ — เด้งทับหน้าจอทันทีที่กดปุ่ม + (เดิมเป็นฟอร์มแทรกบนสุดของหน้า
+          เลื่อนรายการลงมาแล้วกด + จะมองไม่เห็นเพราะฟอร์มไปโผล่เหนือจุดที่กำลังดูอยู่)
+          ============================================================ */}
+      {หน้า === 'animals' && แสดงฟอร์มเพิ่ม && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end"
+             onClick={function () { if (!กำลังบันทึกสัตว์) setแสดงฟอร์มเพิ่ม(false) }}>
+          <div ref={ชีตเพิ่มสัตว์} className="bg-white w-full rounded-t-3xl max-h-[93vh] overflow-y-auto"
+               onClick={function (e) { e.stopPropagation() }}>
+            <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+
+            {/* จำกัดความกว้างและจัดกึ่งกลาง กันฟอร์มยืดเต็มจอตอนเปิดบนหน้าจอกว้าง (desktop) */}
+            <div className="max-w-xl mx-auto w-full">
+              <div className="flex items-center justify-between px-5 py-3">
+                <p className="font-bold text-gray-800">เพิ่มสัตว์เข้าศูนย์พักพิง</p>
+                <button onClick={function () { if (!กำลังบันทึกสัตว์) setแสดงฟอร์มเพิ่ม(false) }} aria-label="ปิด"
+                  className="w-10 h-10 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="px-5 pb-8 space-y-4">
+                {/* รูปภาพสัตว์ — ไม่บังคับ อัปโหลดทันทีที่เลือก เลือกได้หลายรูป รูปแรก = รูปหลักที่โชว์บนการ์ด */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">
+                    รูปภาพสัตว์ <span className="font-normal text-gray-400">(ไม่บังคับ • รูปแรก = รูปหลัก)</span>
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {รูปสัตว์เพิ่ม.map(function (url, i) {
+                      return (
+                        <div key={url} className={`relative aspect-square rounded-xl overflow-hidden border-2 ${i === 0 ? 'border-teal-500' : 'border-gray-100'}`}>
+                          <img src={url} alt={`รูปที่ ${i + 1}`} className="w-full h-full object-cover" />
+                          {i === 0 ? (
+                            <span className="absolute bottom-0 inset-x-0 bg-teal-600/90 text-white text-[9px] text-center py-0.5 font-bold">หลัก</span>
+                          ) : (
+                            <button type="button" onClick={() => ตั้งรูปหลักเพิ่ม(url)} title="ตั้งเป็นรูปหลัก" aria-label="ตั้งเป็นรูปหลัก"
+                              className="absolute bottom-0.5 left-0.5 bg-white/90 text-teal-600 rounded-md w-5 h-5 flex items-center justify-center shadow-sm"><Star size={11} className="fill-teal-600" /></button>
+                          )}
+                          <button type="button" onClick={() => ลบรูปเพิ่ม(url)} title="ลบรูปนี้" aria-label="ลบรูปนี้"
+                            className="absolute top-0.5 right-0.5 bg-black/55 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                    <button type="button" onClick={() => inputรูปสัตว์เพิ่ม.current.click()} disabled={กำลังอัปโหลดรูป}
+                      className="aspect-square rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/50 text-teal-500 flex flex-col items-center justify-center disabled:opacity-60">
+                      {กำลังอัปโหลดรูป
+                        ? <><div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /><span className="text-[10px] mt-1 font-medium">กำลังอัปโหลด</span></>
+                        : <><Camera size={18} /><span className="text-[10px] mt-0.5 font-medium">เพิ่มรูป</span></>}
+                    </button>
+                  </div>
+                  <input ref={inputรูปสัตว์เพิ่ม} type="file" multiple accept="image/*" className="hidden" onChange={เลือกรูปสัตว์เพิ่ม} />
+                </div>
+
+                {[
+                  { key: 'name',   label: 'ชื่อสัตว์', val: ชื่อสัตว์, set: setชื่อสัตว์, placeholder: 'เช่น มะม่วง, ขาว', required: true },
+                  { key: 'breed',  label: 'สายพันธุ์', val: สายพันธุ์, set: setSายพันธุ์, placeholder: 'พิมพ์ชื่อสายพันธุ์ เช่น ไทยหลังอาน, วิเชียรมาศ', required: false },
+                  { key: 'health', label: 'สุขภาพ',   val: สุขภาพสัตว์, set: setSุขภาพสัตว์, placeholder: 'เช่น ปกติ, บาดเจ็บ', required: false },
+                ].map(function (f) {
+                  return (
+                    <div key={f.label}>
+                      <p className="text-xs font-semibold text-gray-600 mb-1">
+                        {f.label} {f.required && <span className="text-red-400">*</span>}
+                      </p>
+                      {/* สายพันธุ์ใช้ช่อง autocomplete ตัวเดียวกับหน้าแจ้งเหตุ ชื่อพันธุ์จะได้ตรงกันทั้งระบบ */}
+                      {f.key === 'breed' ? (
+                        <BreedInput value={f.val} onChange={f.set} placeholder={f.placeholder} สี="teal" />
+                      ) : (
+                        <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.placeholder}
+                          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-400" />
+                      )}
+                    </div>
+                  )
+                })}
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">เพศ <span className="text-red-400">*</span></p>
+                  <div className="flex gap-2">
+                    {['ตัวผู้', 'ตัวเมีย', 'ไม่ทราบ'].map(function (เพศ) {
+                      return (
+                        <button key={เพศ} onClick={() => setเพศสัตว์(เพศ)}
+                          className={`flex-1 py-2 rounded-xl text-xs font-medium border-2 ${
+                            เพศสัตว์ === เพศ ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-700'
+                          }`}>{เพศ}</button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-1">อายุ</p>
+                  <select value={อายุสัตว์} onChange={(e) => setอายุสัตว์(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white">
+                    <option value="">-- เลือก --</option>
+                    {ตัวเลือกอายุสัตว์.map(function (a) {
+                      return <option key={a}>{a}</option>
+                    })}
+                  </select>
+                </div>
+                <button onClick={บันทึกสัตว์ใหม่} disabled={!ชื่อสัตว์ || !เพศสัตว์ || กำลังบันทึกสัตว์ || กำลังอัปโหลดรูป}
+                  className="w-full bg-teal-600 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+                  {กำลังบันทึกสัตว์
+                    ? <><Loader2 size={15} className="animate-spin shrink-0" /> กำลังบันทึก...</>
+                    : 'บันทึกข้อมูลสัตว์'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
           BOTTOM SHEET: แก้ไขสัตว์
           ============================================================ */}
       {สัตว์ที่แก้ไข && (
@@ -2639,10 +2749,11 @@ function VolunteerPage({ หน้า }) {
                   const cover = รูป[0] || null
                   return (
                     <>
-                      {/* รูปหลักขนาดใหญ่ */}
+                      {/* รูปหลักขนาดใหญ่ — object-contain วางตามสัดส่วนจริง ถ้าใช้ object-cover กับกรอบกว้างแบบนี้
+                          รูปจะถูกซูมแล้วตัดจนเห็นแค่บางส่วน (เช่นเห็นแค่ดวงตา) ดูเหมือนรูปยืด ส่วนรูปย่อสี่เหลี่ยมด้านล่างใช้ cover ได้ */}
                       <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-teal-50 flex items-center justify-center">
                         {cover
-                          ? <img src={cover} alt="รูปหลัก" className="w-full h-full object-cover" />
+                          ? <img src={cover} alt="รูปหลัก" className="w-full h-full object-contain" />
                           : <AnimalIcon ชนิด={สัตว์ที่แก้ไข.species || สัตว์ที่แก้ไข.breed} size={56} className="text-teal-400" />}
                         {cover && (
                           <span className="absolute top-2 left-2 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"><Star size={10} className="fill-white shrink-0" /> รูปหลัก</span>
@@ -2886,20 +2997,12 @@ function VolunteerPage({ หน้า }) {
                   สถานะ
                   <span className="text-gray-400 font-normal ml-1.5">— บอกแค่ว่าตอนนี้น้องอยู่ไหน ส่วนจะประกาศอะไรเลือกที่หัวข้อถัดไป</span>
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {['อยู่ศูนย์พักพิง', 'อยู่ระหว่างรักษา', 'รอการรับเลี้ยง', 'มีผู้รับเลี้ยง'].map(function (ส) {
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {สถานะสัตว์ในความดูแล.map(function (ส) {
                     const isWaiting  = ส === 'รอการรับเลี้ยง'
                     const isSelected = สัตว์ที่แก้ไข.status === ส
                     return (
-                      <button key={ส}
-                        onClick={function () {
-                          setSัตว์ที่แก้ไข(function (prev) {
-                            // สถานะบอกแค่ที่อยู่ ไม่ยุ่งกับการประกาศแล้ว
-                            // ยกเว้นสถานะที่แปลว่าน้องออกไปแล้ว → ประกาศต่อไม่ได้ ปิดให้อัตโนมัติ
-                            const publish_mode = สถานะสัตว์ออกไปแล้ว.includes(ส) ? 'none' : โหมดจาก(prev)
-                            return { ...prev, status: ส, publish_mode }
-                          })
-                        }}
+                      <button key={ส} onClick={() => ตั้งสถานะสัตว์(ส)}
                         className={`py-2.5 rounded-xl text-xs font-medium border-2 flex items-center justify-center gap-1 ${
                           isSelected
                             ? isWaiting
@@ -2913,6 +3016,44 @@ function VolunteerPage({ หน้า }) {
                     )
                   })}
                 </div>
+              </div>
+
+              {/* นำสัตว์ออกจากศูนย์พักพิง — เมื่อน้องไม่ได้อยู่ในความดูแลแล้ว (ได้บ้านใหม่ / เจ้าของมารับ / หลุดหาย / เสียชีวิต)
+                  เลือกแล้วต้องกด "บันทึกการแก้ไข" ถึงจะมีผล น้องจะย้ายไปแท็บ "ออกจากศูนย์" และถูกซ่อนจากหน้าสาธารณะ */}
+              <div className="md:col-span-2">
+                <p className="text-xs font-semibold text-gray-600 mb-2">
+                  นำสัตว์ออกจากศูนย์พักพิง
+                  <span className="text-gray-400 font-normal ml-1.5">— เลือกเมื่อน้องไม่ได้อยู่ในความดูแลของศูนย์แล้ว</span>
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ตัวเลือกนำสัตว์ออก.map(function (ตัวเลือก) {
+                    const isSelected = สัตว์ที่แก้ไข.status === ตัวเลือก.value
+                    return (
+                      <button key={ตัวเลือก.value} onClick={() => ตั้งสถานะสัตว์(ตัวเลือก.value)}
+                        className={`px-3 py-2.5 rounded-xl border-2 text-left ${
+                          isSelected ? ตัวเลือก.เลือก : 'border-gray-200 bg-white'
+                        }`}>
+                        {/* จุดสีประจำตัวเลือก โชว์ตลอด (แม้ยังไม่ได้เลือก) ให้แยกแต่ละอันออกจากกันได้ทันที */}
+                        <span className={`flex items-center gap-1.5 text-xs font-semibold ${isSelected ? ตัวเลือก.หัวข้อ : 'text-gray-700'}`}>
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${ตัวเลือก.dot}`} />
+                          {ตัวเลือก.label}
+                        </span>
+                        <span className={`block text-[11px] mt-0.5 ${isSelected ? ตัวเลือก.คำอธิบาย : 'text-gray-500'}`}>{ตัวเลือก.desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {(function () {
+                  // ข้อความเตือนใช้สีเดียวกับตัวเลือกที่เลือกอยู่
+                  const ที่เลือก = ตัวเลือกนำสัตว์ออก.find(function (t) { return t.value === สัตว์ที่แก้ไข.status })
+                  if (!ที่เลือก) return null
+                  return (
+                    <p className={`mt-2 text-xs border rounded-xl px-3 py-2 ${ที่เลือก.แจ้ง}`}>
+                      เมื่อบันทึก น้องจะออกจากรายการในศูนย์ ไปอยู่แท็บ "{ที่เลือก.value === 'มีผู้รับเลี้ยง' ? 'รับเลี้ยงแล้ว' : 'ออกจากศูนย์'}"
+                      และไม่แสดงในหน้าสาธารณะ (ถ้าเลือกผิด เปิดน้องกลับมาแล้วเลือกสถานะที่อยู่ในศูนย์ใหม่ได้)
+                    </p>
+                  )
+                })()}
               </div>
 
               {/* ลักษณะนิสัย — Tag/Chip input */}
