@@ -22,6 +22,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
 import AnimalIcon from '../components/AnimalIcon'
 import BreedInput from '../components/BreedInput'
 import LoadFailed from '../components/LoadFailed'
@@ -1206,7 +1207,7 @@ function VolunteerPage({ หน้า }) {
       for (const ไฟล์ of ไฟล์ทั้งหมด) {
         const ผลตรวจ = await ตรวจสอบไฟล์รูปภาพ(ไฟล์)
         if (!ผลตรวจ.ok) { toastError(`${ไฟล์.name}: ${ผลตรวจ.error}`); continue }
-        const ชื่อไฟล์ = `animal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${ไฟล์.name.replace(/\s/g, '_')}`
+        const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์, 'animal_')
         const { data, error } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์)
         if (error) { toastError(`${ไฟล์.name}: ${ข้อความError(error, 'อัปโหลดรูป')}`); continue }
         const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(data.path)

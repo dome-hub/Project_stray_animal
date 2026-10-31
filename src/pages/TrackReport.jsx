@@ -11,6 +11,7 @@ import {
 import { supabase } from '../supabase'
 import { ชื่อประเภทการแจ้ง } from '../utils/reportTypes'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
@@ -414,7 +415,7 @@ function TrackReport({ user }) {
 
     let image_url = รายงานที่เปิด.image_url || null
     if (ไฟล์รูปแก้ไข) {
-      const ชื่อไฟล์ = `${Date.now()}_${ไฟล์รูปแก้ไข.name.replace(/\s/g, '_')}`
+      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูปแก้ไข)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปแก้ไข)
       if (uploadError) {

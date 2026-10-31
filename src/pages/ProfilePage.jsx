@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
 import AnimalIcon from '../components/AnimalIcon'
 import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
@@ -262,8 +263,7 @@ function ProfilePage({ user }) {
       // bucket_id = 'report-images' ซึ่งจะเปิดให้ผู้ใช้คนใดก็ได้เขียนทับไฟล์ของคนอื่นทั้ง bucket
       // รวมถึงรูปหลักฐานในรายงานของคนอื่นด้วย — แลกไม่คุ้มกับการประหยัดพื้นที่ไม่กี่ KB
       // ไฟล์เก่าที่ค้างใน storage ไม่มีผลเสีย (ไม่มีใครอ้างถึงแล้ว) เหมือนที่คลังรูปสัตว์ทำอยู่
-      const นามสกุล = ไฟล์.name.split('.').pop()
-      const ชื่อไฟล์ = `avatars/${user?.id || 'user'}_${Date.now()}.${นามสกุล}`
+      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์, `avatars/${user?.id || 'user'}_`)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images').upload(ชื่อไฟล์, ไฟล์)
       if (uploadError) throw new Error(uploadError.message)

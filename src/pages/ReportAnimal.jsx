@@ -13,6 +13,7 @@ import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabase'
 import { ชื่อประเภทการแจ้ง } from '../utils/reportTypes'
+import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import BreedInput from '../components/BreedInput'
 import { useSheet } from '../components/useSheet'
@@ -539,7 +540,7 @@ function ReportAnimal({ user }) {
     setกำลังส่ง(true)
     let imageUrl = null
     if (ไฟล์รูปภาพ) {
-      const ชื่อไฟล์ = `${Date.now()}_${ไฟล์รูปภาพ.name.replace(/\s/g, '_')}`
+      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูปภาพ)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
       if (uploadError) {
@@ -657,7 +658,7 @@ function ReportAnimal({ user }) {
     // อัปโหลดรูปของผู้แจ้งคนนี้ (ถ้ามี) แล้วต่อเข้าคลังรูปของเคสเดิม
     let imageUrl = null
     if (ไฟล์รูปภาพ) {
-      const ชื่อไฟล์ = `${Date.now()}_${ไฟล์รูปภาพ.name.replace(/\s/g, '_')}`
+      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูปภาพ)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
       if (!uploadError) {
