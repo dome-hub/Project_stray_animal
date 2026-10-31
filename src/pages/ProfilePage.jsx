@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Trash2, ShieldAlert, X, Shield, HardHat, User, Camera, Home, Save, Loader2,
-  ClipboardList, PawPrint, CheckCircle2, MapPin, Users, FileText, Heart, ArrowLeft
+  PawPrint, CheckCircle2, MapPin, Users, FileText, Heart, ArrowLeft
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
@@ -40,7 +40,7 @@ const ธีมโปรไฟล์ = {
 
 // Tab config แยกตาม role
 const tabsPerRole = {
-  user:      [{ key: 'info', ชื่อ: 'ข้อมูล' }, { key: 'reports', ชื่อ: 'ประวัติแจ้ง' }, { key: 'adoptions', ชื่อ: 'รับเลี้ยง' }],
+  user:      [{ key: 'info', ชื่อ: 'ข้อมูล' }],
   volunteer: [{ key: 'info', ชื่อ: 'ข้อมูล' }, { key: 'stats', ชื่อ: 'สถิติ' }, { key: 'queue', ชื่อ: 'คิวงาน' }],
   admin:     [{ key: 'info', ชื่อ: 'ข้อมูล' }, { key: 'overview', ชื่อ: 'ภาพรวม' }],
 }
@@ -104,9 +104,6 @@ function ProfilePage({ user }) {
   })
 
   // ---- ข้อมูลแต่ละ Tab ----
-  const [ประวัติแจ้ง,    setประวัติแจ้ง]    = useState([])
-  const [กำลังโหลดแจ้ง, setกำลังโหลดแจ้ง] = useState(false)
-
   const [สถิติVolunteer,    setSถิติVolunteer]    = useState(null)
   const [คิวงาน,           setคิวงาน]           = useState([])
   const [กำลังโหลดVolunteer, setกำลังโหลดVolunteer] = useState(false)
@@ -139,21 +136,6 @@ function ProfilePage({ user }) {
 
   // โหลดข้อมูลตาม Tab ที่เปิด
   useEffect(function () {
-    if (แท็บ === 'reports' && user?.id) {
-      // ประวัติแจ้งสัตว์จรของ user นี้
-      setกำลังโหลดแจ้ง(true)
-      supabase
-        .from('reports')
-        .select('id, animal_type, location_text, status, created_at, image_url')
-        .eq('reporter_id', user.id)
-        .order('created_at', { ascending: false })
-        .then(function ({ data }) {
-          setประวัติแจ้ง(data || [])
-          setกำลังโหลดแจ้ง(false)
-        })
-        .catch(function () { setกำลังโหลดแจ้ง(false) })
-    }
-
     if ((แท็บ === 'stats' || แท็บ === 'queue') && currentRole === 'volunteer') {
       setกำลังโหลดVolunteer(true)
       Promise.all([
@@ -375,6 +357,7 @@ function ProfilePage({ user }) {
       </div>
 
       {/* Tab สลับ — ต่างกันตาม role */}
+      {tabs.length > 1 && (
       <div className="flex mx-4 mt-4 bg-gray-100 rounded-xl p-1">
         {tabs.map((t) => (
           <button
@@ -388,6 +371,7 @@ function ProfilePage({ user }) {
           </button>
         ))}
       </div>
+      )}
 
       {/* ======== Tab: ข้อมูลส่วนตัว (ทุก role) ======== */}
       {แท็บ === 'info' && (
@@ -655,67 +639,6 @@ function ProfilePage({ user }) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ======== Tab: ประวัติแจ้ง (user) ======== */}
-      {แท็บ === 'reports' && (
-        <div className="px-4 mt-4 space-y-3">
-          {กำลังโหลดแจ้ง ? (
-            <div className="text-center py-12">
-              <div className={`w-8 h-8 border-4 ${ธีม.สปินเนอร์} border-t-transparent rounded-full animate-spin mx-auto mb-2`} />
-              <p className="text-sm text-gray-400">กำลังโหลด...</p>
-            </div>
-          ) : ประวัติแจ้ง.length === 0 ? (
-            <div className="text-center py-16">
-              <ClipboardList size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
-              <p className="font-medium text-gray-600">ยังไม่มีประวัติการแจ้ง</p>
-              <p className="text-xs text-gray-400 mt-1">เมื่อคุณแจ้งสัตว์จร จะปรากฏที่นี่</p>
-              <button onClick={() => navigate('/report')}
-                className="mt-4 bg-orange-500 text-white px-6 py-2 rounded-xl text-sm font-medium">
-                แจ้งสัตว์จรเลย
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs text-gray-400">รายงานทั้งหมด {ประวัติแจ้ง.length} รายการ</p>
-              {ประวัติแจ้ง.map((r) => (
-                <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-50 flex items-center justify-center shrink-0">
-                        {r.image_url
-                          ? <img src={r.image_url} alt="สัตว์" className="w-full h-full object-cover" />
-                          : <AnimalIcon ชนิด={r.animal_type} size={24} className="text-orange-400" />
-                        }
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800 text-sm">{r.animal_type || 'ไม่ระบุ'}</p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={12} className="shrink-0" /> {r.location_text}</p>
-                        <p className="text-xs text-gray-400">{แปลงวันที่(r.created_at)} • #{String(r.id).padStart(6, '0')}</p>
-                      </div>
-                    </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${สีสถานะ[r.status] || 'text-gray-600 bg-gray-50'}`}>
-                      {r.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ======== Tab: ประวัติรับเลี้ยง (user) ======== */}
-      {แท็บ === 'adoptions' && (
-        <div className="text-center py-16 px-4">
-          <PawPrint size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-600">ยังไม่มีประวัติการรับเลี้ยง</p>
-          <p className="text-xs text-gray-400 mt-1">เมื่อคุณยื่นขอรับเลี้ยงสัตว์ จะปรากฏที่นี่</p>
-          <button onClick={() => navigate('/find-pet')}
-            className="mt-4 bg-green-500 text-white px-6 py-2 rounded-xl text-sm font-medium">
-            ค้นหาสัตว์เลี้ยง
-          </button>
         </div>
       )}
 
