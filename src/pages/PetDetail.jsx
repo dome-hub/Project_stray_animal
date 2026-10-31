@@ -11,6 +11,7 @@ import { supabase } from '../supabase'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
+import { สถานะสัตว์ออกไปแล้ว } from '../utils/animalStatus'
 
 // แปลงแถวจากตาราง animals เป็นรูปแบบที่หน้านี้ใช้ — ต้องตรงกับที่ FindPet ส่งมาทาง router state
 // เพราะหน้านี้รับข้อมูลได้ 2 ทาง: กดมาจากการ์ด (มี state) หรือเปิด URL ตรงๆ (ต้องดึงเอง)
@@ -112,15 +113,24 @@ function PetDetail() {
   const [กำลังโหลดสัตว์, setกำลังโหลดสัตว์] = useState(!state?.สัตว์)
   const [โหลดสัตว์พลาด, setโหลดสัตว์พลาด] = useState(false)
   const [ไม่พบสัตว์,    setไม่พบสัตว์]    = useState(false)
+  const [เหตุไม่แสดง,   setเหตุไม่แสดง]   = useState('')   // '' | 'ได้บ้านแล้ว' | 'ไม่เปิดรับเลี้ยง' (ใช้เลือกข้อความตอนไม่พบ)
 
   async function ดึงสัตว์() {
     if (!id) { setไม่พบสัตว์(true); setกำลังโหลดสัตว์(false); return }
     setกำลังโหลดสัตว์(true)
     setโหลดสัตว์พลาด(false)
     setไม่พบสัตว์(false)
+    setเหตุไม่แสดง('')
     const { data, error } = await supabase.from('animals').select('*').eq('id', id).maybeSingle()
     if (error)      setโหลดสัตว์พลาด(true)
     else if (!data) setไม่พบสัตว์(true)
+    // ตาราง animals ทุกคนที่ล็อกอินอ่านได้ทุกแถว (RLS) — เปิดผ่าน URL ตรงๆ จึงต้องเช็คเองว่าตัวนี้ยังประกาศหาบ้านอยู่
+    // ไม่งั้นสัตว์ที่ออกจากศูนย์ไปแล้ว หรือไม่ได้เปิดรับเลี้ยง จะโชว์ปุ่ม "ติดต่อขอรับเลี้ยง" ให้คนกดได้
+    else if (data.publish_mode !== 'adoption' || สถานะสัตว์ออกไปแล้ว.includes(data.status)) {
+      // บอกเหตุแค่ "ได้บ้านแล้ว" กับ "ไม่เปิดรับเลี้ยง" — ไม่โชว์สาเหตุอื่น (เช่น เสียชีวิต/หลุดหาย) ให้คนนอกเห็น
+      setเหตุไม่แสดง(data.status === 'มีผู้รับเลี้ยง' ? 'ได้บ้านแล้ว' : 'ไม่เปิดรับเลี้ยง')
+      setไม่พบสัตว์(true)
+    }
     else            setSัตว์(แปลงสัตว์จากDB(data))
     setกำลังโหลดสัตว์(false)
   }
@@ -171,8 +181,14 @@ function PetDetail() {
         ) : (
           <div className="text-center pt-24 px-6">
             <PawPrint size={48} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-semibold text-gray-700">ไม่พบข้อมูลสัตว์ตัวนี้แล้ว</p>
-            <p className="text-sm text-gray-500 mt-1">อาจถูกนำออกจากประกาศ หรือมีผู้รับเลี้ยงไปแล้ว</p>
+            <p className="font-semibold text-gray-700">
+              {เหตุไม่แสดง === 'ได้บ้านแล้ว' ? 'น้องได้บ้านใหม่แล้ว' : 'ไม่พบข้อมูลสัตว์ตัวนี้แล้ว'}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              {เหตุไม่แสดง === 'ได้บ้านแล้ว'
+                ? 'มีผู้รับเลี้ยงน้องตัวนี้ไปแล้ว ขอบคุณที่สนใจ ลองดูสัตว์ตัวอื่นที่กำลังรอบ้านได้เลย'
+                : 'น้องตัวนี้ไม่ได้อยู่ในประกาศหาบ้านแล้ว หรืออาจถูกนำออกจากประกาศ'}
+            </p>
             <button onClick={() => navigate('/find-pet')}
               className="mt-5 bg-green-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium">
               ดูสัตว์ตัวอื่น
