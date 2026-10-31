@@ -17,6 +17,7 @@ import BreedInput from '../components/BreedInput'
 import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
+import { แปลงเป็นDate } from '../utils/dateTime'
 
 // ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
 const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
@@ -63,7 +64,9 @@ function ระยะทางเมตร(lat1, lon1, lat2, lon2) {
 
 // "x นาทีที่แล้ว" สำหรับโชว์เวลาที่เคสเดิมถูกแจ้ง
 function เวลาผ่านมา(str) {
-  const นาที = Math.floor((Date.now() - new Date(str).getTime()) / 60000)
+  // แปลงเป็นเวลาจริงก่อน — created_at ไม่มี timezone (UTC) ถ้าอ่านเป็นเวลาท้องถิ่นจะติดลบ
+  // และขึ้น "เมื่อสักครู่" ไปอีก 7 ชั่วโมงหลังมีคนแจ้ง
+  const นาที = Math.floor((Date.now() - แปลงเป็นDate(str).getTime()) / 60000)
   if (นาที < 1)  return 'เมื่อสักครู่'
   if (นาที < 60) return `${นาที} นาทีที่แล้ว`
   const ชม = Math.floor(นาที / 60)

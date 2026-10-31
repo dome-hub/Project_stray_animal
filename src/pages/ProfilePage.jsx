@@ -13,6 +13,7 @@ import AnimalIcon from '../components/AnimalIcon'
 import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
+import { วันที่สั้นไทย } from '../utils/dateTime'
 
 // Role display config
 const roleMap = {
@@ -307,7 +308,7 @@ function ProfilePage({ user }) {
   // ---- แปลงวันที่ ----
   function แปลงวันที่(str) {
     if (!str) return '-'
-    return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+    return วันที่สั้นไทย(str)
   }
 
   return (
