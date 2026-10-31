@@ -11,9 +11,15 @@ export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10MB
 
+// ถ้าชื่อไฟล์มีนามสกุล ต้องเป็นนามสกุลรูปที่รองรับ — แต่ "ไม่มีนามสกุล" ไม่ถือว่าผิด
+// เพราะตัวเลือกรูปของ Android บางรุ่นส่งชื่อไฟล์มาโดยไม่มีนามสกุล ซึ่งเดิมโดนปฏิเสธทั้งที่เป็นรูปจริง
+// (ชนิดไฟล์กับลายเซ็นไฟล์ที่ตรวจต่อจากนี้เข้มกว่านามสกุลอยู่แล้ว และตอนอัปโหลดเราไม่ใช้ชื่อเดิมเลย
+// ดู utils/uploadFileName.js)
 function ตรวจนามสกุล(filename) {
-  const ext = filename?.split('.').pop()?.toLowerCase()
-  return !!ext && ALLOWED_IMAGE_EXTENSIONS.includes(ext)
+  const ส่วน = (filename || '').split('.')
+  if (ส่วน.length < 2) return true
+  const ext = ส่วน.pop().toLowerCase()
+  return ALLOWED_IMAGE_EXTENSIONS.includes(ext)
 }
 
 // อ่าน byte แรกๆ ของไฟล์จริง เทียบกับลายเซ็นมาตรฐานของแต่ละชนิดไฟล์ — กันไฟล์ปลอมนามสกุล/ปลอม MIME

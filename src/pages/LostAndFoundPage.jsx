@@ -19,6 +19,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import { ชื่อไฟล์อัปโหลด } from '../utils/uploadFileName'
 import { วันที่สั้นไทย, วันเวลาเต็มไทย } from '../utils/dateTime'
 import { เงื่อนไขตัดสัตว์ที่ออกไปแล้ว } from '../utils/animalStatus'
 import { อายุประกาศวัน, วันที่เหลือของประกาศ, ประกาศหมดอายุแล้ว } from '../utils/lostPetExpiry'
@@ -626,7 +627,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
     // อัปโหลดรูปก่อน (ถ้ามี) — ใช้ bucket เดียวกับรูปรายงาน
     let photo_url = null
     if (ไฟล์รูป) {
-      const ชื่อไฟล์ = `lost_${Date.now()}_${ไฟล์รูป.name.replace(/\s/g, '_')}`
+      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูป, 'lost_')
       const { data, error: upErr } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์รูป)
       if (upErr) { setError('อัปโหลดรูปไม่สำเร็จ: ' + upErr.message); setกำลังบันทึก(false); return }
       photo_url = supabase.storage.from('report-images').getPublicUrl(data.path).data.publicUrl
@@ -896,7 +897,7 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
     // ถ้าไม่ได้เลือกรูปใหม่ ให้คงรูปเดิมไว้
     let photo_url = โพสต์.photo_url || null
     if (ไฟล์รูป) {
-      const ชื่อไฟล์ = `lost_${Date.now()}_${ไฟล์รูป.name.replace(/\s/g, '_')}`
+      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูป, 'lost_')
       const { data, error: upErr } = await supabase.storage.from('report-images').upload(ชื่อไฟล์, ไฟล์รูป)
       if (upErr) { setError('อัปโหลดรูปไม่สำเร็จ: ' + upErr.message); setกำลังบันทึก(false); return }
       photo_url = supabase.storage.from('report-images').getPublicUrl(data.path).data.publicUrl
