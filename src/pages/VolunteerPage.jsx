@@ -421,10 +421,13 @@ function ProgressBar({ status }) {
 // ---- Helper: รูปสัตว์ ----
 function AnimalThumb({ imageUrl, type, size = 'md' }) {
   const dim = size === 'lg' ? 'w-full h-52' : 'w-16 h-16 shrink-0'
+  // รูปใหญ่วางตามสัดส่วนจริง (object-contain) เหมือนหน้าติดตามรายงานของผู้แจ้ง
+  // ถ้าใช้ object-cover กับกรอบกว้างแบบนี้ รูปแนวตั้งจะถูกซูมแล้วตัดจนดูยืด ส่วนรูปย่อสี่เหลี่ยมเล็กใช้ cover ได้
+  const fit = size === 'lg' ? 'object-contain' : 'object-cover'
   return (
     <div className={`${dim} rounded-xl overflow-hidden bg-teal-50 flex items-center justify-center`}>
       {imageUrl
-        ? <img src={imageUrl} alt="สัตว์" className="w-full h-full object-cover" />
+        ? <img src={imageUrl} alt="สัตว์" className={`w-full h-full ${fit}`} />
         : <AnimalIcon ชนิด={type} size={size === 'lg' ? 64 : 28} className="text-teal-300" />
       }
     </div>
