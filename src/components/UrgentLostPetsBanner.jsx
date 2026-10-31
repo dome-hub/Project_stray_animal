@@ -9,6 +9,7 @@ import { Siren, MapPin, Calendar, ChevronRight, ChevronUp, ChevronDown, Gift } f
 import { supabase } from '../supabase'
 import AnimalIcon from './AnimalIcon'
 import { วันที่สั้นไทย } from '../utils/dateTime'
+import { ประกาศหมดอายุแล้ว } from '../utils/lostPetExpiry'
 
 // จำสถานะพับ/กางไว้ ให้ค้างข้ามหน้าและข้ามการรีเฟรช จนกว่าผู้ใช้จะกดเปลี่ยนเอง
 const KEYพับแบนเนอร์ = 'urgent_banner_collapsed'
@@ -40,12 +41,13 @@ function วันที่สั้น(str) {
 async function โหลดสัตว์หายด่วน() {
   const { data, error } = await supabase
     .from('lost_pets')
-    .select('id, pet_name, species, breed, lost_location, lost_date, photo_url, reward_amount, created_at')
+    .select('*')
     .eq('status', 'กำลังตามหา')
     .order('created_at', { ascending: false })
-    .limit(10)
+    .limit(30)
   if (error) { console.error('ดึงสัตว์หายด่วนไม่สำเร็จ:', error.message); return [] }
-  return data || []
+  // ประกาศเกิน 30 วัน (ไม่ได้ต่ออายุ) ไม่โชว์บนหน้าแรก — ดึงเผื่อ 30 แล้วกรองก่อนตัดเหลือ 10
+  return (data || []).filter(function (p) { return !ประกาศหมดอายุแล้ว(p) }).slice(0, 10)
 }
 
 function UrgentLostPetsBanner() {
