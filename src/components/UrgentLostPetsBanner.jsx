@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { Siren, MapPin, Calendar, ChevronRight, ChevronUp, ChevronDown, Gift } from 'lucide-react'
 import { supabase } from '../supabase'
 import AnimalIcon from './AnimalIcon'
+import { วันที่สั้นไทย } from '../utils/dateTime'
 
 // จำสถานะพับ/กางไว้ ให้ค้างข้ามหน้าและข้ามการรีเฟรช จนกว่าผู้ใช้จะกดเปลี่ยนเอง
 const KEYพับแบนเนอร์ = 'urgent_banner_collapsed'
@@ -31,7 +32,7 @@ function จำสถานะพับ(พับอยู่) {
 // วันที่แบบสั้น มีปี พ.ศ. เช่น "21 ก.ค. 2569"
 function วันที่สั้น(str) {
   if (!str) return 'ไม่ระบุ'
-  return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+  return วันที่สั้นไทย(str)
 }
 
 // โหลดโพสต์ตามหาล่าสุด — แยกนอก component เพราะไม่ได้ใช้ state ใดๆ

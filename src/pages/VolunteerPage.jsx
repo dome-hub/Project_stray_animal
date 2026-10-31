@@ -29,6 +29,7 @@ import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 import { หมุดสี } from '../utils/mapMarker'
+import { ชั่วโมงที่ผ่านมา, วันเวลาสั้นไทย, วันที่สั้นไทย, ป้ายวันที่กลุ่มไทย } from '../utils/dateTime'
 
 // แก้ปัญหา Leaflet หาไอคอนหมุดไม่เจอตอน build ผ่าน Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -334,9 +335,10 @@ function ระยะทางเมตร(lat1, lon1, lat2, lon2) {
 // เคสที่ค้างมา 12 วันหน้าตาเหมือนเคสที่เพิ่งเข้าเมื่อเช้าทุกประการ
 const ชั่วโมงเกินกำหนด = 24
 
+// ใช้ ชั่วโมงที่ผ่านมา (dateTime.js) เพราะ created_at ไม่มี timezone เป็นเวลา UTC
+// เดิมอ่านเป็นเวลาท้องถิ่นแล้วเคสดูใหม่กว่าจริง 7 ชม. ป้าย "เกินกำหนด 24 ชม." จึงขึ้นช้าไป 7 ชม.
 function ชั่วโมงที่ค้าง(str) {
-  if (!str) return 0
-  return Math.floor((Date.now() - new Date(str).getTime()) / 3600000)
+  return ชั่วโมงที่ผ่านมา(str)
 }
 
 // นับเฉพาะเคสที่ "ยังไม่มีใครกดรับเรื่อง" — พอรับเรื่องแล้วถือว่ามีคนดูแลอยู่ นาฬิกาหยุดนับ
@@ -350,34 +352,17 @@ function ข้อความค้าง(ชั่วโมง) {
 }
 
 function แปลงวันที่เวลา(str) {
-  if (!str) return ''
-  const d = new Date(str)
-  return (
-    d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) +
-    ' ' +
-    d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) +
-    ' น.'
-  )
+  return วันเวลาสั้นไทย(str)
 }
 // วันที่รับเข้าศูนย์ (แบบสั้น มีปี พ.ศ.) เช่น "20 ก.ค. 2569" — ใช้บนการ์ดหน้าจัดการข้อมูลสัตว์
 function วันที่รับเข้า(str) {
   if (!str) return 'รอระบุ'
-  return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+  return วันที่สั้นไทย(str)
 }
 
-// ---- Helper: ป้ายกลุ่มวันที่ — วันนี้ / เมื่อวาน / วันที่จริง ----
-function เท่ากันวัน(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
+// ---- Helper: ป้ายกลุ่มวันที่ — วันนี้ / เมื่อวาน / วันที่จริง (ตามปฏิทินวันของไทย) ----
 function ป้ายวันที่กลุ่ม(str) {
-  const d        = new Date(str)
-  const วันนี้   = new Date()
-  const เมื่อวาน = new Date(วันนี้)
-  เมื่อวาน.setDate(วันนี้.getDate() - 1)
-  const วันที่ตัวเลข = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
-  if (เท่ากันวัน(d, วันนี้))   return `วันนี้ (${วันที่ตัวเลข})`
-  if (เท่ากันวัน(d, เมื่อวาน)) return `เมื่อวาน (${วันที่ตัวเลข})`
-  return วันที่ตัวเลข
+  return ป้ายวันที่กลุ่มไทย(str)
 }
 // จัดกลุ่มรายการที่เรียงจากใหม่ไปเก่าอยู่แล้ว (created_at desc) ให้เป็น section ตามวันที่ต่อเนื่อง
 function จัดกลุ่มตามวันที่(รายการ) {

@@ -19,6 +19,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
+import { วันที่สั้นไทย, วันเวลาเต็มไทย } from '../utils/dateTime'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
@@ -159,16 +160,12 @@ async function โหลดรายการ() {
 // ---- Helper: วันที่แบบสั้น มีปี พ.ศ. เช่น "20 ก.ค. 2569" ----
 function วันที่สั้น(str) {
   if (!str) return 'ไม่ระบุ'
-  return new Date(str).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+  return วันที่สั้นไทย(str)
 }
 
-// ---- Helper: วันที่ + เวลา เช่น "20 ก.ค. 2569 เวลา 08:30 น." ----
+// ---- Helper: วันที่ + เวลา เช่น "20 ก.ค. 2569 เวลา 08:30 น." (เวลาไทย ไม่ขึ้นกับ timezone เครื่อง) ----
 function วันเวลาไทย(str) {
-  if (!str) return null
-  const d = new Date(str)
-  const วัน  = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
-  const เวลา = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-  return `${วัน} เวลา ${เวลา} น.`
+  return วันเวลาเต็มไทย(str)
 }
 
 // จับพิกัดกึ่งกลางแผนที่ทุกครั้งที่เลื่อนเสร็จ (นอก component กันแผนที่ remount)

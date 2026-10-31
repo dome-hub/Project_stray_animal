@@ -24,6 +24,7 @@ import { useToast } from '../components/useToast'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
 import { ข้อความError } from '../utils/errorMessage'
+import { วันที่สั้นไทย, วันเวลาสั้นไทย } from '../utils/dateTime'
 
 // ใส่เครื่องหมาย ' นำหน้าค่าที่ขึ้นต้นด้วย = + - @ (และ tab/CR) ก่อนเขียนลง CSV
 // Excel ตีความช่องที่ขึ้นต้นด้วยอักขระพวกนี้เป็น "สูตร" ถึงจะครอบด้วย " แล้วก็ตาม
@@ -478,9 +479,7 @@ function AdminPage({ หน้า, user }) {
   // แปลงวันที่
   function แปลงวันที่(str) {
     if (!str) return '-'
-    return new Date(str).toLocaleDateString('th-TH', {
-      day: 'numeric', month: 'short', year: 'numeric'
-    })
+    return วันที่สั้นไทย(str)
   }
 
   // ---- แผนที่พื้นที่: กรองตามสถานะที่เลือก (ไม่เลือกเลย = ทั้งหมด) ----
@@ -1205,9 +1204,7 @@ function AdminPage({ หน้า, user }) {
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="text-sm font-medium text-gray-800 truncate">{ชนิด.ป้าย}</p>
                         <span className="text-xs text-gray-400 shrink-0">
-                          {new Date(l.created_at).toLocaleString('th-TH', {
-                            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                          })}
+                          {วันเวลาสั้นไทย(l.created_at)}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5 break-all">
