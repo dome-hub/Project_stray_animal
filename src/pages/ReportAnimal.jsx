@@ -18,6 +18,7 @@ import { useSheet } from '../components/useSheet'
 import { useToast } from '../components/useToast'
 import { ข้อความError } from '../utils/errorMessage'
 import { แปลงเป็นDate } from '../utils/dateTime'
+import { ช่วงซูมดิจิทัล, จำกัดซูม, ซูมจากการหยิก, ระยะห่าง, พื้นที่ครอปซูม, อ่านช่วงซูมฮาร์ดแวร์ } from '../utils/cameraZoom'
 
 // ศูนย์กลางตำบลกำแพงแสน — จุดเริ่มต้นแผนที่เมื่อขอ GPS ไม่สำเร็จ
 const ศูนย์กลางแผนที่เริ่มต้น = [14.0206, 99.9673]
@@ -186,6 +187,12 @@ function ReportAnimal({ user }) {
   const inputGallery = useRef(null)     // เลือกจากคลัง (file input ธรรมดา)
   const videoRef     = useRef(null)     // video element สำหรับ live camera
   const streamRef    = useRef(null)     // MediaStream ที่กำลังเปิดอยู่
+  const trackRef     = useRef(null)     // video track ของกล้อง — ใช้สั่งซูมจริงของเซนเซอร์
+  const ซูมRef       = useRef(1)        // ค่าซูมล่าสุด (ให้ท่าทางหยิกอ่านค่าสดได้ ไม่ติดค่าเก่าของ render)
+  // นิ้วที่แตะอยู่บนภาพกล้อง (pointerId → ตำแหน่ง) ใช้ object ธรรมดา ห้ามใช้ new Map() ในไฟล์นี้
+  // เพราะชื่อ Map ถูก import เป็นไอคอนจาก lucide-react บังตัวสร้าง Map ของ JavaScript อยู่ (หน้าจะว่างทั้งหน้า)
+  const จุดสัมผัสRef = useRef({})
+  const เริ่มหยิกRef  = useRef(null)     // { ระยะ, ซูม } ตอนเริ่มหยิก 2 นิ้ว
 
   const [รูปภาพPreview, setรูปภาพPreview] = useState(null)
   const [ไฟล์รูปภาพ,   setไฟล์รูปภาพ]   = useState(null)
@@ -216,6 +223,9 @@ function ReportAnimal({ user }) {
   const [แสดงกล้อง,   setแสดงกล้อง]   = useState(false)
   const [กล้องพร้อม,  setกล้องพร้อม]  = useState(false)
   const [errorกล้อง,  setErrorกล้อง]  = useState('')
+  const [ซูม,         setซูม]         = useState(1)
+  // ฮาร์ดแวร์ = true ใช้ซูมจริงของกล้อง / false ใช้ซูมดิจิทัล (ดู utils/cameraZoom.js)
+  const [ช่วงซูม,     setช่วงซูม]     = useState({ ...ช่วงซูมดิจิทัล, ฮาร์ดแวร์: false })
 
   // ---- ถามยืนยันตอนอัปโหลดรูปไม่สำเร็จ ----
   // เดิมใช้ confirm() ของเบราว์เซอร์ ซึ่งในบิลด์ Capacitor จะขึ้นเป็น system dialog
@@ -363,6 +373,16 @@ function ReportAnimal({ user }) {
         audio: false,
       })
       streamRef.current = stream
+
+      // เลือกวิธีซูม: ถ้ากล้องรองรับซูมจริงใช้อันนั้น ไม่งั้นใช้ซูมดิจิทัล
+      const track = stream.getVideoTracks()[0]
+      trackRef.current = track
+      const ซูมจริง = อ่านช่วงซูมฮาร์ดแวร์(track)
+      const ช่วง = ซูมจริง ? { ...ซูมจริง, ฮาร์ดแวร์: true } : { ...ช่วงซูมดิจิทัล, ฮาร์ดแวร์: false }
+      setช่วงซูม(ช่วง)
+      ซูมRef.current = ช่วง.min
+      setซูม(ช่วง.min)
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.onloadedmetadata = function () {
@@ -388,9 +408,47 @@ function ReportAnimal({ user }) {
       streamRef.current.getTracks().forEach(function (t) { t.stop() })
       streamRef.current = null
     }
+    trackRef.current = null
+    จุดสัมผัสRef.current = {}
+    เริ่มหยิกRef.current = null
+    ซูมRef.current = 1
+    setซูม(1)
     setแสดงกล้อง(false)
     setกล้องพร้อม(false)
     setErrorกล้อง('')
+  }
+
+  // ---- ซูมกล้อง ----
+  // ซูมจริง: สั่งที่เซนเซอร์ ภาพที่ถ่ายได้ซูมมาด้วยเลย
+  // ซูมดิจิทัล: แค่เก็บค่าไว้ ขยายภาพด้วย CSS ตอนแสดง และครอปตรงกลางตอนถ่าย (ดู ถ่ายรูป)
+  function ตั้งซูม(ค่า) {
+    const ใหม่ = จำกัดซูม(ค่า, ช่วงซูม.min, ช่วงซูม.max)
+    ซูมRef.current = ใหม่
+    setซูม(ใหม่)
+    if (ช่วงซูม.ฮาร์ดแวร์ && trackRef.current) {
+      trackRef.current.applyConstraints({ advanced: [{ zoom: ใหม่ }] }).catch(function () {})
+    }
+  }
+
+  // หยิก 2 นิ้วเพื่อซูม — จับที่กรอบภาพกล้องเท่านั้น ปุ่มถ่ายอยู่นอกกรอบนี้ จึงไม่ขยับตาม
+  function นิ้วแตะกล้อง(e) {
+    จุดสัมผัสRef.current[e.pointerId] = { x: e.clientX, y: e.clientY }
+    const นิ้ว = Object.values(จุดสัมผัสRef.current)
+    if (นิ้ว.length === 2) {
+      เริ่มหยิกRef.current = { ระยะ: ระยะห่าง(นิ้ว[0], นิ้ว[1]), ซูม: ซูมRef.current }
+    }
+  }
+  function นิ้วเลื่อนกล้อง(e) {
+    if (!(e.pointerId in จุดสัมผัสRef.current)) return
+    จุดสัมผัสRef.current[e.pointerId] = { x: e.clientX, y: e.clientY }
+    const นิ้ว = Object.values(จุดสัมผัสRef.current)
+    if (นิ้ว.length === 2 && เริ่มหยิกRef.current) {
+      ตั้งซูม(ซูมจากการหยิก(เริ่มหยิกRef.current.ซูม, เริ่มหยิกRef.current.ระยะ, ระยะห่าง(นิ้ว[0], นิ้ว[1]), ช่วงซูม.min, ช่วงซูม.max))
+    }
+  }
+  function นิ้วปล่อยกล้อง(e) {
+    delete จุดสัมผัสRef.current[e.pointerId]
+    if (Object.keys(จุดสัมผัสRef.current).length < 2) เริ่มหยิกRef.current = null
   }
 
   // ---- กดถ่ายรูป ----
@@ -398,9 +456,13 @@ function ReportAnimal({ user }) {
     const video = videoRef.current
     if (!video) return
     const canvas = document.createElement('canvas')
-    canvas.width  = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d').drawImage(video, 0, 0)
+    // ซูมจริง: เฟรมซูมมาแล้ว ใช้เต็มเฟรม / ซูมดิจิทัล: ครอปตรงกลางให้ตรงกับที่เห็นบนจอ
+    const ครอป = ช่วงซูม.ฮาร์ดแวร์
+      ? { sx: 0, sy: 0, sw: video.videoWidth, sh: video.videoHeight }
+      : พื้นที่ครอปซูม(video.videoWidth, video.videoHeight, ซูมRef.current)
+    canvas.width  = Math.round(ครอป.sw)
+    canvas.height = Math.round(ครอป.sh)
+    canvas.getContext('2d').drawImage(video, ครอป.sx, ครอป.sy, ครอป.sw, ครอป.sh, 0, 0, canvas.width, canvas.height)
     canvas.toBlob(function (blob) {
       // toBlob คืน null ได้ถ้าเฟรมยังว่าง (กล้องยังไม่พร้อมจริง) — ถ้าไม่กันไว้ new File([null]) จะพัง
       if (!blob) { toastError('ถ่ายรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); return }
@@ -729,8 +791,10 @@ function ReportAnimal({ user }) {
             <div className="w-16" />
           </div>
 
-          {/* Video / Error */}
-          <div className="flex-1 relative overflow-hidden bg-gray-900 flex items-center justify-center">
+          {/* Video / Error — touch-none กันเบราว์เซอร์ซูมทั้งหน้าตอนหยิก ให้ท่าทางนี้ใช้ซูมกล้องอย่างเดียว */}
+          <div className="flex-1 relative overflow-hidden bg-gray-900 flex items-center justify-center touch-none"
+               onPointerDown={นิ้วแตะกล้อง} onPointerMove={นิ้วเลื่อนกล้อง}
+               onPointerUp={นิ้วปล่อยกล้อง} onPointerCancel={นิ้วปล่อยกล้อง}>
             {errorกล้อง ? (
               <div className="text-center px-8">
                 <p className="text-white text-sm whitespace-pre-line leading-relaxed">{errorกล้อง}</p>
@@ -747,7 +811,18 @@ function ReportAnimal({ user }) {
                   playsInline
                   muted
                   className="w-full h-full object-cover"
+                  style={ช่วงซูม.ฮาร์ดแวร์ ? undefined : { transform: `scale(${ซูม})` }}
                 />
+                {/* แถบซูม — ลอยทับด้านล่างของภาพ (absolute) ไม่ดันเลย์เอาต์ ปุ่มถ่ายด้านล่างจึงอยู่ที่เดิมเสมอ */}
+                {กล้องพร้อม && ช่วงซูม.max > ช่วงซูม.min && (
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[min(80%,20rem)] flex items-center gap-3 bg-black/50 rounded-full px-4 py-2">
+                    <span className="text-white text-xs w-9 text-right tabular-nums">{ซูม.toFixed(1)}×</span>
+                    <input type="range" aria-label="ซูมกล้อง"
+                      min={ช่วงซูม.min} max={ช่วงซูม.max} step={ช่วงซูม.step} value={ซูม}
+                      onChange={(e) => ตั้งซูม(Number(e.target.value))}
+                      className="flex-1 accent-white" />
+                  </div>
+                )}
                 {!กล้องพร้อม && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                     <div className="text-center text-white">
