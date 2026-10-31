@@ -11,11 +11,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor/android": "^8.4.1",
+    "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",
-    "@capacitor/cli": "^8.4.1",
-    "@capacitor/core": "^8.4.1",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "@capacitor/push-notifications": "^8.1.2",
     "@supabase/supabase-js": "^2.106.2",
     "leaflet": "^1.9.4",
