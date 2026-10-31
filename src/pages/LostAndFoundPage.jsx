@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Megaphone, Search, MapPin, Calendar, Loader2, X, Camera,
   PawPrint, Home, HeartCrack, CheckCircle2, Phone, Building2, Info,
-  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban, LocateFixed, ArrowLeft
+  Eye, Hospital, ExternalLink, Gift, Pencil, Save, Trash2, Ban, LocateFixed, ArrowLeft, RefreshCw
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -21,6 +21,7 @@ import { supabase } from '../supabase'
 import { ตรวจสอบไฟล์รูปภาพ } from '../utils/fileValidation'
 import { วันที่สั้นไทย, วันเวลาเต็มไทย } from '../utils/dateTime'
 import { เงื่อนไขตัดสัตว์ที่ออกไปแล้ว } from '../utils/animalStatus'
+import { อายุประกาศวัน, วันที่เหลือของประกาศ, ประกาศหมดอายุแล้ว } from '../utils/lostPetExpiry'
 import AnimalIcon from '../components/AnimalIcon'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
@@ -45,6 +46,7 @@ const สถานะประกาศหาเจ้าของ = 'ประ�
 
 // สถานะของโพสต์ตามหาสัตว์ที่ผู้ใช้แจ้งเอง (อีกสถานะคือ 'เจอแล้ว' ซึ่งจะไม่ถูกดึงมาแสดง)
 const กำลังตามหา = 'กำลังตามหา'
+const เจอแล้ว = 'เจอแล้ว'
 
 // ดึงข้อมูลทั้ง 2 แท็บพร้อมกัน — แยกออกนอก component เพราะไม่ได้ใช้ state ใดๆ
 // คืนค่าเฉยๆ ไม่ setState เอง เพื่อให้ทั้ง effect ตอน mount และปุ่มรีเฟรชเรียกใช้ร่วมกันได้
@@ -786,7 +788,7 @@ function Modalแจ้งสัตว์หาย({ user, onClose, onSaved }) {
 // มีปุ่มแก้ไข/ลบ (เฉพาะเจ้าของ) สลับเนื้อหาโหมดดู ↔ โหมดแก้ไข ภายใน sheet เดียวกัน
 // ไม่ใช่การเปิด modal ซ้อน modal
 // ================================================================
-function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted }) {
+function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted, onFound }) {
   const inputรูป = useRef(null)
   const เป็นเจ้าของ = !!user?.id && โพสต์.owner_id === user.id
   const มีรางวัล = โพสต์.reward_amount > 0
@@ -816,6 +818,14 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
 
   const [แสดงยืนยันลบ, setแสดงยืนยันลบ] = useState(false)
   const [กำลังลบ,      setกำลังลบ]      = useState(false)
+
+  // ปิดประกาศ (เจอแล้ว) / ต่ออายุ — ข้อผิดพลาดแยกจาก error ของฟอร์มแก้ไข เพราะโชว์ในโหมดดู
+  const [ยืนยันเจอแล้ว,   setยืนยันเจอแล้ว]   = useState(false)
+  const [กำลังปิดประกาศ,  setกำลังปิดประกาศ]  = useState(false)
+  const [กำลังต่ออายุ,    setกำลังต่ออายุ]    = useState(false)
+  const [errorสถานะประกาศ, setErrorสถานะประกาศ] = useState('')
+  const วันเหลือ = วันที่เหลือของประกาศ(โพสต์)
+  const หมดอายุ  = วันเหลือ <= 0
 
   // ปุ่ม back ของ Android / Escape / โฟกัส — ดู components/useSheet.js
   // sheet ยืนยันลบซ้อนอยู่บน sheet รายละเอียด กองซ้อนจะปิดตัวบนสุดก่อนเสมอ
@@ -913,6 +923,30 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
 
     setโหมดแก้ไข(false)
     onSaved({ ...โพสต์, ...ข้อมูล })
+  }
+
+  // เจ้าของกด "เจอน้องแล้ว" — ปิดประกาศ (status = 'เจอแล้ว') ไม่ลบแถวทิ้ง จะได้ยังมีประวัติ
+  // คนอื่นไม่เห็นอีกเพราะทั้งหน้านี้และแบนเนอร์หน้าแรกดึงเฉพาะ 'กำลังตามหา'
+  async function ปิดประกาศเจอแล้ว() {
+    if (กำลังปิดประกาศ) return
+    setErrorสถานะประกาศ('')
+    setกำลังปิดประกาศ(true)
+    const { error: e } = await supabase.from('lost_pets').update({ status: เจอแล้ว }).eq('id', โพสต์.id)
+    setกำลังปิดประกาศ(false)
+    if (e) { setErrorสถานะประกาศ('ปิดประกาศไม่สำเร็จ: ' + e.message); return }
+    onFound(โพสต์.id)
+  }
+
+  // ต่ออายุ — เริ่มนับ 30 วันใหม่จากตอนนี้ (ต้องมีคอลัมน์ renewed_at จาก supabase-fix-lost-pets-expiry.sql)
+  async function ต่ออายุประกาศ() {
+    if (กำลังต่ออายุ) return
+    setErrorสถานะประกาศ('')
+    setกำลังต่ออายุ(true)
+    const เวลาตอนนี้ = new Date().toISOString()
+    const { error: e } = await supabase.from('lost_pets').update({ renewed_at: เวลาตอนนี้ }).eq('id', โพสต์.id)
+    setกำลังต่ออายุ(false)
+    if (e) { setErrorสถานะประกาศ('ต่ออายุไม่สำเร็จ: ' + e.message); return }
+    onSaved({ ...โพสต์, renewed_at: เวลาตอนนี้ }, 'ต่ออายุประกาศอีก ' + อายุประกาศวัน + ' วันแล้ว')
   }
 
   async function ลบโพสต์() {
@@ -1098,8 +1132,10 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
               {/* ชื่อ + สถานะ */}
               <div className="flex items-center justify-between gap-2">
                 <p className="font-bold text-gray-800 text-lg truncate min-w-0">{โพสต์.pet_name}</p>
-                <span className="text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap shrink-0 bg-rose-100 text-rose-700">
-                  สัตว์สูญหาย
+                <span className={`text-xs px-3 py-1.5 rounded-full font-semibold whitespace-nowrap shrink-0 ${
+                  หมดอายุ ? 'bg-gray-100 text-gray-600' : 'bg-rose-100 text-rose-700'
+                }`}>
+                  {หมดอายุ ? 'ประกาศหมดอายุ' : 'สัตว์สูญหาย'}
                 </span>
               </div>
 
@@ -1178,6 +1214,55 @@ function LostPetDetailModal({ โพสต์, user, onClose, onSaved, onDeleted
                 )}
               </div>
 
+              {/* จัดการอายุ/ปิดประกาศ — เฉพาะเจ้าของ */}
+              {เป็นเจ้าของ && (
+                <div className={`rounded-2xl border p-4 space-y-3 ${
+                  หมดอายุ ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-100'
+                }`}>
+                  <p className={`text-xs leading-relaxed ${หมดอายุ ? 'text-amber-800' : 'text-gray-500'}`}>
+                    {หมดอายุ
+                      ? 'ประกาศนี้หมดอายุแล้ว คนอื่นมองไม่เห็นแล้ว ถ้ายังตามหาอยู่ กด "ต่ออายุ" เพื่อแสดงอีก ' + อายุประกาศวัน + ' วัน'
+                      : 'ประกาศนี้แสดงต่อสาธารณะอีก ' + วันเหลือ + ' วัน หลังจากนั้นจะถูกซ่อนอัตโนมัติ ต่ออายุได้ทุกเมื่อ'}
+                  </p>
+
+                  {errorสถานะประกาศ && (
+                    <p className="text-red-500 text-xs bg-red-50 rounded-lg px-3 py-2">{errorสถานะประกาศ}</p>
+                  )}
+
+                  {ยืนยันเจอแล้ว ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-gray-800">เจอน้อง "{โพสต์.pet_name}" แล้วใช่ไหม?</p>
+                      <p className="text-xs text-gray-500">ประกาศจะถูกปิดและไม่แสดงให้คนอื่นเห็นอีก</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setยืนยันเจอแล้ว(false)} disabled={กำลังปิดประกาศ}
+                          className="flex-1 border-2 border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
+                          ยังไม่ใช่
+                        </button>
+                        <button onClick={ปิดประกาศเจอแล้ว} disabled={กำลังปิดประกาศ}
+                          className="flex-[2] bg-green-500 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                          {กำลังปิดประกาศ
+                            ? <><Loader2 size={15} className="animate-spin shrink-0" /> กำลังปิด...</>
+                            : <><CheckCircle2 size={16} className="shrink-0" /> ยืนยัน เจอแล้ว</>}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => setยืนยันเจอแล้ว(true)}
+                        className="flex-1 bg-green-500 text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-1.5">
+                        <CheckCircle2 size={16} className="shrink-0" /> เจอน้องแล้ว
+                      </button>
+                      <button onClick={ต่ออายุประกาศ} disabled={กำลังต่ออายุ}
+                        className="flex-1 border-2 border-rose-200 text-rose-600 rounded-xl py-2.5 text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5">
+                        {กำลังต่ออายุ
+                          ? <Loader2 size={15} className="animate-spin shrink-0" />
+                          : <RefreshCw size={15} className="shrink-0" />} ต่ออายุ
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ปุ่มติดต่อ — เฉพาะคนอื่นที่ไม่ใช่เจ้าของโพสต์ */}
               {!เป็นเจ้าของ && (
                 <a href={`tel:${โพสต์.contact_phone}`}
@@ -1255,7 +1340,7 @@ function LostAndFoundPage({ user }) {
       // อ่านจาก window โดยตรง ไม่ผูกเป็น dep ของ effect เพื่อไม่ให้เกิด lint warning ใหม่
       const openId = new URLSearchParams(window.location.search).get('open')
       if (openId) {
-        const เจอ = ผล.lost.find(function (p) { return String(p.id) === openId })
+        const เจอ = ผล.lost.find(function (p) { return String(p.id) === openId && !ประกาศหมดอายุแล้ว(p) })
         if (เจอ) { setแท็บ('lost'); setโพสต์ที่ดู(เจอ) }
         // ล้าง param กันเปิด modal ซ้ำตอน refresh
         window.history.replaceState(null, '', window.location.pathname)
@@ -1283,10 +1368,18 @@ function LostAndFoundPage({ user }) {
   }
 
   // แก้ไขในโหมด view/edit เดียวกัน — อัปเดตทั้ง list และ modal ที่เปิดอยู่ ไม่ต้อง refetch ใหม่ทั้งหมด
-  function โพสต์แก้ไขสำเร็จ(อัปเดตแล้ว) {
+  function โพสต์แก้ไขสำเร็จ(อัปเดตแล้ว, ข้อความ) {
     setโพสต์ตามหา(function (prev) { return prev.map((p) => (p.id === อัปเดตแล้ว.id ? อัปเดตแล้ว : p)) })
     setโพสต์ที่ดู(อัปเดตแล้ว)
-    setToast('บันทึกการแก้ไขเรียบร้อยแล้ว')
+    setToast(ข้อความ || 'บันทึกการแก้ไขเรียบร้อยแล้ว')
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  // เจ้าของกดเจอน้องแล้ว — เอาออกจากรายการ (ดึงมาใหม่ก็ไม่เจอเพราะ status ไม่ใช่ 'กำลังตามหา' แล้ว)
+  function โพสต์ปิดเพราะเจอแล้ว(id) {
+    setโพสต์ตามหา(function (prev) { return prev.filter((p) => p.id !== id) })
+    setโพสต์ที่ดู(null)
+    setToast('ปิดประกาศแล้ว ยินดีด้วยที่เจอน้องแล้ว')
     setTimeout(() => setToast(''), 3000)
   }
 
@@ -1297,7 +1390,11 @@ function LostAndFoundPage({ user }) {
     setTimeout(() => setToast(''), 3000)
   }
 
-  const รายการที่แสดง = แท็บ === 'found' ? สัตว์ที่ศูนย์พบ : โพสต์ตามหา
+  // ประกาศที่หมดอายุ (เกิน 30 วัน) ซ่อนจากคนอื่น เจ้าของยังเห็นของตัวเองเพื่อกดต่ออายุ/ปิดประกาศ
+  const โพสต์ตามหาที่เห็น = โพสต์ตามหา.filter(function (p) {
+    return !ประกาศหมดอายุแล้ว(p) || (!!user?.id && p.owner_id === user.id)
+  })
+  const รายการที่แสดง = แท็บ === 'found' ? สัตว์ที่ศูนย์พบ : โพสต์ตามหาที่เห็น
 
   return (
     <div className="min-h-screen bg-rose-50 pb-24">
@@ -1405,8 +1502,9 @@ function LostAndFoundPage({ user }) {
                   />
                 )
               })
-            : โพสต์ตามหา.map(function (p) {
+            : โพสต์ตามหาที่เห็น.map(function (p) {
                 const เป็นเจ้าของโพสต์ = !!user?.id && p.owner_id === user.id
+                const หมดอายุแล้ว = ประกาศหมดอายุแล้ว(p)
                 return (
                   <การ์ดประกาศ
                     key={p.id}
@@ -1415,9 +1513,9 @@ function LostAndFoundPage({ user }) {
                     ชื่อ={p.pet_name}
                     สถานที่={p.lost_location}
                     วันที่={p.lost_date || p.created_at}
-                    ป้าย={เป็นเจ้าของโพสต์ ? 'ประกาศของคุณ' : 'สัตว์สูญหาย'}
-                    สีป้าย={เป็นเจ้าของโพสต์ ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}
-                    PIcon={เป็นเจ้าของโพสต์ ? Pencil : Search}
+                    ป้าย={หมดอายุแล้ว ? 'หมดอายุ' : เป็นเจ้าของโพสต์ ? 'ประกาศของคุณ' : 'สัตว์สูญหาย'}
+                    สีป้าย={หมดอายุแล้ว ? 'bg-gray-500 text-white' : เป็นเจ้าของโพสต์ ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}
+                    PIcon={หมดอายุแล้ว ? Ban : เป็นเจ้าของโพสต์ ? Pencil : Search}
                     ข้อมูลรอง={[p.species, p.breed].filter(Boolean).join(' · ')}
                     รางวัล={p.reward_amount}
                     onClick={() => setโพสต์ที่ดู(p)}
@@ -1460,6 +1558,7 @@ function LostAndFoundPage({ user }) {
           onClose={() => setโพสต์ที่ดู(null)}
           onSaved={โพสต์แก้ไขสำเร็จ}
           onDeleted={โพสต์ลบสำเร็จ}
+          onFound={โพสต์ปิดเพราะเจอแล้ว}
         />
       )}
     </div>
