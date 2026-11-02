@@ -77,6 +77,8 @@ class Query {
   in(c, arr) { this.filters.push((r) => arr.some((x) => เท่ากัน(r[c], x))); return this }
   gte(c, v) { this.filters.push((r) => r[c] >= v); return this }
   lte(c, v) { this.filters.push((r) => r[c] <= v); return this }
+  gt(c, v)  { this.filters.push((r) => r[c] > v); return this }
+  lt(c, v)  { this.filters.push((r) => r[c] < v); return this }
   not(c, op, v) {
     if (op === 'in')      this.filters.push((r) => !แยกรายการ(v).includes(r[c]))
     else if (op === 'is') this.filters.push((r) => (v === null ? r[c] != null : r[c] !== v))

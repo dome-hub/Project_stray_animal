@@ -62,6 +62,16 @@ export function ชั่วโมงที่ผ่านมา(str) {
   return Math.floor((Date.now() - แปลงเป็นDate(str).getTime()) / 3600000)
 }
 
+// แปลงวันที่ตามปฏิทินไทย (YYYY-MM-DD จาก <input type="date">) เป็นขอบเขตเวลา UTC ของวันนั้น
+// ไว้กรอง created_at ช่วงวันที่เลือก — กรุงเทพฯ offset คงที่ +7 ไม่มี daylight saving
+// จึงต่อ "+07:00" เข้ากับสตริงแล้วให้ Date คำนวณ UTC ที่ตรงกันให้เองได้เลย
+export function เริ่มวันไทย(dateStr) {
+  return new Date(`${dateStr}T00:00:00+07:00`).toISOString()
+}
+export function สิ้นวันไทย(dateStr) {
+  return new Date(`${dateStr}T23:59:59.999+07:00`).toISOString()
+}
+
 // ป้ายหัวกลุ่มวันที่ — "วันนี้ (31 ต.ค.)" / "เมื่อวาน (30 ต.ค.)" / "29 ต.ค." ตามปฏิทินวันของไทย
 export function ป้ายวันที่กลุ่มไทย(str) {
   const d = แปลงเป็นDate(str)

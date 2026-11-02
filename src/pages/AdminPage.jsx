@@ -24,7 +24,7 @@ import { useToast } from '../components/useToast'
 import LoadFailed from '../components/LoadFailed'
 import { useSheet } from '../components/useSheet'
 import { ข้อความError } from '../utils/errorMessage'
-import { วันที่สั้นไทย, วันเวลาสั้นไทย } from '../utils/dateTime'
+import { วันที่สั้นไทย, วันเวลาสั้นไทย, วันนี้ไทย, เริ่มวันไทย, สิ้นวันไทย } from '../utils/dateTime'
 
 // ใส่เครื่องหมาย ' นำหน้าค่าที่ขึ้นต้นด้วย = + - @ (และ tab/CR) ก่อนเขียนลง CSV
 // Excel ตีความช่องที่ขึ้นต้นด้วยอักขระพวกนี้เป็น "สูตร" ถึงจะครอบด้วย " แล้วก็ตาม
@@ -164,6 +164,10 @@ function AdminPage({ หน้า, user }) {
   // ---- State: Export ----
   const [จำนวนExport, setจำนวนExport] = useState({ รายงาน: 0, สัตว์: 0, ผู้ใช้: 0 })
   const [โหลดExport, setโหลดExport] = useState(true)
+  // ช่วงวันที่ (ตามปฏิทินไทย) ที่จะ export — ว่าง = ทั้งหมด ไม่จำกัดช่วง (ค่าเริ่มต้นเดิม)
+  // กันตารางโตแล้วลาก export ดึงทั้งตารางทุกครั้งโดยไม่มีเพดานเลย
+  const [เริ่มExport,   setเริ่มExport]   = useState('')
+  const [สิ้นสุดExport, setสิ้นสุดExport] = useState('')
 
   // ---- State: บันทึกการใช้งาน (audit log) ----
   const [รายการLog, setรายการLog]     = useState([])
@@ -426,15 +430,23 @@ function AdminPage({ หน้า, user }) {
     setโหลดแผนที่(false)
   }
 
+  // ใส่ช่วงวันที่ (ถ้าเลือกไว้) ลงใน query builder เดียวกัน — ว่าง = ไม่กรอง ได้ทั้งตารางเหมือนเดิม
+  function กรองช่วงวันที่(q) {
+    if (เริ่มExport)   q = q.gte('created_at', เริ่มวันไทย(เริ่มExport))
+    if (สิ้นสุดExport) q = q.lte('created_at', สิ้นวันไทย(สิ้นสุดExport))
+    return q
+  }
+
   // ---- ดึงจำนวนสำหรับ Export ----
+  // ผูกกับช่วงวันที่ด้วย — ตัวเลขที่โชว์ต้องตรงกับที่จะ export จริงเสมอ ไม่งั้นแอดมินสับสนว่าทำไมไฟล์ที่ได้น้อยกว่าเลขที่เห็น
   useEffect(function () {
     if (หน้า !== 'export') return
     async function ดึงExport() {
       setโหลดExport(true)
       const [ร1, ร2, ร3] = await Promise.all([
-        supabase.from('reports').select('id', { count: 'exact', head: true }),
-        supabase.from('animals').select('id', { count: 'exact', head: true }),
-        supabase.from('users').select('id', { count: 'exact', head: true }),
+        กรองช่วงวันที่(supabase.from('reports').select('id', { count: 'exact', head: true })),
+        กรองช่วงวันที่(supabase.from('animals').select('id', { count: 'exact', head: true })),
+        กรองช่วงวันที่(supabase.from('users').select('id', { count: 'exact', head: true })),
       ])
       // นับไม่ได้ ≠ ไม่มีข้อมูล — เดิมโชว์ "0 รายการ" ทำให้แอดมินไม่กด export เพราะคิดว่าไม่มีอะไรให้โหลด
       // ใช้ null แล้วให้ฝั่ง render โชว์ "—" แทน (ปุ่ม export ยังกดได้ เพราะมันยิง query ของตัวเองใหม่อยู่แล้ว)
@@ -448,14 +460,13 @@ function AdminPage({ หน้า, user }) {
       setโหลดExport(false)
     }
     ดึงExport()
-  }, [หน้า])
+  }, [หน้า, เริ่มExport, สิ้นสุดExport])
 
-  // Export ข้อมูลเป็น CSV จริง
+  // Export ข้อมูลเป็น CSV จริง — กรองตามช่วงวันที่ที่เลือกไว้ (ถ้ามี) เหมือนตัวเลขที่โชว์
   async function exportCSV(ตาราง, ชื่อไฟล์) {
-    const { data, error } = await supabase
-      .from(ตาราง)
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data, error } = await กรองช่วงวันที่(
+      supabase.from(ตาราง).select('*').order('created_at', { ascending: false })
+    )
 
     if (error) { toastError(ข้อความError(error, 'ดึงข้อมูลเพื่อส่งออก')); return }
     // ไม่มีข้อมูลไม่ใช่ความผิดพลาด — เป็นข้อเท็จจริงที่ต้องบอก จึงใช้ toast กลางไม่ใช่สีแดง
@@ -471,7 +482,9 @@ function AdminPage({ หน้า, user }) {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `${ชื่อไฟล์}_${new Date().toLocaleDateString('th-TH')}.csv`
+    // มีช่วงวันที่ → ต่อช่วงเข้าชื่อไฟล์ให้รู้ว่าไฟล์นี้คือข้อมูลช่วงไหน แยกจากไฟล์ "ทั้งหมด" ได้
+    const ช่วง = (เริ่มExport || สิ้นสุดExport) ? `_${เริ่มExport || 'เริ่มต้น'}_ถึง_${สิ้นสุดExport || 'ล่าสุด'}` : ''
+    a.download = `${ชื่อไฟล์}${ช่วง}_${new Date().toLocaleDateString('th-TH')}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -1064,6 +1077,39 @@ function AdminPage({ หน้า, user }) {
       {หน้า === 'export' && (
         <div className="px-4 pt-4 space-y-4">
           <p className="text-sm text-gray-500">ดึงข้อมูลจริงจาก Supabase แล้ว Export เป็น CSV</p>
+
+          {/* ช่วงวันที่ — เว้นว่างทั้งคู่ = export ทั้งหมดเหมือนเดิม กรองจาก created_at ของแต่ละตาราง */}
+          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+            <p className="text-sm font-bold text-gray-800">ช่วงวันที่ (ไม่เลือก = ทั้งหมด)</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                aria-label="วันที่เริ่มต้น"
+                value={เริ่มExport}
+                max={สิ้นสุดExport || วันนี้ไทย()}
+                onChange={(e) => setเริ่มExport(e.target.value)}
+                className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400"
+              />
+              <span className="text-gray-400 text-sm shrink-0">ถึง</span>
+              <input
+                type="date"
+                aria-label="วันที่สิ้นสุด"
+                value={สิ้นสุดExport}
+                min={เริ่มExport}
+                max={วันนี้ไทย()}
+                onChange={(e) => setสิ้นสุดExport(e.target.value)}
+                className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-purple-400"
+              />
+            </div>
+            {(เริ่มExport || สิ้นสุดExport) && (
+              <button
+                onClick={() => { setเริ่มExport(''); setสิ้นสุดExport('') }}
+                className="text-xs font-medium text-purple-600 underline"
+              >
+                ล้างช่วงวันที่ (export ทั้งหมด)
+              </button>
+            )}
+          </div>
 
           {โหลดExport ? (
             <div className="text-center py-10">
