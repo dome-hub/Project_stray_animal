@@ -718,10 +718,11 @@ function ReportAnimal({ user }) {
 
   // ---- ส่งรายงาน: เช็คเบอร์ก่อน → ถ้าไม่มีให้กรอก → ไม่งั้นเช็คเคสซ้ำแล้วส่ง ----
   async function ส่งรายงาน() {
-    if (!ตำแหน่ง || !เหตุผลแจ้ง) return
+    if (!เหตุผลแจ้ง) return
     if (กำลังตรวจRef.current) return
     // ยังไม่มีพิกัดจริง (ไม่เคยกด GPS/ปักหมุดบนแผนที่) → โชว์ error + สั่นเตือน แล้วหยุดไม่ส่ง
-    if (!latitude || !longitude) {
+    // เช็ค !ตำแหน่ง ด้วย เพราะช่องสถานที่พบถูกล็อกไว้จนกว่าจะมีพิกัด จึงว่างคู่กับ latitude/longitude เสมอ
+    if (!latitude || !longitude || !ตำแหน่ง) {
       setErrorไม่มีGPS(true)
       setสั่นครั้งที่(function (n) { return n + 1 })
       return
@@ -1226,8 +1227,9 @@ function ReportAnimal({ user }) {
           </p>
           <div className="relative">
             <input type="text" value={ตำแหน่ง} onChange={(e) => setตำแหน่ง(e.target.value)}
-              placeholder="เช่น หน้าวัดกำแพงแสน หรือ ถนนสาย 1"
-              className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-white focus:outline-none focus:border-orange-400" />
+              disabled={!(latitude && longitude)}
+              placeholder={latitude && longitude ? 'เช่น หน้าวัดกำแพงแสน หรือ ถนนสาย 1' : 'แตะปุ่ม 📍 หรือเปิดแผนที่เพื่อระบุตำแหน่งก่อน'}
+              className="w-full border border-gray-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-white focus:outline-none focus:border-orange-400 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
             <button
               onClick={ใช้GPSปัจจุบัน}
               disabled={กำลังหาตำแหน่ง}
@@ -1240,7 +1242,9 @@ function ReportAnimal({ user }) {
                 : <LocateFixed size={16} />}
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1.5">แตะไอคอนเป้าเล็งเพื่อดึงตำแหน่งปัจจุบัน</p>
+          <p className="text-xs text-gray-400 mt-1.5">
+            {latitude && longitude ? 'แตะไอคอนเป้าเล็งเพื่อดึงตำแหน่งปัจจุบันใหม่ หรือแก้คำอธิบายได้' : 'แตะไอคอนเป้าเล็งเพื่อดึงตำแหน่งปัจจุบัน'}
+          </p>
 
           {/* เปิดแผนที่แบบเลื่อนหมุดเอง (แบบแอปเรียกรถ) */}
           <button
@@ -1283,7 +1287,7 @@ function ReportAnimal({ user }) {
         </div>
 
         {/* ส่ง */}
-        <button onClick={ส่งรายงาน} disabled={!ตำแหน่ง || !เหตุผลแจ้ง || กำลังส่ง || กำลังตรวจก่อนส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
+        <button onClick={ส่งรายงาน} disabled={!เหตุผลแจ้ง || กำลังส่ง || กำลังตรวจก่อนส่ง || กำลังวิเคราะห์ || ต้องกรอกเบอร์}
           className="w-full bg-orange-500 text-white rounded-xl py-3.5 font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {กำลังส่ง ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin shrink-0" /> กำลังอัปโหลดและบันทึก...</span>
             : กำลังตรวจก่อนส่ง ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin shrink-0" /> กำลังตรวจสอบ...</span>
