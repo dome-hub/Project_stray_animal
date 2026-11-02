@@ -124,94 +124,92 @@ function NotificationPage({ user }) {
     } catch { return new Set() }
   })
 
-  useEffect(function () {
-    if (!user?.id) return
-    setโหลด(true)
-
-    // ---- role: user → ดึงจาก notifications table ----
-    if (role === 'user') {
-      supabase
+  // ---- role: user → ดึงจาก notifications table ----
+  async function ดึงUser(เงียบ) {
+    if (!เงียบ) setโหลด(true)
+    try {
+      const { data } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(30)
-        .then(async function ({ data }) {
-          const items = (data || []).map(function (n) {
-            // หา ref id ของรายงานจากข้อความ (เช่น "#000025") เพื่อ deep-link + ดึงรูปสัตว์
-            const m = String((n.title || '') + ' ' + (n.body || '')).match(/#(\d+)/)
-            const refId = m ? parseInt(m[1], 10) : null
-            return {
-              id:       n.id,
-              Icon:     n.type === 'report_update' ? HardHat : Bell,
-              หัวข้อ:   n.title || '',
-              ข้อความ:  n.body || n.title || '',
-              เวลา:     เวลาการ์ด(n.created_at),
-              created:  n.created_at,
-              อ่านแล้ว: n.is_read,
-              dbId:     n.id,
-              refId:    refId,
-              image_url: null,
-              path:     refId ? `/track?open=${refId}` : '/track',
-            }
-          })
-          // ดึงรูปสัตว์ของแต่ละเคสมาแสดงเป็นไอคอน
-          const ids = [...new Set(items.map(function (i) { return i.refId }).filter(Boolean))]
-          if (ids.length > 0) {
-            const { data: reps } = await supabase.from('reports').select('id, image_url').in('id', ids)
-            const รูปตามId = {}
-            ;(reps || []).forEach(function (r) { รูปตามId[r.id] = r.image_url })
-            items.forEach(function (i) { if (i.refId) i.image_url = รูปตามId[i.refId] || null })
-          }
-          setรายการ(items)
-          setโหลด(false)
-        })
-        .catch(function () { setโหลด(false) })
-      return
+      const items = (data || []).map(function (n) {
+        // หา ref id ของรายงานจากข้อความ (เช่น "#000025") เพื่อ deep-link + ดึงรูปสัตว์
+        const m = String((n.title || '') + ' ' + (n.body || '')).match(/#(\d+)/)
+        const refId = m ? parseInt(m[1], 10) : null
+        return {
+          id:       n.id,
+          Icon:     n.type === 'report_update' ? HardHat : Bell,
+          หัวข้อ:   n.title || '',
+          ข้อความ:  n.body || n.title || '',
+          เวลา:     เวลาการ์ด(n.created_at),
+          created:  n.created_at,
+          อ่านแล้ว: n.is_read,
+          dbId:     n.id,
+          refId:    refId,
+          image_url: null,
+          path:     refId ? `/track?open=${refId}` : '/track',
+        }
+      })
+      // ดึงรูปสัตว์ของแต่ละเคสมาแสดงเป็นไอคอน
+      const ids = [...new Set(items.map(function (i) { return i.refId }).filter(Boolean))]
+      if (ids.length > 0) {
+        const { data: reps } = await supabase.from('reports').select('id, image_url').in('id', ids)
+        const รูปตามId = {}
+        ;(reps || []).forEach(function (r) { รูปตามId[r.id] = r.image_url })
+        items.forEach(function (i) { if (i.refId) i.image_url = รูปตามId[i.refId] || null })
+      }
+      setรายการ(items)
+    } finally {
+      setโหลด(false)
     }
+  }
 
-    // ---- role: volunteer → ดึงรายงานล่าสุดจาก reports table ----
-    if (role === 'volunteer') {
-      supabase
+  // ---- role: volunteer → ดึงรายงานล่าสุดจาก reports table ----
+  async function ดึงVolunteer(เงียบ) {
+    if (!เงียบ) setโหลด(true)
+    try {
+      const { data } = await supabase
         .from('reports')
         .select('id, animal_type, location_text, status, created_at, image_url')
         .order('created_at', { ascending: false })
         .limit(30)
-        .then(function ({ data }) {
-          // อ่าน ID ที่เคยลบจาก localStorage
-          const delKey = `noti_deleted_${user?.id || 'anon'}`
-          let deletedSet = new Set()
-          try {
-            const raw = localStorage.getItem(delKey)
-            if (raw) deletedSet = new Set(JSON.parse(raw))
-          } catch {}
+      // อ่าน ID ที่เคยลบจาก localStorage
+      const delKey = `noti_deleted_${user?.id || 'anon'}`
+      let deletedSet = new Set()
+      try {
+        const raw = localStorage.getItem(delKey)
+        if (raw) deletedSet = new Set(JSON.parse(raw))
+      } catch {}
 
-          const items = (data || [])
-            .filter(function (r) { return !deletedSet.has(r.id) })
-            .map(function (r) {
-              const isNew = r.status === 'รอดำเนินการ'
-              return {
-                id:       r.id,
-                Icon:     ไอคอนสถานะ(r.status),
-                หัวข้อ:   isNew ? 'รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
-                ข้อความ:  `${r.animal_type || 'สัตว์จร'} · ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-                เวลา:     เวลาการ์ด(r.created_at),
-                created:  r.created_at,
-                isNew,
-                image_url: r.image_url || null,
-                path:     '/volunteer/reports',
-              }
-            })
-          setรายการ(items)
-          setโหลด(false)
+      const items = (data || [])
+        .filter(function (r) { return !deletedSet.has(r.id) })
+        .map(function (r) {
+          const isNew = r.status === 'รอดำเนินการ'
+          return {
+            id:       r.id,
+            Icon:     ไอคอนสถานะ(r.status),
+            หัวข้อ:   isNew ? 'รายงานใหม่รอดำเนินการ' : `สถานะ: ${r.status}`,
+            ข้อความ:  `${r.animal_type || 'สัตว์จร'} · ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+            เวลา:     เวลาการ์ด(r.created_at),
+            created:  r.created_at,
+            isNew,
+            image_url: r.image_url || null,
+            path:     '/volunteer/reports',
+          }
         })
-        .catch(function () { setโหลด(false) })
-      return
+      setรายการ(items)
+    } finally {
+      setโหลด(false)
     }
+  }
 
-    // ---- role: admin → ดึงรายงาน + ผู้ใช้ใหม่ ----
-    if (role === 'admin') {
-      Promise.all([
+  // ---- role: admin → ดึงรายงาน + ผู้ใช้ใหม่ ----
+  async function ดึงAdmin(เงียบ) {
+    if (!เงียบ) setโหลด(true)
+    try {
+      const [ร1, ร2] = await Promise.all([
         supabase
           .from('reports')
           .select('id, animal_type, location_text, status, created_at, image_url')
@@ -222,54 +220,112 @@ function NotificationPage({ user }) {
           .select('id, name, created_at, avatar_url')
           .order('created_at', { ascending: false })
           .limit(10),
-      ]).then(function ([ร1, ร2]) {
-        // อ่าน ID ที่เคยลบจาก localStorage
-        const delKey = `noti_deleted_${user?.id || 'anon'}`
-        let deletedSet = new Set()
-        try {
-          const raw = localStorage.getItem(delKey)
-          if (raw) deletedSet = new Set(JSON.parse(raw))
-        } catch {}
+      ])
+      // อ่าน ID ที่เคยลบจาก localStorage
+      const delKey = `noti_deleted_${user?.id || 'anon'}`
+      let deletedSet = new Set()
+      try {
+        const raw = localStorage.getItem(delKey)
+        if (raw) deletedSet = new Set(JSON.parse(raw))
+      } catch {}
 
-        const reportItems = (ร1.data || [])
-          .filter(function (r) { return !deletedSet.has('r' + r.id) })
-          .map(function (r) {
-            return {
-              id:      'r' + r.id,
-              Icon:    ไอคอนสถานะ(r.status),
-              หัวข้อ:  r.status === 'รอดำเนินการ' ? 'รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
-              ข้อความ: `${r.animal_type || 'สัตว์จร'} · ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
-              เวลา:    เวลาการ์ด(r.created_at),
-              created: r.created_at,
-              isNew:   r.status === 'รอดำเนินการ',
-              image_url: r.image_url || null,
-              path:    '/admin/dashboard',
-            }
-          })
-        const userItems = (ร2.data || [])
-          .filter(function (u) { return !deletedSet.has('u' + u.id) })
-          .map(function (u) {
-            return {
-              id:      'u' + u.id,
-              Icon:    User,
-              หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
-              ข้อความ: u.name || 'ผู้ใช้ใหม่',
-              เวลา:    เวลาการ์ด(u.created_at),
-              created: u.created_at,
-              isNew:   false,
-              image_url: u.avatar_url || null,
-              path:    '/admin/users',
-            }
-          })
-        // รวม 2 แหล่งแล้วปล่อยให้ จัดกลุ่มแจ้งเตือน เรียงตาม created ทีเดียวตอนแสดงผล
-        // (เดิมมี .sort ที่ return 0 เสมอ = ไม่ได้เรียงอะไรเลย ทั้งที่คอมเมนต์บอกว่าเรียงแล้ว)
-        setรายการ([...reportItems, ...userItems])
-        setโหลด(false)
-      }).catch(function () { setโหลด(false) })
-      return
+      const reportItems = (ร1.data || [])
+        .filter(function (r) { return !deletedSet.has('r' + r.id) })
+        .map(function (r) {
+          return {
+            id:      'r' + r.id,
+            Icon:    ไอคอนสถานะ(r.status),
+            หัวข้อ:  r.status === 'รอดำเนินการ' ? 'รายงานรอดำเนินการ' : `รายงาน: ${r.status}`,
+            ข้อความ: `${r.animal_type || 'สัตว์จร'} · ${r.location_text || 'ไม่ระบุ'} · #${String(r.id).padStart(6, '0')}`,
+            เวลา:    เวลาการ์ด(r.created_at),
+            created: r.created_at,
+            isNew:   r.status === 'รอดำเนินการ',
+            image_url: r.image_url || null,
+            path:    '/admin/dashboard',
+          }
+        })
+      const userItems = (ร2.data || [])
+        .filter(function (u) { return !deletedSet.has('u' + u.id) })
+        .map(function (u) {
+          return {
+            id:      'u' + u.id,
+            Icon:    User,
+            หัวข้อ:  'ผู้ใช้ใหม่ลงทะเบียน',
+            ข้อความ: u.name || 'ผู้ใช้ใหม่',
+            เวลา:    เวลาการ์ด(u.created_at),
+            created: u.created_at,
+            isNew:   false,
+            image_url: u.avatar_url || null,
+            path:    '/admin/users',
+          }
+        })
+      // รวม 2 แหล่งแล้วปล่อยให้ จัดกลุ่มแจ้งเตือน เรียงตาม created ทีเดียวตอนแสดงผล
+      // (เดิมมี .sort ที่ return 0 เสมอ = ไม่ได้เรียงอะไรเลย ทั้งที่คอมเมนต์บอกว่าเรียงแล้ว)
+      setรายการ([...reportItems, ...userItems])
+    } finally {
+      setโหลด(false)
+    }
+  }
+
+  useEffect(function () {
+    if (!user?.id) { setโหลด(false); return }
+    if (role === 'user')      { ดึงUser(false);      return }
+    if (role === 'volunteer') { ดึงVolunteer(false);  return }
+    if (role === 'admin')     { ดึงAdmin(false);      return }
+    setโหลด(false)
+  }, [role, user?.id])
+
+  // ---- อัปเดตรายการแบบเรียลไทม์ ----
+  // เดิมหน้านี้ดึงข้อมูลแค่ครั้งเดียวตอนเปิดหน้า เจ้าหน้าที่/แอดมินต้องกดออกแล้วเข้าใหม่
+  // ถึงจะเห็นรายงานใหม่หรือเคสที่เปลี่ยนสถานะ ไม่ realtime เหมือนหน้า Track ของผู้ใช้ทั่วไป
+  // ใช้วิธี "รีเฟรชเงียบ" (ดึงใหม่ทั้งชุดแบบไม่โชว์สปินเนอร์) เหมือน Home.jsx/TrackReport.jsx
+  // ง่ายกว่าและชัวร์กว่าการ merge payload เอง เพราะต้องกรอง deletedSet + จัดกลุ่ม/เรียงใหม่อยู่ดี
+  useEffect(function () {
+    if (!user?.id) return
+    let เลิกแล้ว = false
+
+    function รีเฟรชเงียบ() {
+      if (เลิกแล้ว) return
+      if (role === 'user') ดึงUser(true)
+      else if (role === 'admin') ดึงAdmin(true)
+      else if (role === 'volunteer') ดึงVolunteer(true)
     }
 
-    setโหลด(false)
+    if (role !== 'user' && role !== 'volunteer' && role !== 'admin') return
+
+    // ชื่อ channel ใช้อักษรอังกฤษ เพราะถูกส่งเป็น topic ของ WebSocket
+    const ช่อง = supabase.channel(`noti-list-${role}-${user.id}`)
+
+    if (role === 'user') {
+      ช่อง.on('postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        รีเฟรชเงียบ)
+    } else {
+      // volunteer/admin เห็นทุกเคส ไม่กรอง filter ด้วย reporter_id
+      ช่อง.on('postgres_changes',
+        { event: '*', schema: 'public', table: 'reports' },
+        รีเฟรชเงียบ)
+      if (role === 'admin') {
+        ช่อง.on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'users' },
+          รีเฟรชเงียบ)
+      }
+    }
+
+    ช่อง.subscribe(function (สถานะการเชื่อมต่อ) {
+      // ต่อสำเร็จ (รวมถึงต่อใหม่หลังหลุด) → ดึงล่าสุดทันที กันพลาดสิ่งที่เปลี่ยนไปช่วงที่ยังไม่ได้ต่อ
+      if (สถานะการเชื่อมต่อ === 'SUBSCRIBED') รีเฟรชเงียบ()
+    })
+
+    // กันกรณีที่ realtime หลุดตอนแอปอยู่เบื้องหลัง (มือถือตัดการเชื่อมต่อเพื่อประหยัดแบต)
+    function เมื่อกลับมาดู() { if (document.visibilityState === 'visible') รีเฟรชเงียบ() }
+    document.addEventListener('visibilitychange', เมื่อกลับมาดู)
+
+    return function () {
+      เลิกแล้ว = true
+      document.removeEventListener('visibilitychange', เมื่อกลับมาดู)
+      supabase.removeChannel(ช่อง)
+    }
   }, [role, user?.id])
 
   // สำหรับ volunteer/admin ใช้ local state ติดตามการอ่าน

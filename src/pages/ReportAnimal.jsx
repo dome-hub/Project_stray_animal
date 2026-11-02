@@ -214,6 +214,10 @@ function ReportAnimal({ user }) {
   // ref กันซ้ำทันที (ไม่ต้องรอ render) / state ไว้ปิดปุ่มและโชว์ว่ากำลังตรวจสอบ
   const กำลังตรวจRef = useRef(false)
   const [กำลังตรวจก่อนส่ง, setกำลังตรวจก่อนส่ง] = useState(false)
+  // doSubmit เองก็ต้องกันซ้ำแยกต่างหาก เพราะปุ่ม "คนละตัว" ใน modal เคสซ้ำเรียก doSubmit()
+  // ตรงๆ โดยไม่ผ่าน ส่งรายงาน() (ที่มี กำลังตรวจRef คุมอยู่) — ถ้าพึ่ง state กำลังส่ง อย่างเดียว
+  // แตะรัวๆ ก่อน re-render จะเริ่ม doSubmit ซ้อนกันได้เหมือนเดิม
+  const กำลังส่งRef = useRef(false)
   const [ส่งสำเร็จ,    setส่งสำเร็จ]    = useState(false)
   const [รหัสรายงาน,  setรหัสรายงาน]  = useState(null)
   // หน้าสำเร็จใช้ร่วมกัน 2 กรณี — สร้างใบใหม่ กับ แนบเข้าเคสที่คนอื่นแจ้งไว้แล้ว
@@ -537,72 +541,80 @@ function ReportAnimal({ user }) {
   }
 
   // ---- ส่งรายงานจริง (ถูกเรียกหลังผ่านเช็คเบอร์แล้ว) ----
+  // กันซ้ำด้วย ref ตรงนี้เอง ไม่พึ่ง กำลังตรวจRef ของ ส่งรายงาน() อย่างเดียว เพราะปุ่ม
+  // "คนละตัว" ใน modal เคสซ้ำ (ยืนยันเคสใหม่) เรียก doSubmit() ตรงๆ ไม่ผ่าน ส่งรายงาน()
   async function doSubmit() {
-    setกำลังส่ง(true)
-    let imageUrl = null
-    if (ไฟล์รูปภาพ) {
-      const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูปภาพ)
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
-      if (uploadError) {
-        // อัปโหลดรูปไม่สำเร็จ — ต้องแจ้งผู้ใช้ทันที ไม่งั้นรายงานจะถูกส่งแบบไม่มีรูปโดยไม่มีใครรู้ตัว
-        setกำลังส่ง(false)
-        const ส่งต่อไม่มีรูป = await ถามยืนยันส่งไม่มีรูป(ข้อความError(uploadError, 'อัปโหลดรูป'))
-        if (!ส่งต่อไม่มีรูป) return
-        setกำลังส่ง(true)
-      } else {
-        const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
-        imageUrl = urlData.publicUrl
-      }
-    }
-
-    const { data, error } = await supabase.from('reports').insert({
-      animal_type:   สายพันธุ์สุดท้าย.trim() || 'ไม่ระบุ',
-      location_text: ตำแหน่ง,
-      detail:        รายละเอียด,
-      urgency:       เหตุผลแจ้ง?.urgency || 'ปานกลาง',
-      status:        'รอดำเนินการ',
-      image_url:     imageUrl,
-      reporter_id:   user?.id,
-      latitude:      latitude,
-      longitude:     longitude,
-    }).select().single()
-
-    setกำลังส่ง(false)
-    if (error) {
-      toastError(ข้อความError(error, 'ส่งรายงาน'))
-    } else {
-      if (user?.id) {
-        await supabase.from('notifications').insert({
-          user_id: user.id,
-          title:   '📋 ส่งรายงานสำเร็จ',
-          body:    `รายงาน #${String(data.id).padStart(6, '0')} ได้รับแล้ว เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง`,
-          type:    'report_update',
-          is_read: false,
-        })
-
-        // แจ้งเตือนเจ้าหน้าที่ว่ามีเคสใหม่เข้ามา
-        // ต้องผ่าน RPC เพราะ policy notifications_insert ยอมให้ผู้ใช้ทั่วไป insert ได้
-        // เฉพาะแถวที่ user_id เป็นตัวเอง — insert หา user_id ของเจ้าหน้าที่ตรงๆ จะโดน RLS ปฏิเสธ
-        // (ดู supabase-notify-staff-new-report.sql)
-        //
-        // ถ้าพลาดให้ log เงียบๆ ห้าม toastError เด็ดขาด เพราะรายงานถูกบันทึกสำเร็จไปแล้ว
-        // ถ้าเด้ง error ตรงนี้ผู้แจ้งจะเข้าใจผิดว่าส่งรายงานไม่สำเร็จแล้วกดส่งซ้ำ
-        //
-        // ⚠️ ชื่อฟังก์ชันต้องไม่เกิน 21 ตัวอักษรไทย
-        // PostgreSQL จำกัดชื่อ identifier ไว้ที่ 63 ไบต์ และตัวอักษรไทยกินตัวละ 3 ไบต์
-        // ชื่อเดิม 'แจ้งเตือนเจ้าหน้าที่เคสใหม่' ยาว 27 ตัว = 81 ไบต์ เกินขีดจำกัด
-        // Postgres จะตัดทิ้งเงียบๆ เหลือ 'แจ้งเตือนเจ้าหน้าที่เ' (21 ตัว)
-        // แต่ PostgREST เทียบชื่อจาก URL แบบเต็ม จึงหาไม่เจอและคืน 404 (PGRST202)
-        // ผลคือเจ้าหน้าที่ไม่เคยได้รับแจ้งเตือนเลย โดยไม่มี error ให้ผู้ใช้เห็น
-        const { error: แจ้งเจ้าหน้าที่พลาด } = await supabase
-          .rpc('แจ้งเตือนเคสใหม่', { id_รายงาน: data.id })
-        if (แจ้งเจ้าหน้าที่พลาด) {
-          console.error('แจ้งเตือนเจ้าหน้าที่ไม่สำเร็จ:', แจ้งเจ้าหน้าที่พลาด.message, แจ้งเจ้าหน้าที่พลาด.code)
+    if (กำลังส่งRef.current) return
+    กำลังส่งRef.current = true
+    try {
+      setกำลังส่ง(true)
+      let imageUrl = null
+      if (ไฟล์รูปภาพ) {
+        const ชื่อไฟล์ = ชื่อไฟล์อัปโหลด(ไฟล์รูปภาพ)
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('report-images').upload(ชื่อไฟล์, ไฟล์รูปภาพ)
+        if (uploadError) {
+          // อัปโหลดรูปไม่สำเร็จ — ต้องแจ้งผู้ใช้ทันที ไม่งั้นรายงานจะถูกส่งแบบไม่มีรูปโดยไม่มีใครรู้ตัว
+          setกำลังส่ง(false)
+          const ส่งต่อไม่มีรูป = await ถามยืนยันส่งไม่มีรูป(ข้อความError(uploadError, 'อัปโหลดรูป'))
+          if (!ส่งต่อไม่มีรูป) return
+          setกำลังส่ง(true)
+        } else {
+          const { data: urlData } = supabase.storage.from('report-images').getPublicUrl(uploadData.path)
+          imageUrl = urlData.publicUrl
         }
       }
-      setรหัสรายงาน(data.id)
-      setส่งสำเร็จ(true)
+
+      const { data, error } = await supabase.from('reports').insert({
+        animal_type:   สายพันธุ์สุดท้าย.trim() || 'ไม่ระบุ',
+        location_text: ตำแหน่ง,
+        detail:        รายละเอียด,
+        urgency:       เหตุผลแจ้ง?.urgency || 'ปานกลาง',
+        status:        'รอดำเนินการ',
+        image_url:     imageUrl,
+        reporter_id:   user?.id,
+        latitude:      latitude,
+        longitude:     longitude,
+      }).select().single()
+
+      setกำลังส่ง(false)
+      if (error) {
+        toastError(ข้อความError(error, 'ส่งรายงาน'))
+      } else {
+        if (user?.id) {
+          await supabase.from('notifications').insert({
+            user_id: user.id,
+            title:   '📋 ส่งรายงานสำเร็จ',
+            body:    `รายงาน #${String(data.id).padStart(6, '0')} ได้รับแล้ว เจ้าหน้าที่จะดำเนินการภายใน 24 ชั่วโมง`,
+            type:    'report_update',
+            is_read: false,
+          })
+
+          // แจ้งเตือนเจ้าหน้าที่ว่ามีเคสใหม่เข้ามา
+          // ต้องผ่าน RPC เพราะ policy notifications_insert ยอมให้ผู้ใช้ทั่วไป insert ได้
+          // เฉพาะแถวที่ user_id เป็นตัวเอง — insert หา user_id ของเจ้าหน้าที่ตรงๆ จะโดน RLS ปฏิเสธ
+          // (ดู supabase-notify-staff-new-report.sql)
+          //
+          // ถ้าพลาดให้ log เงียบๆ ห้าม toastError เด็ดขาด เพราะรายงานถูกบันทึกสำเร็จไปแล้ว
+          // ถ้าเด้ง error ตรงนี้ผู้แจ้งจะเข้าใจผิดว่าส่งรายงานไม่สำเร็จแล้วกดส่งซ้ำ
+          //
+          // ⚠️ ชื่อฟังก์ชันต้องไม่เกิน 21 ตัวอักษรไทย
+          // PostgreSQL จำกัดชื่อ identifier ไว้ที่ 63 ไบต์ และตัวอักษรไทยกินตัวละ 3 ไบต์
+          // ชื่อเดิม 'แจ้งเตือนเจ้าหน้าที่เคสใหม่' ยาว 27 ตัว = 81 ไบต์ เกินขีดจำกัด
+          // Postgres จะตัดทิ้งเงียบๆ เหลือ 'แจ้งเตือนเจ้าหน้าที่เ' (21 ตัว)
+          // แต่ PostgREST เทียบชื่อจาก URL แบบเต็ม จึงหาไม่เจอและคืน 404 (PGRST202)
+          // ผลคือเจ้าหน้าที่ไม่เคยได้รับแจ้งเตือนเลย โดยไม่มี error ให้ผู้ใช้เห็น
+          const { error: แจ้งเจ้าหน้าที่พลาด } = await supabase
+            .rpc('แจ้งเตือนเคสใหม่', { id_รายงาน: data.id })
+          if (แจ้งเจ้าหน้าที่พลาด) {
+            console.error('แจ้งเตือนเจ้าหน้าที่ไม่สำเร็จ:', แจ้งเจ้าหน้าที่พลาด.message, แจ้งเจ้าหน้าที่พลาด.code)
+          }
+        }
+        setรหัสรายงาน(data.id)
+        setส่งสำเร็จ(true)
+      }
+    } finally {
+      กำลังส่งRef.current = false
     }
   }
 
