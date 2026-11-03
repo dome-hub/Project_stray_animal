@@ -384,7 +384,14 @@ function NotificationPage({ user }) {
         }
       }
     } else {
-      const allIds = รายการ.map(function (n) { return n.id })
+      // กระดิ่งหน้าแรก (Home.jsx) นับจากเคส "รอดำเนินการ" ทั้งหมดในระบบ ไม่ใช่แค่ 30 รายการ
+      // ล่าสุดที่หน้านี้โชว์ — ต้อง query สดเพิ่มเติม ไม่งั้นเคสเก่าที่หลุดนอก 30 รายการ
+      // จะยังไม่ถูกทำเครื่องหมายว่าอ่านแล้ว ทำให้กระดิ่งค้างเลขไม่เป็น 0 แม้กด "อ่านทั้งหมด" แล้ว
+      const { data: เคสค้าง } = await supabase
+        .from('reports').select('id').eq('status', 'รอดำเนินการ')
+      const idเคสค้าง = (เคสค้าง || []).map(function (r) { return role === 'admin' ? 'r' + r.id : r.id })
+      const idที่แสดง = รายการ.map(function (n) { return n.id })
+      const allIds = [...new Set([...idเคสค้าง, ...idที่แสดง])]
       const next = new Set(allIds)
       try { localStorage.setItem(lsKey, JSON.stringify(allIds)) } catch {}
       setอ่านแล้วLocal(next)
